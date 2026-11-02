@@ -36,6 +36,7 @@
 static int g_on;
 
 void regional_install(void){
+    return; /* NA-only: European car files unavailable */
     /* only on the data of the exe this port is made for */
     if (MR32(LOCKED_NA) != T_CORSA || MR32(LOCKED_NA + 4u) != T_PEUGOT106
         || MR8(AI_CARS_NA + AI_CARS_NA_N - 2u) != 5u || MR8(AI_CARS_NA + AI_CARS_NA_N - 1u) != 18u
