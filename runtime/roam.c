@@ -139,8 +139,13 @@ static int roaming(void){
     return rd32(G_FLOW) == 6u && ok(race, 0xc00) && MR32(race) == 4u && MR32(race + 0x24u) == 1u &&
            !rd32(G_CAREER_RACE);
 }
-/* free roam now (runtime/web/input_web.c: the touch controls' free-roam buttons) */
-int roam_exploring(void){ return roaming(); }
+/* free roam now (runtime/web/status_web.c "drive": the touch controls' free-roam buttons, else a race's with
+ * the gear buttons in a drag): on free roam's own track (4000; the race parameters' track, [0x89E7A0]), as
+ * roam_game.c's roaming() has it.  The crib's Performance Tuning test runs are one racer and no career race
+ * too, but a race on a track of their own (a circuit 4705, 0x4FEF80; a drag 4709 with the drag byte set,
+ * 0x4FEFF0): read as free roam, a drag test run on a phone had no gear buttons (a player's report). */
+#define G_TRACK         0x0089e7a0u
+int roam_exploring(void){ return roaming() && rd32(G_TRACK) % 1000u == 0; }
 /* One line per car of the world list (World +0 head; the list node is the
  * car's first two dwords). */
 static void log_cars(const char *why){
@@ -590,11 +595,17 @@ void sub_005f46a0(CPU *c){
     sub_005f46a0_orig(c);
 }
 /* A touching pair of collision bodies (0x5B2610, thiscall, from the
- * collision step 0x5FFA50 only): a hit between the player's car and a
- * friend's car is shared between the two (roam_game.c, roam_game_contact) */
+ * collision step 0x5FFA50 only): with Ghost mode Everything the game's own
+ * cars pass through the player's car and friends' cars (roam_game.c,
+ * roam_game_ghost_pair: not resolved); a hit between the player's car and a
+ * friend's car is shared between the two (roam_game_contact) */
 void sub_005b2610_orig(CPU *c);
+int roam_game_ghost_pair(uint32_t contact);
 void roam_game_contact(CPU *c, void (*orig)(CPU *));
-void sub_005b2610(CPU *c){ roam_game_contact(c, sub_005b2610_orig); }
+void sub_005b2610(CPU *c){
+    if (roam_game_ghost_pair(c->ecx)){ POP32(c->eip); return; }    /* thiscall, ret */
+    roam_game_contact(c, sub_005b2610_orig);
+}
 /* The race's end, for the random encounters (0x42EFB0): new goals for the AI
  * range's cars that are out, through their brains; friends' cars have none
  * to give up and are left out (roam_game.c, roam_game_goals) */

@@ -213,9 +213,36 @@ fn the_wire_a_sessions_hello_to_the_hub_says_the_links_it_wants() {
         l.both_ends();
         assert_eq!(l.of(0).len(), want, "{arg:?}");
         match decode_roam(&h) {
-            Some(RoamMsg::Hello { core, crews, .. }) => assert_eq!((core, crews.len()), (10, 2), "its crews still read"),
+            Some(RoamMsg::Hello { core, crews, .. }) => assert_eq!((core, crews.len()), (11, 2), "its crews still read"),
             other => panic!("not its HELLO: {other:?}"),
         }
+    }
+}
+
+// the wire: a session in an outrun (rc_set_duel) names its other player after the links it wants; in a crowd of 60
+// nearer to it than that player (2 km off), the hub links the two first once that one names it back, and not before
+#[test]
+fn the_wire_a_sessions_hello_to_the_hub_names_its_outruns_other_player() {
+    let Some(run) = hubwire("roam_hubwire_duel.wasm") else { return };
+    let h = unhex(&run(&["hellocrew", "40", "a1"]));
+    let none = unhex(&run(&["hellocrew", "40"]));
+    assert_eq!(h.len(), none.len() + 4, "four bytes more: {}", hex(&h));
+    assert_eq!(&h[h.len() - 8..h.len() - 4], &0xA1u32.to_le_bytes(), "the id last, before the CRC: {}", hex(&h));
+    assert_eq!(h[h.len() - 9], 40, "after the links it wants");
+    for back in [0, 0x1234ABCD] {
+        let mut k = Kit::new(RoamOptions { view_m: 1e-9, ..RoamOptions::default() });
+        k.from(V(0), &h);
+        k.from(V(0), &snap(0x1234ABCD, [0.25, 0.25, 0.0]));
+        for i in 1..=60u32 {
+            k.from(V(i), &hello_with(100 + i, &HelloOpts { core: 10, links: 48, ..Default::default() }));
+            k.from(V(i), &snap(100 + i, [((i - 1) % 8) as f64 * 3.0 - 9.25, ((i - 1) / 8) as f64 * 3.0 - 9.25, 0.0]));
+        }
+        k.from(V(61), &hello_with(0xA1, &HelloOpts { core: 11, links: 40, duel: back, ..Default::default() }));
+        k.from(V(61), &snap(0xA1, [2000.25, 0.25, 0.0]));
+        k.hub.tick();
+        let l = Lists(k.lists());
+        l.both_ends();
+        assert_eq!((l.has(0, 61), l.of(0).len()), (back != 0, 40), "named back: {back:#x}");
     }
 }
 
@@ -789,6 +816,50 @@ fn six_hundred_players_the_grid_links_as_every_pair_does() {
         assert!((g_links - a_links).abs() <= a_links * 0.01, "as many links");
         assert!(g_mean <= a_mean * 1.03, "as near");
     }
+}
+
+// 1500 players in a room of 2 km, driving (view points), a few not driving, 16, 32 or 48 links each, some coming and
+// going: with their walks read on 4 threads, the hub sends what it sends with them read on its own thread, byte for
+// byte, tick after tick (`RoamOptions::link_threads`)
+#[test]
+fn walks_read_on_threads_link_as_on_the_hubs_own() {
+    let run = |threads: usize| {
+        let mut k = Kit::new(RoamOptions { link_threads: threads, ..RoamOptions::default() });
+        let mut seed: u32 = 4242;
+        let mut rnd = || {
+            seed = seed.wrapping_mul(1103515245).wrapping_add(12345);
+            seed as f64 / 4294967296.0
+        };
+        let n = 1500u32;
+        let vip = |i: u32| 0x0A4D_0100 + i;
+        let mut pos: Vec<[f64; 3]> = (0..n).map(|_| [rnd() * 2000.0 - 1000.0, rnd() * 2000.0 - 1000.0, rnd() * 10.0]).collect();
+        let vel: Vec<[f64; 3]> = (0..n).map(|_| [rnd() * 60.0 - 30.0, rnd() * 60.0 - 30.0, 0.0]).collect();
+        let mut sent = Vec::new();
+        for tick in 0..6u32 {
+            k.clear();
+            for i in 0..n {
+                // players 7 mod 13 go at the fourth tick
+                if i % 13 == 7 && tick >= 3 {
+                    continue;
+                }
+                let (p, v) = (&mut pos[i as usize], vel[i as usize]);
+                p[0] += v[0] * 0.5;
+                p[1] += v[1] * 0.5;
+                let status = if i % 11 == 4 { 3 } else { 2 };
+                let links = [16u8, 32, 48][(i % 3) as usize];
+                k.from(vip(i), &hello_with(1000 + i, &HelloOpts { core: 10, status, links, ..Default::default() }));
+                k.from(vip(i), &snap_moving(1000 + i, *p, v, v[1].atan2(v[0]), status));
+            }
+            k.hub.tick();
+            sent.push(k.sent.lock().clone());
+            k.step(500.0);
+        }
+        (sent, k.info("links"))
+    };
+    let (one, links) = run(1);
+    // (pairs: about 32 a player, two players a pair)
+    assert!(links > 1500.0 * 10.0, "a crowd's links ({links})");
+    assert!(one == run(4).0, "the same lists, byte for byte");
 }
 
 // ---- the hub on its thread (the idle hub, frames posted and its lists: tests/roam_thread.rs) ----

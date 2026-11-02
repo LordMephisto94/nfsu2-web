@@ -42,7 +42,11 @@ const SCEN = [
   ['kb_profile', 'kb_profile', [], null, 'int2-fin-kb/kb_profile', 300],
   // a first profile's name field starting with Your name (overrides.c sub_004ff3b0)
   ['kb_profile_prefill', 'kb_profile_prefill', ['NFSU2_NEW_PROFILE_NAME=Alex_the_Great'], null, null, 300],
+  // in Chinese the box starts empty, not with the pack's NAME (font bytes the field never takes)
+  ['kb_profile_zh', 'kb_profile_zh', ['NFSU2_LANGUAGE=chinese'], null, null, 300],
   ['kb_no_pad_controls', 'kb_no_pad_controls', [], null, null, 300],
+  // an x typed into the game's text entry (a name, a chat line) is no drift-mode key (drift.c x_is_typing)
+  ['kb_typing_x', 'kb_typing_x', [], null, null, 400],
   ['kb_pad_capture_escape', 'kb_pad_capture_escape', [], null, 'kbdrev-07-kb_pad_capture_escape', 300],
   ['kb_rebind_save', 'kb_rebind_save', [], 'kb', 'int2-fin-kb/kb_rebind_save', 400],
   ['kb_rebind_load', 'kb_rebind_load', [], 'kb', 'int2-fin-kb/kb_rebind_load', 300],
@@ -60,6 +64,8 @@ const SCEN = [
   ['pad_hotplug', 'pad_hotplug', ['NFSU2_PAD=hotplug'], null, 'pad-rvf-hotplug', 300],
   ['pad_hotplug_controls', 'pad_hotplug_controls', ['NFSU2_PAD=hotplug'], null, null, 600],
   ['pad_hotplug_race', 'pad_hotplug_race', ['NFSU2_PAD=hotplug'], null, null, 300],
+  // the pad's bindings back after an unplug (dinput_pad.c keep_bindings)
+  ['pad_hotplug_bindings', 'pad_hotplug_bindings', ['NFSU2_PAD=hotplug'], null, null, 300],
   // a steering wheel: the game's driving device, its layout and steering; a wheel taking over from a pad and back
   ['pad_wheel_race', 'pad_wheel_race', [], null, null, 300],
   ['pad_wheel_switch', 'pad_wheel_switch', [], null, null, 300],

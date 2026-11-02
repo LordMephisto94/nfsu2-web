@@ -24,7 +24,7 @@ and it says something only when it is worth it:
 
 - **when a fix goes live**, in a thread whose problem one of the release's commits fixes: that a fix may have solved
   it, what the fix changes (one plain sentence, no internals), to reload the page, and to post a new log if it still
-  happens. Only when a full look at the thread is sure; at most once a thread, at most 3 threads a release (short,
+  happens. Only when a full look at the thread is sure; at most once a thread, at most 15 threads a release (short,
   low-effort looks), threads of the last 14 days, also threads staff wrote in (one the bot never looked at is matched
   by its title and first post). A report about the thread turns ✅ Fixed.
 
@@ -107,7 +107,8 @@ still goes out; new logs still reach the report).
 Every model call goes on a meter (`spend.mjs`, `state/spend.json`): looks, sorting, tags, translations, release checks,
 against `BOT_BUDGET` dollars a month (200, UTC months). Only the looks wait for money: each day they may spend what is
 left of the month over the days left in it, so a quiet day leaves more for the rest and a busy week can't spend the
-month. A look past today's share waits for the next day and runs then; staff's mentions still get theirs at once. The
+month. A look past today's share waits for the next day and runs then; staff's mentions and a release's notices
+(fix live, suggestion added) still get theirs at once. The
 bot's first log line says what the month and the day spent so far.
 
 ## How it works
@@ -117,13 +118,16 @@ bot's first log line says what the month and the day spent so far.
   visual tokens big (`picture()` in `investigate.mjs`, with sharp), the size Claude read pictures at before Opus 4.7:
   a phone screenshot costs 1,456 tokens instead of 3,354, a 4K one 1,560 instead of 4,784.
 - `investigate.mjs`: one look. It sends Claude the rules (`system.md`), the maintainer's notes (`knowledge.md`),
-  `docs/web/PLAYING.md`, the live version, recent commits, recent threads and the problems the developer has a report
-  on (each report's first thread, where it stands; what it points posters to and joins duplicates to), and the
-  thread with the files it can read named at its top. The rules, the notes, the guide and the code's history (the
-  same for every look until the next commit or release) are kept an hour in the prompt cache, so a look reads them
-  for a tenth of the price instead of sending them again. Claude reads what it needs through the
-  tools, then returns a verdict as JSON: none, ask or answer, and whether to tell the developer. `vet()` drops weak
-  answers and replies that paste code.
+  `docs/web/PLAYING.md` as of the live version, the live version, recent commits, recent threads and the problems the
+  developer has a report on (each report's first thread, where it stands; what it points posters to and joins
+  duplicates to), and the thread with the files it can read named at its top. The rules, the notes, the guide and the
+  code's history up to the live version (the same for every look until the next release, or a change to the rules or
+  the notes) are kept an hour in the prompt cache, so a look reads them for a tenth of the price instead of sending
+  them again; the newest commits, which change more often, go with the thread. Claude reads what it needs through the
+  tools, several calls a turn, at most 8 turns, then returns a verdict as JSON: none, ask or answer, and whether to
+  tell the developer. `vet()` drops weak answers and replies that paste code. A new post in a suggestion forum first
+  gets a quick pass with Haiku and no tools (`firstPass()`): when it finds nothing for the bot to say, its summary,
+  category and tags stand and there is no full look; anything else gets the full look, which writes the reply.
 - `tools.mjs`: what Claude can do. It can search and read the code, read the thread's attachments, look at the git
   history (`LIVE` is the live server's commit), search the forums' threads (to point a duplicate to the earlier one)
   and the archive of recent messages (the staff channel's marked private: the model may use them, never repeat them).

@@ -58,7 +58,8 @@
  *     axis LX|LY|RX|RY V       stick position, -1..1 (+X right, +Y down)
  *     trigger LT|RT V          trigger position, 0..1
  *     tappaduntil BUTTON NAME [every] [tmo]  like tapuntil, with a pad button
- *     poke ADDR VAL            write dword VAL to ADDR (debug only)
+ *     poke ADDR VAL [byte]     write dword (or byte) VAL to ADDR (debug only); ADDR
+ *                              may be an expression as trace's ([0x8900ac]+0x20)
  *     wzero [now]              world-time origin for absolute Nwms lines: the
  *                              start of the current race (GameFlow 6) when
  *                              racing, else (or with "now") the current time
@@ -392,7 +393,8 @@ static void load_script(const char *path){
             else e.addr = (uint32_t)strtoul(a1, 0, 0);
             e.n = a2[0] ? atol(a2) : 1; if (e.n < 1 || e.n > 64) e.n = 1; }
         else if (!strcasecmp(cmd, "poke")){ e.cmd = C_POKE; e.addr = (uint32_t)strtoul(a1, 0, 0);
-            e.val = (uint32_t)strtoul(a2, 0, 0); }
+            if (strchr(a1, '[')) e.xtext = strdup(a1);
+            e.val = (uint32_t)strtoul(a2, 0, 0); e.n = !strcasecmp(a3, "byte"); }
         else if (!strcasecmp(cmd, "loop")){ e.cmd = C_LOOP; e.n = atol(a1); }
         else if (!strcasecmp(cmd, "endloop")) e.cmd = C_ENDLOOP;
         else if (!strcasecmp(cmd, "status")){ e.cmd = C_STATUS; snprintf(e.text, sizeof e.text, "%s", a1); }
@@ -902,10 +904,14 @@ static int fire(CPU *c, Ev *e, double tms){
             fprintf(stderr, "[autotest] f=%ld peek [0x%08x] = 0x%08x (%u, %g)\n", g_frame, a, v, v, (double)fv);
         }
         break;
-    case C_POKE:
-        if (mem_is_committed(e->addr + 3)){ MR32(e->addr) = e->val;
-            fprintf(stderr, "[autotest] f=%ld poke [0x%08x] <- 0x%08x\n", g_frame, e->addr, e->val); }
-        break;
+    case C_POKE: {
+        const char *x = e->xtext; int ok = 1;
+        uint32_t a = x ? tr_eval(&x, &ok) : e->addr;
+        if (!ok || !mem_is_committed(a + (e->n ? 0u : 3u))){
+            fprintf(stderr, "[autotest] f=%ld poke %s: unmapped\n", g_frame, e->xtext ? e->xtext : "?"); break; }
+        if (e->n) MR8(a) = (uint8_t)e->val; else MR32(a) = e->val;
+        fprintf(stderr, "[autotest] f=%ld poke%s [0x%08x] <- 0x%08x\n", g_frame, e->n ? " byte" : "", a, e->val);
+        break; }
     case C_WAITMEM: {
         if (g_wait_start < 0) g_wait_start = g_frame;
         uint32_t v = mem_is_committed(e->addr + 3) ? MR32(e->addr) : 0xDEADBEEFu;
@@ -971,17 +977,19 @@ static void status_line(double t, double tms, const char *label){
     /* the frame pacer's spin on the clock per sleep since the last line (win32_ext.c sleep_precise_ns) */
     if (k > 0 && k < (int)sizeof ms){ int pacer_spin_status(char *, size_t); pacer_spin_status(ms + k, sizeof ms - (size_t)k); }
 #endif
-    fprintf(stderr, "[status]%s%s f=%ld t=%.1fs fps=%.1f cpu=%.0f%% gcpu=%.2fms/f flow=%u rss=%ldMB%s\n",
+#ifdef __wasm__
+    /* no ru_maxrss: rss = the wasm memory's size (it only grows), brk = the top of all the runtime heap ever took
+     * (runtime/web/sbrk.c): what of that memory the game has used, the guest's 640 MB included */
+    uint64_t memory_bytes(void), heap_break(void);
+    char rss[48]; snprintf(rss, sizeof rss, "%ldMB brk=%ldMB", (long)(memory_bytes() >> 20), (long)(heap_break() >> 20));
+#else
+    char rss[24]; snprintf(rss, sizeof rss, "%ldMB", (long)(ru.ru_maxrss / (1024 * 1024)));
+#endif
+    fprintf(stderr, "[status]%s%s f=%ld t=%.1fs fps=%.1f cpu=%.0f%% gcpu=%.2fms/f flow=%u rss=%s%s\n",
             label ? " " : "", label ? label : "", g_frame, tms / 1e3, dt > 0 ? nf / dt : 0.0,
             dt > 0 ? 100.0 * (cpu - g_st_cpu) / dt : 0.0,
             nf > 0 ? (gcpu - g_st_gcpu) / nf : 0.0,
-            mem_is_committed(0x8654a4u) ? MR32(0x8654a4u) : 0u,
-            
-#ifdef __wasm__
-            (long)((uintptr_t)sbrk(0) >> 20), ms);   /* no ru_maxrss: the wasm memory's size (it only grows) */
-#else
-            (long)(ru.ru_maxrss / (1024 * 1024)), ms);
-#endif
+            mem_is_committed(0x8654a4u) ? MR32(0x8654a4u) : 0u, rss, ms);
     g_st_t = t; g_st_f = g_frame; g_st_cpu = cpu; g_st_gcpu = gcpu;
 }
 

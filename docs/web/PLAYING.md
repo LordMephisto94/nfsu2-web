@@ -3,7 +3,7 @@
 The game runs in Google Chrome, Edge and the other Chromium browsers (Brave, Opera), in Firefox, and in Safari 26 (on a
 Mac, or an iPhone or iPad with iOS 26 or iPadOS 26). One server hosts it: it keeps the game files, serves the game to the
 browsers and connects players for free roam. On a Mac it serves that Mac; for other PCs it goes behind HTTPS, usually
-on a VPS ([VPS.md](VPS.md)). Nothing is installed on the players' PCs, and no file is picked by hand.
+on a VPS (`web/deploy/`). Nothing is installed on the players' PCs, and no file is picked by hand.
 
 ## 1. Start it (on the Mac)
 
@@ -33,8 +33,8 @@ or two. The page shows a problem only when there is one, with what to do about i
 ## 2. Other PCs
 
 The browser runs the game only on a secure page (`https://`, or `localhost` on the machine itself), so friends play
-from a server behind HTTPS: a certificate on the server, or a proxy or tunnel in front of it. [VPS.md](VPS.md) has
-the ways to set that up. Each player then opens that `https://` address in the latest **Google Chrome** or
+from a server behind HTTPS: a certificate on the server, or a proxy or tunnel in front of it (`web/deploy/` has a
+Docker setup). Each player then opens that `https://` address in the latest **Google Chrome** or
 **Firefox** and presses **Play**.
 
 The first start on a PC downloads about 7 MB of game code and, while playing, the game data it needs, compressed on
@@ -86,7 +86,7 @@ While you drive:
   above the steering.
 - **Small buttons** along the top: pause, camera (held: look back), reset; in free roam also the map, messages,
   **Drift** (drift mode, the game's drift icon, lit while it is on), the career status (the game's Career Status, as
-  D-pad Down on a controller; the keyboard has no key for it), and the horn and quick chat (not with quick chat off)
+  D-pad Down on a controller, T or F4 on a keyboard), and the horn and quick chat (not with quick chat off)
   while another player's car is within a horn's reach. In free roam **Start** shows above the steering where it does
   something: at an event's or a shop's marker, at an outrun offer, or at a race spot or lobby of other players.
 - **HUD:** a phone starts with the game's 4:3 HUD layout (Game, Display, HUD layout), which keeps the minimap and
@@ -120,7 +120,7 @@ While you drive:
 | Enter | Choose (menus); in free roam, start an event at its marker or take an outrun |
 | F12 | Photo mode while you drive (see below), and in it the photo; elsewhere a screenshot. Both are PNGs kept with your saves and shown in Saves on the start page |
 | **F8** | Frame-rate counter: off, on, detailed |
-| **F9** | The page menu: when the game last saved, full screen, counter, ghost mode and crews (in free roam), radio, controls, log, **Quit game**, and Stop waiting: play offline while you wait in line; on a controller Home, or both sticks pressed in; on a touch screen the ☰ button |
+| **F9** | The page menu: when the game last saved, full screen, counter, ghost mode (off, players, everything) and crews (in free roam), radio, controls, log, **Quit game**, and Stop waiting: play offline while you wait in line; on a controller Home, or both sticks pressed in; on a touch screen the ☰ button |
 | **Hold Esc** | Leave full screen (a short press still goes to the game) |
 
 The start page shows these keys under **Controls**, and F9, Controls shows them while you play.
@@ -208,7 +208,7 @@ that room.
 
 | Where | Settings |
 |---|---|
-| Online | free roam with others, your name (in free roam and online), your horn, room, ghost mode, players' cars shown (16, 24, 32, 40 or 48; computers start at 32, phones at 16, tablets at 24), quick chat and your phrases; more: the game's Online mode (on by default) |
+| Online | free roam with others, your name (in free roam and online), your horn, room, ghost mode (off, players or everything), players' cars shown (16, 24, 32, 40 or 48; computers start at 32, phones at 16, tablets at 24), quick chat and your phrases; more: the game's Online mode (on by default) |
 | Friends & crews | crews (with their colours), and your friends (once your name is claimed) |
 | Game, Game | language, movies, subtitles, autosave; more: show hidden races, startup movies (skippable, original or off), sound, pause or keep running in the background, sound output latency, highest graphics for a new save |
 | Game, Display | full screen on Play (off: the game plays in the browser window; on by default on phones), resolution scale (phones start at 75%, 100% once one shows it has the room), frame rate (auto follows the screen: 120 on a 120 Hz display, 240 on a 240 Hz one; 30, 60, 120 or 240, where 30 keeps a phone that cannot hold 60 steady; Online and LAN races at most 120); more: menus and HUD (original or upscaled), HUD layout (wide, or 4:3 as phones start), movie framing, cutscene bars, other cars' headlights (players, all cars, off), frame-rate counter, fixed render size, pixel limit |
@@ -216,7 +216,7 @@ that room.
 
 - **Language:** English, French, German, Italian, Spanish, Dutch, Swedish, Danish, Korean, Chinese, Japanese, Russian,
   Thai, Portuguese (Brazil), Polish, Turkish or Hungarian, for the menus and all the game's text. Where the server
-  has the [language packs](VPS.md#languages), French, German, Italian, Spanish, Japanese and Russian also play with
+  has the language packs, French, German, Italian, Spanish, Japanese and Russian also play with
   their dubbed voices and movies, Chinese, Japanese and Thai with their full text, and Russian, Portuguese, Polish,
   Turkish and Hungarian with their text at all. Without the packs those five play in English, and the other
   languages with English voices and movies. Your browser fetches only your language's files: the dubbed voices are
@@ -229,7 +229,7 @@ that room.
 - **Subtitles:** on by default: the movies' lines as text (the PSA, the tutorials and the story) in every language
   but French, German, Italian and Spanish, whose movies are dubbed. English's are VileStuff's
   [English Subtitles Fixed](https://nfsmods.xyz/mod/5286), with who says each line, where the server has its
-  [language pack](VPS.md#languages) (without it English has none: the game's own English lines stop at their first
+  language pack (without it English has none: the game's own English lines stop at their first
   apostrophe).
 - **Show hidden races:** off by default. The career has 33 hidden races (one in the prologue, then 4, 8, 10 and 10
   in the later stages) that are not on the map or the radar: in the original game one shows only when you drive near it,
@@ -238,7 +238,7 @@ that room.
   (the GPS takes you there), and the map offers up to 8 races of each kind at once instead of 1 to 4, so they take no
   others off it. Turned off again, a career is as it was: the races open stay open.
 - **Menus and HUD:** Original (the default) is the game's own. Upscaled shows LunicAura106's [Upscaled
-  HUD](https://nfsmods.xyz/mod/4319) where the server has its [texture pack](VPS.md#texture-packs): the menus, the
+  HUD](https://nfsmods.xyz/mod/4319) where the server has its texture pack: the menus, the
   race HUD, the fonts and the car and brand logos redrawn at four times their size, sharp on a large screen. The
   game's layout stays as it is. Your browser fetches the pack only with Upscaled (about 5 MB to download). A language
   with fonts of its own (Russian, Polish, Turkish, Chinese, Japanese, Thai) keeps them. Most phones decode the larger
@@ -390,7 +390,7 @@ or use a Room to keep to a group.
 
 Good to know:
 
-- **How many:** up to 12000 players on a server set up as VPS.md describes (2000 with the older Node server), 128 on
+- **How many:** up to 12000 players on a server set up with `web/deploy/` (2000 with the older Node server), 128 on
   one started by hand (its owner can change that). Only free roam and the LAN and Online screens take a place;
   single-player takes none. When it is full, you wait in line for a place, first come first served: the top of the
   screen shows your place and, once a few went in, about how long it takes. You play alone meanwhile and join the
@@ -414,9 +414,14 @@ Good to know:
   sends you their car 5 times a second instead of 20 (past 1 km, twice), which saves traffic and doesn't show at that
   distance. When many players arrive at once, their cars load one after another, about one a second, so the last of 32
   can take half a minute to appear.
-- **Ghost mode:** off by default: you collide with the other players' cars (Online, Ghost mode; on: you drive through
-  them, and they through yours). The page menu (F9) switches it while you play, at once, and keeps it for your next
-  games. A car that appears on top of yours, at a garage or after a jump, lets you through until you are apart. Each
+- **Ghost mode:** Online, Ghost mode. **Off** (the default): you collide with the other players' cars. **Players**: you
+  drive through them, and they through yours. **Everything**: traffic and the game's tuners pass through you as well
+  (and through the other players' cars on your screen), in free roam with others only: races stay as the game has
+  them, and an outrun's opponent is solid while it runs, as in the game: the tuner you race, or a player whose Ghost
+  mode is Off or Everything too (with Players, or on an older version, you two drive through each other as before).
+  Traffic and tuners are in your game only, so this changes nothing for the others. The page menu (F9) switches
+  between the three while you play, at once, and keeps it for your next games. With Off, a car that appears on top
+  of yours, at a garage or after a jump, lets you through until you are apart. Each
   player's own game moves their car: a car you hit is pushed in its owner's game, and moves on your screen as it does
   there. A hit is shared between the two cars by their models' weight (0.96 t for the Peugeot 106 to 2.9 t for the
   Hummer): driving into a standing car of your weight, you go on at about half your speed and it leaves at about the
@@ -710,12 +715,15 @@ Good to know:
   In the original game the Filter always hid all others, so a game made with Collision Detection off was seen by no
   one. A game with **Private Room** on is not listed, as in the original game.
 - **Ranked games** need three players at least. Ranked races give ranking points by place. After a ranked race the
-  results screen lists whose results came in (received or waiting), then, once the games of two players who finished
-  sent the same result, Official Race Results: each player's place, time (drift: score) and the ranking points the
-  race gave (100 for the winner down to 0 for the last; 0 for a player who left the race, shown as Disconnected).
-- **A race counts** in Rankings once the games of two players who finished it sent the same result (every game
-  sends its own at the results screen), so a race that only one player finished does not count. A player who left
-  the race decides nothing: their game counts every player as gone. Each player races from their own browser.
+  results screen lists whose results came in (received or waiting), then, once the games of two players sent the
+  same finishing order, Official Race Results: each player's place, time (drift: score) and the ranking points the
+  race gave (100 for the winner down to 0 for the last; 0 for a player who did not finish, shown as Disconnected:
+  who left the race, or was still on the way when it ended, 30 s after the first finisher).
+- **A race counts** in Rankings once the games of two players who raced to the end (finished, or were still on the
+  way when the race ended) sent the same finishing order (every game sends its own at the results screen), so a race
+  counts even when only its winner finished. A player who left the race decides nothing: their game counts every
+  player as gone. Each player races from their own browser. **Monthly Point Leaders** (Online Main Menu) shows this
+  month's two leaders of each race type and, on its other page, last month's.
 - **EA Messenger** (the Online Main Menu's button): Search finds the players online on this server and those with a
   race in Rankings. **Send Friend Request** reaches the other player now, or when they next come online: they see you
   in their list with a green arrow and pick **Answer Friend Request**: Accept, Decline or Block. Your friends stay on
@@ -734,7 +742,8 @@ Good to know:
 |---|---|
 | "Secure, isolated page" on another PC, `PAGE-NOT-SECURE` | Open the server's `https://` address, not `http`. Only `localhost` works without HTTPS. |
 | `PAGE-NOT-ISOLATED` ("not cross-origin isolated"), and with it `MODULE-NOT-ISOLATED` | The page is not opened from the game's server, or something in the browser changes it on the way, most often an extension. A guest or private window shows whether that is it (its saves are gone when it closes); then, in a normal window, turn the extensions off one by one. |
-| `PAGE-NO-MEMORY`: "Shared 4 GB WebAssembly memory is not available" | The browser cannot give the game the memory it needs. Close other tabs, update the browser and restart it. |
+| `PAGE-NO-MEMORY`: "Shared WebAssembly memory is not available" | The browser cannot give the game the memory it needs. Close other tabs, update the browser and restart it. |
+| `PAGE-NO-JIT`: "The JavaScript optimizer is off for this site" (or "exnref not supported by the Wasm interpreter") | The browser runs WebAssembly without its compiler here, and the game cannot run that way. Chrome: Settings, Privacy and security, JavaScript optimization and security: allow the site (Android's Advanced Protection turns the optimizer off for every site). Edge: add the site as an exception to Enhanced security. |
 | `PAGE-NO-WAITASYNC`: "This browser is too old for the game" | Update the browser (Firefox 145 or newer), or play in Chrome. |
 | "Graphics (WebGPU)", `GPU-OFF` and the other `GPU-OFF-…` | The browser has no WebGPU, which the game needs. Chrome: update it (on Linux also turn on `chrome://flags/#enable-unsafe-webgpu`). Firefox has it on Windows and on Macs with Apple chips; elsewhere (Linux, Macs with Intel chips) play in Chrome, or set `dom.webgpu.enabled` to true in about:config. Firefox for Android has none yet: play in Chrome. iPhone and iPad: WebGPU comes with iOS 26 and iPadOS 26. `GPU-NOT-SECURE`: see "Secure, isolated page" above. |
 | `GPU-ACCEL-OFF` | Chrome uses no graphics at all (it draws WebGL in software, or not at all): "Use graphics acceleration when available" in `chrome://settings/system` is off, or Chrome gave up on the graphics after they crashed. Turn it on and restart Chrome; if it was on, update the graphics driver. |
@@ -744,6 +753,7 @@ Good to know:
 | `GPU-ADAPTER-ANDROID` | Chrome on Android has WebGPU from Android 12 on Qualcomm (Adreno), ARM (Mali) and Intel graphics, and from Android 16 on Imagination (PowerVR). Update Android and Chrome. If that does not help, turn on `chrome://flags/#enable-unsafe-webgpu` (on the phone, type it into Chrome's address bar, or open `chrome://flags` and search for "Unsafe WebGPU"), then restart Chrome: that lifts Chrome's WebGPU blocklist. Samsung's Xclipse (some Galaxy phones) is on it, and the game runs with the flag (a player's Xclipse 540 with Android 16). If the game still does not run with it, it cannot run on that phone yet. |
 | `GPU-ADAPTER`, `GPU-ADAPTER-FIREFOX` | The browser would not use the graphics. Restart it; update the graphics driver (on a Mac: macOS) and the browser. `chrome://gpu` in Chrome, about:support (Graphics) in Firefox says why. In Firefox on Windows, graphics without Direct3D 12 cannot run it either. |
 | `GPU-ADAPTER-AFTER-LOST` | The graphics stopped during the last game (`GPU-LOST`), and the browser has not given the reloaded page graphics since: not graphics too old. Chrome keeps a site whose graphics hung off them for a while (two minutes); the page asks again every 10 seconds, and Play comes on once they are back. If it stays off, quit the browser completely (every window) and start it again. If the graphics stop again, update the graphics driver; two players' Intel Iris Xe hung this way (`DXGI_ERROR_DEVICE_HUNG` in the log). |
+| `GPU-SOFTWARE`: a note that the graphics are software | Chrome gave the game its processor's stand-in for graphics (SwiftShader), which it does with `chrome://flags/#enable-unsafe-webgpu` where it cannot use the graphics: the game runs at ~13 fps. On Linux (a Steam Deck's Chrome, for one), turn on `chrome://flags/#enable-vulkan` and `chrome://flags/#default-angle-vulkan` and restart Chrome (a player's fix: `--enable-features=Vulkan --use-angle=vulkan`). Elsewhere, see `GPU-ACCEL-OFF`. |
 | `GPU-NO-BC`: a note about packed textures | Nothing to do: the game plays. These graphics can read neither of the texture formats the game uses, so the page unpacks the textures as the game loads: about 200 MB more memory, and loading screens may pause for a moment. Graphics that can read ASTC (iPhones, iPads, most phones) get no note: most textures are converted to that, about 50 MB more. |
 | `GPU-INTEGRATED-FIREFOX`: "Graphics: Intel (integrated)" (or AMD) in Firefox on Windows | Firefox runs the game on the graphics it draws its own windows with, whatever the game asks for. If the computer also has a graphics card, as many laptops do, give Firefox the card: Windows Settings, System, Display, Graphics, Firefox, High performance; then quit Firefox completely and start it again. On a computer with integrated graphics only, nothing changes. Chrome does the same (its `chrome://gpu` names the graphics it uses): the same Windows setting for Chrome, or `chrome://flags/#force-high-performance-gpu`. |
 | `GPU-RENDERER`: "The game was stopped" | The graphics did not start: the game cannot go on without them. Restart the browser and press **Play**; if it happens again, update the graphics driver, and download the log (its `[gpu]` lines say why). |
@@ -751,7 +761,7 @@ Good to know:
 | "Game module", `MODULE-LOAD` | The game did not load, or the server is not reachable. The page tries again by itself, or press **Retry**. If the module is missing, start the server with `web/start.sh`, which builds it. |
 | "A new version of the game is on the server" | Press **Reload** or **Play**: the page loads the new version, and your saves and settings stay. Download the log first if you want to keep it: after the reload, Download log has only a shorter copy of that game's. Before any game the page reloads by itself; during a game it says so over the game, and the start page offers it when you quit. |
 | "Open elsewhere" | The game runs in another tab of this browser. Switch to it, or close it. |
-| `GAME-START`: "Did not start", "The game could not start" | Press **Play** again; if it happens again, **Download log** (on the start page) and post the log with the message. |
+| `GAME-START`: "Did not start", "The game could not start" | Press **Play** again; if it happens again, **Download log** (on the start page) and post the log with the message. "could not allocate memory" (Chrome) or "Out of memory" (Safari): the browser would not set aside the game's 1 GB, most often on phones with 2 to 4 GB (a 32-bit Chrome, an iPhone's Home Screen app). Close other apps and reload the page; the log's `[memory]` line says what the browser refused. |
 | `STORAGE-NONE`: "This browser window cannot store files" | A guest or private window cannot keep saves: open the page in a normal window. |
 | `STORAGE-ASK`: the browser asks whether the site may keep its data | Allow it, so that your saves stay when the disk runs low (section 5). |
 | `BROWSER-CHROME-OLD`, `BROWSER-FIREFOX-OLD` | A warning: the game may still play. Update the browser (Chrome 140 or newer, Firefox 145 or newer). |
