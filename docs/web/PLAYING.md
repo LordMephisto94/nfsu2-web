@@ -396,12 +396,18 @@ Good to know:
   screen shows your place and, once a few went in, about how long it takes. You play alone meanwhile and join the
   others by yourself when it is your turn. The page menu's "Stop waiting: play offline" leaves the line for the rest
   of that game, and when the server is full as you press Play the start page asks whether to wait in line or play
-  offline (or, the first time, says so in its free-roam question). The server pairs each player with the 32 players
-  nearest to them (fewer while it is busy, 8 at the least), and your game shows up to 32 of their cars at once: phones
-  start at 16 and tablets at 24 (Online, more: Players' cars shown: 16, 20, 24, 28 or 32). Their names show
+  offline (or, the first time, says so in its free-roam question). The server pairs each player with the players
+  nearest to them, as many as their game shows cars (fewer while it is busy, 8 at the least): 48 in Chrome, Edge or
+  Firefox on a Windows computer with 8 cores or more (and 8 GB of memory or more, where the browser says), 32 on other
+  computers, 24 on tablets and 16 on phones (Online, more: Players' cars shown: 16, 20, 24, 28, 32, 40 or 48). On a computer that shows 48 by itself, the
+  game goes down to 32 for the rest of the game when its frame rate stays under 40 among more than 32 cars; one you
+  set yourself stays as you set it. Their names show
   over the cars within 100 m, and each gets an arrow on the minimap when it is near and a marker on the world map (M),
   in the game's orange. The game's own outrun challengers are grey on both (the legend's Opponent Car too), so you can
-  tell them from players. The world map also marks the other players in free roam, the nearest 2048 past those
+  tell them from players. The minimap also has an arrow, the same as a car's, for the players near you whose cars
+  your game does not show (the nearest 64 within its reach, from the server four times a second), so a crowd looks
+  as big as it is; theirs are left out at the minimap's edge, where the cars' arrows point the way. The world map
+  also marks the other players in free roam, the nearest 2048 past those
   32, and while it is open every marker moves smoothly with its player. Its legend (the list on the
   map's left) has two rows of ours after the game's: **Players** and **Players' races**. Pick one with Up or Down and
   Enter crosses it out, as with the game's own rows: the map then leaves out the other players' markers (a crew-mate's

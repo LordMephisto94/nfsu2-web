@@ -21,10 +21,12 @@
 #include <stddef.h>
 
 #define RC_PROTO_VER     1          /* header byte 4; a different value is ignored */
-#define RC_CORE_VER      9          /* HELLO: implementation revision (2: lists of up to RC_MAX_PEERS; 3: RC_MSG_DUEL;
+#define RC_CORE_VER      10         /* HELLO: implementation revision (2: lists of up to 32 (RC_PEERS_V9); 3: RC_MSG_DUEL;
                                        4: state extensions, RC_HF_STATEX; 5: race lobbies, RC_HF_LOBBY; 6: quick chat,
                                        RC_HF_SAY; 7: crews, RC_HF_CREW; 8: crews from the hub, RC_HF_HUBCREW;
-                                       9: a HELLO to one peer names only that peer, roam_core.c fill_hello) */
+                                       9: a HELLO to one peer names only that peer, roam_core.c fill_hello;
+                                       10: lists of up to RC_MAX_PEERS (48), and its HELLO to the hub ends in the links
+                                       it wants, rc_config.links) */
 #define RC_MAGIC0        0x4E       /* "N2FR" */
 #define RC_MAGIC1        0x32
 #define RC_MAGIC2        0x46
@@ -34,10 +36,11 @@
 #define RC_HDR           16
 #define RC_CRC           4
 #define RC_NAME_MAX      24
-#define RC_MAX_PLAYERS   33         /* the mesh: this machine + 32 peers */
+#define RC_MAX_PLAYERS   49         /* the mesh: this machine + 48 peers */
 #define RC_MAX_PEERS     (RC_MAX_PLAYERS - 1)
 #define RC_PEERS_V1      7          /* the most a core of version 1 reads in a HELLO's ids or a PEERS list */
-#define RC_TABLE         64         /* known addresses (configured, gossiped, heard) */
+#define RC_PEERS_V9      32         /* ...a core of versions 2 to 9 */
+#define RC_TABLE         96         /* known addresses (configured, gossiped, heard): the peers and those going or coming */
 #define RC_SNAP_STATES   3          /* states per SNAP (newest first): loss redundancy */
 #define RC_STATE_BYTES   52
 #define RC_STATEX_BYTES  29         /* a state's extension (RC_HF_STATEX), its length byte included, at most */
@@ -62,6 +65,8 @@
 #define RC_MAPD_PLACE    9          /* ...without: x, y (int16, m), heading (u8), velocity x, y (int8, m/s) follow */
 #define RC_MAPD_BYTES    1152       /* entries' bytes per MAPD datagram at most */
 #define RC_MAPD_PARTS    16         /* MAPD datagrams per answer at most */
+#define RC_NEAR_MAX      128        /* NEARD entries per answer at most: one datagram (RC_MAPD_BYTES / RC_MAPD_PLACE) */
+#define RC_NEAR_M        1000       /* a NEARREQ's radius at most (m) */
 #define RC_LOBBY_MAX     6          /* players in a race lobby: the game's network race takes 6 */
 #define RC_LOBBY_INBOX   16         /* LOBBY messages held for the game side */
 #define RC_LOBBIES_ENTRY 11         /* a LOBBIES entry: x, y (int16, m), race (u32), n, max, state (u8) */
@@ -110,7 +115,12 @@ enum { RC_MSG_HELLO = 1, RC_MSG_PEERS = 2, RC_MSG_SNAP = 3, RC_MSG_CFG = 4, RC_M
         * racer's place in them, by its player's id, its time and how far it came.  The server compares the players'
         * games' results for a racer far ahead of the others (a teleport to the finish, a speed hack).  A hub before it
         * ignores the type, and no player is sent one */
-       RC_MSG_RACERES = 16 };
+       RC_MSG_RACERES = 16,
+       /* the minimap's other players (roam_game.c near_*): NEARREQ (req, max and base as a MAPREQ's; radius: how far from
+        * us at most, m, RC_NEAR_M at most) only to the hub, which answers with one NEARD datagram laid out as a MAPD
+        * (nparts 1): the players of our room in free roam within radius, past us and our peers, the nearest max
+        * (RC_NEAR_MAX) at most, as what changed since the answer base.  A hub before it ignores the type */
+       RC_MSG_NEARREQ = 18, RC_MSG_NEARD = 19 };
 /* RACEREP flags */
 #define RC_RR_HOST       0x01       /* the reporter hosted the race */
 #define RC_RR_QUIT       0x02       /* ...left it with its pause menu's Quit */
@@ -327,7 +337,8 @@ typedef struct {
     union {
         struct { uint16_t core_ver; uint8_t platform, status; uint16_t listen_port, cfg_rev;
                  uint32_t room; char name[RC_NAME_MAX + 1]; uint8_t n_seen; uint32_t seen[RC_MAX_PEERS];
-                 uint8_t n_crews; uint32_t crews[RC_CREW_MAX]; } hello;   /* crews: with RC_HF_CREW only */
+                 uint8_t n_crews; uint32_t crews[RC_CREW_MAX];             /* crews: with RC_HF_CREW only */
+                 uint8_t links; } hello;   /* after the crews (their count too, 0 or not): the links we want, 0: not said (core 10, to the hub) */
         struct { uint8_t n; struct { uint32_t ip; uint16_t port; uint32_t id; } e[RC_MAX_PEERS];
                  uint8_t n_mine; uint32_t mine[RC_CREW_MAX]; uint8_t crew[RC_MAX_PEERS]; } peers;   /* the crew marks: with RC_HF_CREW only */
         struct { uint8_t status, epoch; uint16_t cfg_rev; uint8_t n, clock; rc_state s[RC_SNAP_STATES]; } snap;
@@ -337,7 +348,9 @@ typedef struct {
         struct { uint8_t reason; } bye;
         struct { uint8_t op, arg; uint32_t to, duel; } duel;      /* to: the player it is for */
         struct { uint16_t req, max, base; } mapreq;
-        struct { uint16_t req, base, total, len; uint8_t part, nparts, n; const uint8_t *data; } mapd;   /* data: n entries, len bytes */
+        struct { uint16_t req, base, total, len; uint8_t part, nparts, n; const uint8_t *data; } mapd;   /* data: n entries, len bytes;
+                                                                                                           NEARD's too */
+        struct { uint16_t req, max, base, radius; } nearreq;
         rc_lobby lobby;
         struct { uint16_t req; uint8_t n; const uint8_t *data; } lobbies;   /* data: n entries */
         rc_racerep racerep;
@@ -483,6 +496,9 @@ typedef struct {
     int      duels;                /* we take outrun challenges (HELLO says so: RC_HF_DUELS) */
     int      lobbies;              /* we take race lobbies (HELLO says so: RC_HF_LOBBY) */
     int      say;                  /* we take quick chat (HELLO says so: RC_HF_SAY) */
+    int      links;                /* the players the hub links us with at most (our HELLO to it says so): the friends' cars
+                                      the game shows, 1 .. RC_MAX_PEERS; 0: not said (the hub's own most, 32 for a core
+                                      before version 10) */
 } rc_config;
 
 enum { RC_PS_FREE = 0, RC_PS_CANDIDATE = 1, RC_PS_HEARD = 2, RC_PS_EST = 3 };
@@ -572,6 +588,12 @@ typedef struct {
     uint16_t  map_held;
     uint32_t  map_gen;  int map_n;  uint16_t map_total;
     rc_mapent map_e[RC_MAP_MAX], map_tmp[RC_MAP_MAX];
+    /* the minimap's other players (rc_ask_near): our last question, and the
+     * players as of the last answer (near_held its question; near_gen +1 for
+     * each), by id */
+    uint16_t  near_req, near_held;  int64_t near_asked_us;
+    uint32_t  near_gen;  int near_n;  uint16_t near_total;
+    rc_mapent near_e[RC_NEAR_MAX], near_tmp[RC_NEAR_MAX];
     /* LOBBY messages for us (to our id) from established peers, oldest
      * first, until the game side takes them (rc_take_lobby) */
     struct { uint32_t from; rc_lobby l; } lobby_in[RC_LOBBY_INBOX];
@@ -616,6 +638,8 @@ int  rc_peer_friend(const rc_session *s, int i);
  * repeats left out; the hub (or without one, the peers) hears them at the
  * next tick */
 void rc_set_crews(rc_session *s, const uint32_t *crews, int n);
+/* the links we want from the hub changed while the session runs (rc_config.links): it hears at the next tick */
+void rc_set_links(rc_session *s, int links);
 /* our room changed while the session runs (rc_room_hash, 0: none): every
  * peer of the old one goes, with the world map's markers and lobbies, and the
  * hub (or the peers) hears the new one at the next tick.  The number of
@@ -630,6 +654,11 @@ int  rc_take_duel(rc_session *s, uint32_t *from, uint8_t *op, uint8_t *arg, uint
  * most (RC_MAP_MAX), as what changed since the answer we hold; 1 when asked.
  * The players are in map_e[0 .. map_n) once map_gen changes */
 int  rc_ask_map(rc_session *s, int64_t now_us, int max);
+/* asks the hub (while it answers) for the minimap's other players: those
+ * within radius_m of us (RC_NEAR_M), max at most (RC_NEAR_MAX), as what
+ * changed since the answer we hold; 1 when asked.  The players are in
+ * near_e[0 .. near_n) once near_gen changes */
+int  rc_ask_near(rc_session *s, int64_t now_us, int max, int radius_m);
 /* a LOBBY message to the established peer with id l->to, if its HELLO said
  * it takes them, or (to 0) to the hub while it answers; 1 when sent */
 int  rc_send_lobby(rc_session *s, const rc_lobby *l);

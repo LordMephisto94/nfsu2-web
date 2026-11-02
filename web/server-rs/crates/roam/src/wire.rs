@@ -15,6 +15,10 @@ pub(crate) const MSG_BYE: u8 = 8;
 pub(crate) const MSG_MAPREQ: u8 = 10;
 /// the world map's answer to a MAPREQ that names the answer it holds (roam_core.h RC_MSG_MAPD): what changed since
 pub(crate) const MSG_MAPD: u8 = 17;
+/// the minimap's question (roam_core.h RC_MSG_NEARREQ: a MAPREQ's fields and a radius) and its answer, one datagram laid
+/// out as a MAPD (RC_MSG_NEARD)
+pub(crate) const MSG_NEARREQ: u8 = 18;
+pub(crate) const MSG_NEARD: u8 = 19;
 pub(crate) const MSG_LOBBY: u8 = 12;
 pub(crate) const MSG_LOBBIES: u8 = 13;
 /// a player's report of a multiplayer race (roam_core.h RC_MSG_RACEREP): only to the hub, which logs it
@@ -43,7 +47,11 @@ pub(crate) const MARK_FRIEND: u8 = 0x80;
 /// the most crews a player is in (roam_core.h RC_CREW_MAX: the start page's four words)
 pub(crate) const CREWS: usize = 4;
 /// the most ids a HELLO names (roam_core.h RC_MAX_PEERS: its decoder takes no more)
-const SEEN_MAX: usize = 32;
+const SEEN_MAX: usize = 48;
+/// the most links a player has (roam_core.h RC_MAX_PEERS, core version 10: its HELLO says how many it wants, at most
+/// this); a core before version 10 reads lists of 32 at most (RC_PEERS_V9) and says nothing
+pub(crate) const LINKS_MAX: usize = 48;
+pub(crate) const LINKS_V9: usize = 32;
 /// a LOBBY's ops (roam_core.h RC_LOBBY_*) the hub keeps: the host's advert and its end, and a player's ask to join
 pub(crate) const LOBBY_ADVERT: u8 = 1;
 /// a player's ask to join (to its host, and a copy to the hub: the hub links the two first)
@@ -81,6 +89,8 @@ pub(crate) enum Msg<'a> {
         /// its crews as it sent them (HF_CREW), 0 after them: none for a HELLO without the flag, or with the flag
         /// and nothing after its ids
         crews: [u32; CREWS],
+        /// the links it wants (core version 10: the byte after its crews), 0 not said
+        links: u8,
     },
     /// v: the newest state's velocity, 0 where roam_core's decoder would not take it (not finite, 200 m/s or more);
     /// heading: where its car points, 256 a turn (the game's atan2 of the forward row, roam_game.c); t_us: its time on
@@ -100,6 +110,13 @@ pub(crate) enum Msg<'a> {
         req: u16,
         max: u16,
         base: u16,
+    },
+    /// the minimap's question (roam_core.h RC_MSG_NEARREQ): a MAPREQ's fields, and how far from the asker at most (m)
+    NearReq {
+        req: u16,
+        max: u16,
+        base: u16,
+        radius: u16,
     },
     /// a race lobby (roam_core.h RC_MSG_LOBBY), checked as roam_core.c's lobby_ok: what the hub keeps of one sent to
     /// it (to 0)
@@ -317,6 +334,7 @@ pub(crate) fn decode(d: &[u8]) -> Option<(u8, u32, Msg<'_>)> {
             }
             let flags = u16_le(d, 14);
             let mut crews = [0u32; CREWS];
+            let mut links = 0u8;
             // the crews after the ids it hears (n_seen, then n_seen ids), only with the flag: without it the bytes
             // after the name's are not read, as before the flag (a page of before sends what it likes there)
             if flags & HF_CREW != 0 {
@@ -336,9 +354,14 @@ pub(crate) fn decode(d: &[u8]) -> Option<(u8, u32, Msg<'_>)> {
                     if crews[..n].contains(&0) {
                         return None;
                     }
+                    // (as roam_core.c's decoder: a byte after them is the links it wants, past that a newer core's)
+                    if at + 1 + 4 * n < end {
+                        links = d[at + 1 + 4 * n];
+                    }
                 }
             }
-            Msg::Hello { sender, core, status, room, name, lobbies: flags & HF_LOBBY != 0, marks: flags & HF_HUBCREW != 0, crews }
+            let (lobbies, marks) = (flags & HF_LOBBY != 0, flags & HF_HUBCREW != 0);
+            Msg::Hello { sender, core, status, room, name, lobbies, marks, crews, links }
         }
         MSG_SNAP => {
             if end < 22 + 52 {
@@ -356,6 +379,9 @@ pub(crate) fn decode(d: &[u8]) -> Option<(u8, u32, Msg<'_>)> {
             Msg::Snap { sender, status, p, v: velocity(d, 38), heading: heading(d, 50), t_us: u32_le(d, 22), clock: d[21] }
         }
         MSG_MAPREQ if end == HDR + 6 => Msg::MapReq { req: u16_le(d, 16), max: u16_le(d, 18), base: u16_le(d, 20) },
+        MSG_NEARREQ if end == HDR + 8 => {
+            Msg::NearReq { req: u16_le(d, 16), max: u16_le(d, 18), base: u16_le(d, 20), radius: u16_le(d, 22) }
+        }
         MSG_LOBBY => {
             // op arg state max, to, lobby, race, x y, t, n, a reserved byte, then n ids (roam_core.c rc_encode)
             if end < HDR + 24 {
@@ -398,7 +424,9 @@ pub fn decode_roam(d: &[u8]) -> Option<RoamMsg> {
         },
         Msg::Snap { sender, status, p, .. } => RoamMsg::Snap { sender, status, p },
         Msg::Bye => RoamMsg::Bye { sender },
-        Msg::MapReq { .. } | Msg::Lobby { .. } | Msg::RaceRep(_) | Msg::RaceRes(_) | Msg::Other => RoamMsg::Other { kind, sender },
+        Msg::MapReq { .. } | Msg::NearReq { .. } | Msg::Lobby { .. } | Msg::RaceRep(_) | Msg::RaceRes(_) | Msg::Other => {
+            RoamMsg::Other { kind, sender }
+        }
     })
 }
 
@@ -413,18 +441,11 @@ pub(crate) fn peers_crew_len(n: usize, k: usize) -> usize {
 }
 
 /// Writes a PEERS datagram into `b` (exactly `peers_len(n)` bytes long, or `peers_crew_len(n, mine.len())` with marks):
-/// list = [{ vip, port, id }] (at most 32: roam_core's RC_MAX_PEERS).  With marks (`b` the longer, `marks` n bytes) the
+/// list = [{ vip, port, id }] (at most the receiver's degree: 48, LINKS_MAX).  With marks (`b` the longer, `marks` n bytes) the
 /// list ends in the receiver's crew marks (HF_CREW on it): `mine` (its crews, at most CREWS, none 0; maybe none), then
 /// a byte per entry, `marks[i]` bit c: entry i is in crew `mine[c]` too; MARK_FRIEND: entry i is its friend.  So a
 /// player learns which of its peers are in its crews, and its friends, without anyone's crews but its own going out.
-pub(crate) fn write_peers(
-    b: &mut [u8],
-    sender: u32,
-    seq: u16,
-    list: impl ExactSizeIterator<Item = PeerEntry>,
-    mine: &[u32],
-    marks: &[u8],
-) {
+pub(crate) fn write_peers(b: &mut [u8], sender: u32, seq: u16, list: impl ExactSizeIterator<Item = PeerEntry>, mine: &[u32], marks: &[u8]) {
     let len = b.len();
     let n = list.len();
     let with = len > peers_len(n);
@@ -506,15 +527,27 @@ pub(crate) fn mapd_len(bytes: usize) -> usize {
     HDR + 9 + bytes + CRC
 }
 
-/// One MAPD datagram, part `part` of `nparts` of the answer to question `req` (roam_core.h RC_MSG_MAPD) into `b`
-/// (exactly `mapd_len(e.len())` bytes long): what changed since the answer `base` (0: from nothing), `total` players
-/// past the asker and its peers, n entries in `e`.
+/// One MAPD datagram (or, `kind` MSG_NEARD, the minimap's NEARD laid out the same), part `part` of `nparts` of the
+/// answer to question `req` (roam_core.h RC_MSG_MAPD) into `b` (exactly `mapd_len(e.len())` bytes long): what changed
+/// since the answer `base` (0: from nothing), `total` players past the asker and its peers, n entries in `e`.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn write_mapd(b: &mut [u8], sender: u32, seq: u16, req: u16, base: u16, part: u8, nparts: u8, total: u16, n: u8, e: &[u8]) {
+pub(crate) fn write_mapd(
+    b: &mut [u8],
+    kind: u8,
+    sender: u32,
+    seq: u16,
+    req: u16,
+    base: u16,
+    part: u8,
+    nparts: u8,
+    total: u16,
+    n: u8,
+    e: &[u8],
+) {
     let len = b.len();
     b[..4].copy_from_slice(b"N2FR");
     b[4] = 1;
-    b[5] = MSG_MAPD;
+    b[5] = kind;
     b[6..8].copy_from_slice(&(len as u16).to_le_bytes());
     b[8..12].copy_from_slice(&sender.to_le_bytes());
     b[12..14].copy_from_slice(&seq.to_le_bytes());
