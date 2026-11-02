@@ -1157,3 +1157,174 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.64); }
   *, *::before, *::after { transition: none !important; animation: none !important; }
   .photo-flash { display: none !important; }          /* no white flash at all, rather than a still one */
 }
+
+/* BEGIN IRONWING NFSU2 THEME - local customisation */
+/* Original IronWing palette adapted to the NFSU2-Web UI.
+   Original project identity, credits, tabs and page behaviour are unchanged. */
+:root {
+  --bg: #0b0f16;
+  --frame: #101826;
+  --panel: #142037;
+  --field: #0c1522;
+  --line: #31445d;
+  --edge: #9dafc5;
+  --text: #e7edf7;
+  --muted: #b2c1d7;
+  --lime: #b9d3ff; /* Existing game UI uses --lime for its action accent. */
+  --lime-fill: #233b54;
+  --lime-glow: rgba(108, 193, 241, .36);
+  --iw-cyan: #48c7ed;
+  --iw-blue: #b9d3ff;
+  --iw-gold: #e9ac55;
+}
+
+body {
+  background:
+    radial-gradient(ellipse 900px 380px at 15% -150px, rgba(43, 123, 182, .21), transparent 78%),
+    radial-gradient(ellipse 600px 420px at 95% 20%, rgba(233, 172, 85, .055), transparent 85%),
+    var(--bg);
+}
+
+.top {
+  background: linear-gradient(115deg, #111e2e 0%, #101826 65%, #151a28 100%);
+  border: 1px solid rgba(185, 211, 255, .20);
+  box-shadow: 0 14px 48px rgba(0,0,0,.22), inset 0 1px rgba(255,255,255,.045);
+}
+
+.panel {
+  background: linear-gradient(140deg, #172238, #111b2b 85%);
+  border: 1px solid rgba(185, 211, 255, .14);
+  box-shadow: 0 12px 30px rgba(0,0,0,.09);
+}
+
+.top-row { flex-wrap: wrap; }
+.brand { flex: 1 1 420px; }
+.iw-game-heading { margin: 0; line-height: 1; }
+.iw-game-logo {
+  display: block;
+  width: min(100%, 530px);
+  height: auto;
+  max-height: 188px;
+  object-fit: contain;
+  object-position: left center;
+  filter: drop-shadow(0 0 15px rgba(38,194,228,.14));
+}
+.iw-edition {
+  color: var(--iw-gold);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: .20em;
+  font-weight: 800;
+  margin-top: 2px;
+  margin-bottom: 4px;
+}
+
+.iw-host-banner {
+  margin-top: 16px;
+  margin-bottom: 3px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 22px;
+  padding: 12px 16px;
+  background: linear-gradient(95deg, rgba(25,63,90,.68), rgba(14,27,43,.75));
+  border: 1px solid rgba(72,199,237,.28);
+  border-left: 3px solid var(--iw-gold);
+  border-radius: 10px;
+}
+.iw-host-identity { display: flex; gap: 12px; align-items: center; min-width: 0; }
+.iw-host-mark {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  flex: 0 0 52px;
+  border-radius: 10px;
+  border: 1px solid rgba(233,172,85,.33);
+  background: #0b0f16;
+  color: var(--iw-gold);
+  font: italic 900 18px/1 Arial, sans-serif;
+}
+.iw-host-mark img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.iw-host-identity > div { display: grid; gap: 3px; }
+.iw-host-kicker {
+  color: var(--iw-gold);
+  text-transform: uppercase;
+  font-weight: 800;
+  letter-spacing: .16em;
+  font-size: 10px;
+}
+.iw-host-name { color: var(--text); font-size: 14px; line-height: 1.3; }
+.iw-host-name strong { font-weight: 800; }
+.iw-host-name a { color: inherit; text-decoration: none; }
+.iw-host-name a:hover { text-decoration: underline; }
+.iw-original-credit { margin: 0; max-width: 340px; color: var(--muted); font-size: 12px; line-height: 1.4; }
+.iw-original-credit a { color: var(--iw-blue); }
+
+/* Give the existing Play panel a little neon trim without touching functionality. */
+.side > .hero { border-top: 2px solid var(--iw-cyan); }
+
+@media (max-width: 720px) {
+  .iw-host-banner { align-items: flex-start; }
+  .iw-original-credit { max-width: none; padding-left: 64px; }
+  .iw-game-logo { max-height: 150px; }
+}
+@media (max-width: 420px) {
+  .iw-host-banner { padding: 10px; }
+  .iw-host-name { font-size: 13px; }
+  .iw-original-credit { padding-left: 0; }
+  .iw-game-logo { max-height: 120px; }
+}
+/* END IRONWING NFSU2 THEME */
+
+/* IronWing About tabs: BEGIN */
+/* Keep all four instance/project/credit tabs on one line on desktop.
+   This applies only to the About panel, not the game's other tabs. */
+@media (min-width: 560px) {
+  #about > .tabs.big,
+  #about > .tabs.big[data-fit="rows"] {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+    box-shadow: inset 0 -1px var(--line);
+  }
+
+  #about > .tabs.big > .tab,
+  #about > .tabs.big[data-fit] > .tab,
+  #about > .tabs.big[data-fit="rows"] > .tab {
+    width: 100%;
+    min-width: 0;
+    height: 40px;
+    min-height: 40px;
+    padding: 0 1px;
+    font-size: 13px;
+    line-height: 20px;
+    text-align: center;
+    white-space: nowrap;
+    overflow-wrap: normal;
+    hyphens: none;
+  }
+
+  #about > .tabs.big[data-fit="rows"] > .tab {
+    box-shadow: none;
+  }
+
+  #about > .tabs.big[data-fit="rows"] > .tab[aria-selected="true"] {
+    box-shadow: inset 0 -3px var(--lime);
+  }
+}
+
+/* Small screens get two balanced rows, rather than three tabs plus one. */
+@media (max-width: 559px) {
+  #about > .tabs.big[data-fit="rows"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #about > .tabs.big[data-fit="rows"] > .tab {
+    font-size: 14px;
+    overflow-wrap: normal;
+    hyphens: none;
+  }
+}
+/* IronWing About tabs: END */
