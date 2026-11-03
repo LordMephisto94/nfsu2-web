@@ -4,9 +4,10 @@
 // shapes.  See web/src/host/abi.ts for the shared-memory side (nfsu2_register
 // kinds).
 import type { GameProcess } from '../host/process';
+import type { PhotoLook } from '../gpu/photo-picture';
 import type { PadPage, TouchPad } from '../input/gamepad';
 import type { TextEntry } from '../input/index';
-import type { NetQueue, NetRemoved } from '../net';
+import type { NetQueue, NetRaces, NetRemoved, NetRename } from '../net';
 
 /** Given to every subsystem. */
 export interface CommonOptions {
@@ -80,6 +81,11 @@ export interface NetOptions extends CommonOptions {
   block?: string[];
   /** the operator removed this player from playing with others (a kick or a ban) */
   removed?: (r: NetRemoved) => void;
+  /** the operator's race ban: this player plays on with others but races none of them, until when and why (null: it
+   *  races again) */
+  races?: (r: NetRaces | null) => void;
+  /** the operator took this player's name away: the page asks for another (NetSubsystem.rename) */
+  rename?: (r: NetRename) => void;
 }
 
 /** What an attach call returns.  Everything but detach is optional. */
@@ -94,8 +100,16 @@ export interface Subsystem {
 export interface RendererSubsystem extends Subsystem {
   /** the game's image inside the canvas, in canvas pixels */
   imageRect(): { x: number; y: number; w: number; h: number };
-  /** tests: the next frame as PNG (also uploaded as <name>.png with RendererOptions.artifacts) */
-  dump?(name: string): Promise<Blob>;
+  /** tests, F12: the next frame as PNG (also uploaded as <name>.png with RendererOptions.artifacts); mark: the
+   *  site's address in its corner */
+  dump?(name: string, mark?: boolean): Promise<Blob>;
+  /** photo mode's picture as PNG (gpu/photo-picture.ts: once the still picture has all its frames, with its look and
+   *  crop); dump()'s with photo mode off */
+  photo?(name: string, mark?: boolean): Promise<Blob>;
+  /** photo mode's look and crop, shown from the next frame on and kept by photo() */
+  photoLook?(look: PhotoLook): void;
+  /** photo mode's still picture so far: frames in it, frames it will have (0: none coming) */
+  photoProgress?(): { n: number; target: number };
   /** each frame's time from its submit until the GPU had done it, ms, since the last call (rendercheck.ts) */
   doneMs?(): number[];
   /** the game's textures on the GPU now, bytes, those unpacked from DXT and those DXT1 as ASTC (the log's copy,
@@ -121,6 +135,9 @@ export interface InputSubsystem extends Subsystem {
   sms?(id: number): boolean;
   /** photo mode (runtime/photo.c, photo.ts): what (its PH_* number) and its values; false: it cannot reach the game */
   photo?(what: number, a?: number, b?: number): boolean;
+  /** a new name for free roam and Online mode, now (the operator took the old one away); false: it cannot reach the
+   *  game */
+  name?(name: string): boolean;
   /** every key and button the game holds goes up (photo mode takes the keys) */
   releaseAll?(): void;
   /** performance.now() of the player's last key, mouse or controller input; null: the page cannot tell
@@ -155,10 +172,13 @@ export interface NetSubsystem extends Subsystem {
   away?(on: boolean): void;
   /** the player stops waiting in line for a place (a full server): off the server's LAN for the rest of this game */
   offline?(): void;
+  /** the player picked another name after the operator took its name away: back on the server's LAN under it */
+  rename?(name: string): void;
   /** free roam's solid cars, switched while the game runs (the page menu), as roam_collide has them */
   solid?(collide: 'on' | 'off' | 'none'): void;
-  /** quick chat: the player says phrase p (quickchat.ts); false: the game has no free roam */
-  say?(p: number): boolean;
+  /** quick chat: the player says phrase p (quickchat.ts; race: in a race between players); false: the game has no free
+   *  roam (race: no LAN play) */
+  say?(p: number, race?: boolean): boolean;
   /** free roam's friends: a message to the server (friends.ts); false: not connected now */
   friend?(m: Record<string, unknown>): boolean;
   /** free roam's crews, changed while the game runs (the page menu): their hashes, in the player's order, and their

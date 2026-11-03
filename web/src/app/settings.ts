@@ -206,10 +206,11 @@ export const TEMPLATE = `# NFSU2 settings, read at every launch.
 
 # The game's language: english, french, german, italian, spanish, dutch,
 # swedish, danish, korean, chinese, japanese, russian, thai, portuguese
-# (Brazil's), polish, turkish or hungarian.  French, German, Italian,
-# Spanish, Japanese and Russian come with their dubbed voices and movies
-# where the server has the language packs; Russian, Portuguese, Polish,
-# Turkish and Hungarian take their text from them too.  [NFSU2_LANGUAGE]
+# (Brazil's), polish, turkish, hungarian or ukrainian.  French, German,
+# Italian, Spanish, Japanese and Russian come with their dubbed voices and
+# movies where the server has the language packs; Russian, Portuguese,
+# Polish, Turkish, Hungarian and Ukrainian take their text from them too.
+# [NFSU2_LANGUAGE]
 #language = english
 
 # The movies' subtitles: the PSA, the tutorials and the story, in every
@@ -428,19 +429,20 @@ export const TEMPLATE = `# NFSU2 settings, read at every launch.
 # off = Ghost mode for players: you drive through their cars, and they
 # through yours.  none = Ghost mode for everything: traffic and the game's
 # tuners pass through you too (in free roam with others; races stay as they
-# are), but not an outrun's opponent: the tuner, or a player who has on or
-# none too.  [NFSU2_ROAM_COLLIDE]
+# are), but not a tuner you race in an outrun.  An outrun with another
+# player is solid only when you both have on.  [NFSU2_ROAM_COLLIDE]
 #roam_collide = on
-# Quick chat: say one of your sixteen set phrases to the players near you
-# (1 to 4, then 1 to 4; a controller's right stick twice; the chat button on
-# a touch screen), and see theirs over their cars.  off = neither, and the
-# others send you none.  [NFSU2_ROAM_SAY]
+# Quick chat: say one of your sixteen set phrases to the players near you in
+# free roam, or to everyone in a multiplayer race, while driving and on its
+# results (1 to 4, then 1 to 4; a controller's right stick twice; the chat
+# button on a touch screen), and see theirs.  off = neither, and the others
+# send you none in free roam.  [NFSU2_ROAM_SAY]
 #quick_chat = on
 # Your sixteen: the phrases' numbers (web/src/app/phrases.ts), four for each
 # of 1 to 4, and the four groups' names (hi, reply, thanks, nice, drive,
 # meet, race, react or help).  The start page's Your phrases picks them.
 # [NFSU2_ROAM_SAY_PHRASES, NFSU2_ROAM_SAY_GROUPS]
-#quick_chat_phrases = 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
+#quick_chat_phrases = 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,152
 #quick_chat_groups = hi,reply,drive,race
 # Snapshots per second (10 to 30), the delay ghost cars are shown with in
 # ms (0 to 1000) and the longest cars are extrapolated in ms (0 to 1000).

@@ -4,9 +4,9 @@
 //!
 //! # The protocol
 //!
-//! Every browser that joins gets an address on 10.77.0.0/18 (`MASK`): 250 in each of 10.77.0-47.x (`NETS`, host
-//! bytes 2-251, so none ends in .0 or .255 and 10.77.0.1 and .253 stay the server's own), `ADDRS` (12000) in all,
-//! handed out in turn across the forty-eight (`vip_at`: 10.77.0.2, 10.77.1.2, ..., 10.77.47.2, 10.77.0.3, ...), so two
+//! Every browser that joins gets an address on 10.77.0.0/18 (`MASK`): 250 in each of 10.77.0-55.x (`NETS`, host
+//! bytes 2-251, so none ends in .0 or .255 and 10.77.0.1 and .253 stay the server's own), `ADDRS` (14000) in all,
+//! handed out in turn across the fifty-six (`vip_at`: 10.77.0.2, 10.77.1.2, ..., 10.77.55.2, 10.77.0.3, ...), so two
 //! players are rarely in the same /24 and anything that still takes the network for a /24 (or for the /19 it was
 //! before) shows at once, not only past 250 (or 8000) players.  Binary frames carry the game's network traffic; the
 //! switch only routes them and never looks inside:
@@ -28,7 +28,7 @@
 //!   UDP, TCP segments and ICMP with ports at [12..15] and an 8-byte LAN header (op, ttl, connection id) before the
 //!   data.  Their broadcasts go only to the browsers that have LAN play open (the game's LAN or Online screens:
 //!   "lan":1 in the hello, then {"t":"lan","on":0|1}; one that says nothing has it shut): the others drop them
-//!   anyway, and on a full switch each one would reach 12000 browsers.
+//!   anyway, and on a full switch each one would reach 14000 browsers.
 //! - 32 (`KIND_BUNDLE`): a bundle: several frames in one message, [1..3] reserved, then entries of [0] u8 n,
 //!   [1] reserved, [2..3] u16 frame length, n x u32 destination vip, the frame: to each of the n (the frame's own
 //!   destination is ignored), or with n = 0 to its own.  The switch takes them from anyone, and sends a client its
@@ -58,7 +58,7 @@
 //! A page whose LAN play is shut ("lan":0, or no word of it: free roam alone) gets a list of the server's own hosts only, and no changes,
 //! until it opens LAN play ({"t":"lan","on":1}: the whole list then, and the changes after it; shut again, no more
 //! changes).  Only LAN play needs the other players' addresses (members.rs `list_for`), and on a full switch the whole
-//! list is about 420 KB and every change went to 12000 pages, four times a second.
+//! list is about 490 KB and every change went to 14000 pages, four times a second.
 //!
 //! ## Addresses and tokens
 //!
@@ -131,7 +131,12 @@
 //! (`AttachOpts::refuse`, the server checks), or at its hello (`AttachOpts::on_hello` asks the server, with a
 //! [`Hello`]): by the id its page keeps in its storage ("id", at most 64 characters), the ones the page found in its
 //! other stores besides it ("was", at most [`WAS_MAX`] of them), or the keyphrase it plays with ("claim": below, as
-//! its owner).  The switch keeps who was on it for the operator's `who` ([`LanSwitch::who`]): each player's address
+//! its owner).  A hello under a name the operator took away is turned away the same way with [`CLOSE_RENAME`] (its
+//! page asks the player for another name and comes back).  A player under a race ban ([`HelloAnswer::no_races`], or
+//! [`LanSwitch::set_races`] while it plays) stays, but no frame that races goes from it or to it (`races`: LAN play,
+//! which every race between browsers is once it starts, and free roam's outrun and lobby messages), and the hub's list
+//! of lobby races does not reach it; the hosts hear of it with each frame (`FrameCtx::no_races`: the Online lobby
+//! gives it no game).  The switch keeps who was on it for the operator's `who` ([`LanSwitch::who`]): each player's address
 //! and name (with the other names its game shows in free roam: `Host::other_names`), the opaque id the server gave
 //! its client address (`AttachOpts::ident`, a keyed hash), its page's id and its keyphrase's owner, and the same of
 //! the players who left in the last `GONE_MS`, so that one who just left can still be banned.  None of it is ever
@@ -152,8 +157,9 @@
 //!
 //! ## Friends
 //!
-//! A page's {"t":"friend",...} and {"t":"room",...} go to the server as they came ([`LanSwitch::on_text`], with the
-//! page's address, its keyphrase's owner and its client), under the text messages' budget (`text_rate`, `max_text`):
+//! A page's {"t":"friend",...}, {"t":"room",...} and {"t":"flying",...} go to the server as they came
+//! ([`LanSwitch::on_text`], with the page's address, its keyphrase's owner and its client), under the text messages'
+//! budget (`text_rate`, `max_text`):
 //! free roam's friends (the server's friends.rs).  The server answers one page with [`LanSwitch::send_text`], and
 //! finds a friend's pages for a message by their keyphrase's owner ([`LanSwitch::vips_of_owner`]).
 //!
@@ -171,7 +177,7 @@
 //!   own buckets (behind its own lock, uncontended but for the Online host's charges), its client's and site's
 //!   (behind theirs: shared only by that client's connections), then the receivers.  No lock is shared by all.
 //! - Who is on the switch changes under one lock (`members`: admit, leave, reservations, the peer-list changes,
-//!   the store); routing never takes it.  A frame finds its receiver in a fixed table of the 12000 addresses (an
+//!   the store); routing never takes it.  A frame finds its receiver in a fixed table of the 14000 addresses (an
 //!   `ArcSwapOption<Peer>` per address: one atomic load), a broadcast walks a copy-on-write list of every peer (LAN
 //!   play's, of every peer with LAN play open).  What a broadcast costs its sender is its list's length, known
 //!   without a look at the peers, and they are walked only for a broadcast paid for (the second security audit,
@@ -263,14 +269,34 @@ pub use text::{clean_name, vip_num};
 
 /// 10.77.0.0/18's mask, which the welcome tells the page
 pub const MASK: &str = "255.255.192.0";
-/// the /24s of it that addresses are handed out in: 10.77.0-47.x
-pub const NETS: usize = 48;
-/// addresses the switch hands out: host bytes 2-251 in each of the forty-eight /24s
+/// the /24s of it that addresses are handed out in: 10.77.0-55.x
+pub const NETS: usize = 56;
+/// addresses the switch hands out: host bytes 2-251 in each of the fifty-six /24s
 pub const ADDRS: usize = NETS * 250;
 pub const BROADCAST: u32 = 0xFFFF_FFFF;
 /// the close codes of a kick and a ban (the crate doc's Kicks and bans): the page stays off the switch after them
 pub const CLOSE_KICKED: u16 = 4001;
 pub const CLOSE_BANNED: u16 = 4003;
+/// the close code of a name taken away (the crate doc's Kicks and bans): the page asks for another name, then comes back
+pub const CLOSE_RENAME: u16 = 4004;
+/// free roam's datagrams that race another player (runtime/roam_core.h): an outrun's (RC_MSG_DUEL), a lobby race's
+/// (RC_MSG_LOBBY); and the hub's list of lobby races (RC_MSG_LOBBIES)
+const ROAM_DUEL: u8 = 9;
+const ROAM_LOBBY: u8 = 12;
+const ROAM_LOBBIES: u8 = 13;
+
+/// a free-roam datagram's type (runtime/roam_core.h: "N2FR", version, type after the frame's 16 bytes), None for any
+/// other frame.  Its CRC is not checked: a frame that is no such datagram is none to an honest game either.
+fn roam_type(data: &[u8]) -> Option<u8> {
+    (data.len() > 21 && data[0] == KIND_UDP && &data[16..20] == b"N2FR").then(|| data[21])
+}
+
+/// A frame that races another player: LAN play's (kinds 3-5: the game's LAN races, and Online's and free roam's lobby
+/// races once they start, go from browser to browser so), or free roam's outrun or lobby message.  None goes from or
+/// to a player under a race ban (`Conn::no_races`).
+pub(crate) fn races(data: &[u8]) -> bool {
+    (KIND_LAN_UDP..=KIND_LAN_ICMP).contains(&data[0]) || matches!(roam_type(data), Some(ROAM_DUEL | ROAM_LOBBY))
+}
 /// the most ids a hello's "was" names (the page keeps its id in two stores: one other is all it sends)
 pub const WAS_MAX: usize = 4;
 /// the players who left in this long are kept for `who` (ms), this many at most
@@ -507,14 +533,26 @@ impl LanOptions {
 pub type OnJoin = Box<dyn Fn(u32, bool, usize) + Send + Sync>;
 /// `AttachOpts::on_leave`: (vip, name, players on the switch now)
 pub type OnLeave = Box<dyn Fn(u32, &str, usize) + Send + Sync>;
-/// `AttachOpts::on_hello`: what the hello names its client by -> the control message that turns it away, or None
-pub type OnHello = Box<dyn Fn(&Hello) -> Option<Bytes> + Send + Sync>;
+/// `AttachOpts::on_hello`: what the hello names its client by -> what the server makes of it
+pub type OnHello = Box<dyn Fn(&Hello) -> HelloAnswer + Send + Sync>;
 
 /// What a hello names its client by, for the operator's bans (the crate doc's Kicks and bans): its page's id first,
-/// then the ones the page found besides it ("was"); the owner of the keyphrase it plays with (`AttachOpts::on_claim`)
+/// then the ones the page found besides it ("was"); the owner of the keyphrase it plays with (`AttachOpts::on_claim`);
+/// the name it plays under ("name", as it came)
 pub struct Hello<'a> {
     pub ids: Vec<&'a str>,
     pub owner: Option<&'a str>,
+    pub name: &'a str,
+}
+
+/// What the server makes of a hello (`AttachOpts::on_hello`)
+#[derive(Default)]
+pub struct HelloAnswer {
+    /// the control message that turns the client away, and the close after it: `CLOSE_BANNED`, or `CLOSE_RENAME` (its
+    /// name was taken away)
+    pub refuse: Option<(Bytes, u16)>,
+    /// it races nobody (a race ban): the control message its page hears of it
+    pub no_races: Option<Bytes>,
 }
 /// `AttachOpts::on_claim`: the hello's "claim" (a keyphrase's token) -> the owner the hosts are told of, or None
 pub type OnClaim = Box<dyn Fn(&str) -> Option<Arc<str>> + Send + Sync>;
@@ -542,7 +580,8 @@ pub struct AttachOpts {
     pub ident: Option<String>,
     /// a banned client: this control message, then the close with `CLOSE_BANNED`; it never gets a place
     pub refuse: Option<Bytes>,
-    /// the hello's ids (its page's own) and keyphrase: a message back turns the client away as `refuse` does
+    /// the hello's ids (its page's own), keyphrase and name: the answer turns the client away as `refuse` does (or with
+    /// `CLOSE_RENAME`), or keeps it out of races
     pub on_hello: Option<OnHello>,
     /// the hello's "claim" (the token of the keyphrase its page plays with): the owner its frames name to the hosts
     /// (`FrameCtx::owner`); never kept or shown otherwise
@@ -878,7 +917,7 @@ pub struct LanSwitch {
     online_backlog: Arc<nfsu2_util::host::Backlog>,
     tap: Option<Tap>,
     store: Option<Arc<store::Store>>,
-    /// the peer at each of the 12000 addresses (`slot()`), for unicast without a lock
+    /// the peer at each of the 14000 addresses (`slot()`), for unicast without a lock
     table: Box<[ArcSwapOption<Peer>]>,
     /// every peer, in the order of `Members::peers` (broadcasts, the timers, info)
     all: ArcSwap<Vec<Arc<Peer>>>,
@@ -1136,6 +1175,10 @@ impl LanSwitch {
             self.stats.shed.inc();
             return SendResult::Full;
         }
+        // a player under a race ban is shown no lobby races (it could join none)
+        if p.conn.no_races.load(Relaxed) && roam_type(&data) == Some(ROAM_LOBBIES) {
+            return SendResult::Sent;
+        }
         if let Some(c) = cause {
             c.spend(1, data.len());
         }
@@ -1336,13 +1379,27 @@ impl LanSwitch {
     pub(crate) fn expel_conn(&self, conn: &Arc<Conn>, msg: Bytes, code: u16) {
         conn.expelled.store(true, Relaxed);
         conn.push(Out::Text(msg));
-        let reason: &[u8] = if code == CLOSE_KICKED { b"kicked" } else { b"banned" };
+        let reason: &[u8] = match code {
+            CLOSE_KICKED => b"kicked",
+            CLOSE_RENAME => b"rename",
+            _ => b"banned",
+        };
         conn.close(conn::close_payload(code, reason));
     }
 
-    /// a hello (the first control message of a connection) whose ids or keyphrase the server turns away: the
-    /// connection goes, and true.  The id and the owner its claim names are kept either way (for `who`, and the owner
-    /// for the hosts).
+    /// The player at `vip` races nobody from now on (`off`, a race ban), or may again: its page hears `msg`.  False:
+    /// nobody is there.
+    pub fn set_races(&self, vip: u32, off: bool, msg: Bytes) -> bool {
+        let guard = slot(vip).map(|i| self.table[i].load());
+        let Some(p) = guard.as_ref().and_then(|g| g.as_ref()).filter(|p| p.open()) else { return false };
+        p.conn.no_races.store(off, Relaxed);
+        self.send(p, Out::Text(msg));
+        true
+    }
+
+    /// a hello (the first control message of a connection) whose ids, keyphrase or name the server turns away: the
+    /// connection goes, and true.  One under a race ban stays, out of races.  The id and the owner its claim names are
+    /// kept either way (for `who`, and the owner for the hosts).
     pub(crate) fn hello_refused(&self, conn: &Arc<Conn>, ctx: &AttachCtx, b: &Bytes) -> bool {
         if b.len() > self.o.max_text || !conn.open() {
             return false;
@@ -1372,16 +1429,17 @@ impl LanSwitch {
             }
         }
         let owner = conn.owner.get().map(|o| &**o);
-        if ids.is_empty() && owner.is_none() {
-            return false;
+        let name = m.get("name").and_then(serde_json::Value::as_str).unwrap_or("");
+        let Some(a) = ctx.on_hello.as_ref().map(|f| f(&Hello { ids, owner, name })) else { return false };
+        if let Some((msg, code)) = a.refuse {
+            self.expel_conn(conn, msg, code);
+            return true;
         }
-        match ctx.on_hello.as_ref().and_then(|f| f(&Hello { ids, owner })) {
-            Some(msg) => {
-                self.expel_conn(conn, msg, CLOSE_BANNED);
-                true
-            }
-            None => false,
+        if let Some(msg) = a.no_races {
+            conn.no_races.store(true, Relaxed);
+            conn.push(Out::Text(msg));
         }
+        false
     }
 
     /// the switch's counts and its players, as JSON (for the tests: names and virtual addresses only, never a real
@@ -1671,7 +1729,7 @@ pub struct ReservedView {
     pub site: Option<String>,
 }
 
-/// the i-th address in the order they are handed out (round the forty-eight /24s: the crate doc says why)
+/// the i-th address in the order they are handed out (round the fifty-six /24s: the crate doc says why)
 pub fn vip_at(i: usize) -> u32 {
     BASE | ((i % NETS) << 8) as u32 | ((i / NETS) as u32 + 2)
 }
@@ -1704,13 +1762,13 @@ mod tests {
             BASE | 1,
             BASE | 252,
             BASE | 255,
-            BASE | 0x3000 | 2,
+            BASE | 0x3800 | 2,
             BASE | 0x3F00 | 2,
             BASE | 0x4000 | 2,
             0,
             BROADCAST,
-            BASE | 0x2F00 | 0xFD,
-            BASE | 0x2FFF,
+            BASE | 0x3700 | 0xFD,
+            BASE | 0x37FF,
             BASE | 0x3FFF,
         ] {
             assert_eq!(slot(v), None, "{v:x}");

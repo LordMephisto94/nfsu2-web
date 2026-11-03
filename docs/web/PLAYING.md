@@ -78,17 +78,24 @@ While you drive:
   straight ahead. That button held opens the touch settings (the Controls sheet's Touch tab) over the game.
 - **Position**, in the Touch tab and kept in this browser: **Steering left** (the default) or **Steering right**, where
   the pedals go under the left thumb and the steering, the gear buttons and Start under the right (◀ ▶ stay in their
-  order); either one **moved in**, 48 px further from the screen's sides (upright, as far as there is room), for
-  phones whose edges a thumb reaches badly. **Nitro on the steering side** (a switch there) puts Nitro under the thumb
-  that is not on Gas: above the steering, with Start above Gas instead; with tilt, Nitro and the handbrake trade
-  places.
+  order); either one **moved in**, 48 px further from the screen's sides, or **moved in more**, 112 px (upright, as
+  far as there is room), for phones whose edges a thumb reaches badly. **Nitro on the steering side** (a switch
+  there) puts Nitro under the thumb that is not on Gas: above the steering, with Start above Gas instead; with tilt,
+  Nitro and the handbrake trade places.
 - **Gears:** with a manual gearbox (the race's Transmission choice, and always in a drag race), gear down and gear up
   above the steering.
 - **Small buttons** along the top: pause, camera (held: look back), reset; in free roam also the map, messages,
   **Drift** (drift mode, the game's drift icon, lit while it is on), the career status (the game's Career Status, as
   D-pad Down on a controller, T or F4 on a keyboard), and the horn and quick chat (not with quick chat off)
-  while another player's car is within a horn's reach. In free roam **Start** shows above the steering where it does
+  while another player's car is within a horn's reach. In a race with other players quick chat shows after reset
+  (in landscape after Pressurize and Bounce, on a car with hydraulics), and on its results beside the menu's button.
+  In free roam **Start** shows above the steering where it does
   something: at an event's or a shop's marker, at an outrun offer, or at a race spot or lobby of other players.
+- **Hydraulics:** with a car that has them (the Hydraulics part, Car Specialties), **Pressurize** and **Bounce** join
+  the small buttons (in free roam after the career status, upright in the second row; in a race after reset). A tap
+  turns one on (lit, as H or J held on a keyboard), another tap turns it off, or the other one on. While one is on,
+  the steering and Gas and Brake pick the corners instead of driving, under 10 mph as with H and J; turned on faster,
+  it starts working once the car is that slow.
 - **HUD:** a phone starts with the game's 4:3 HUD layout (Game, Display, HUD layout), which keeps the minimap and
   the speedometer between the thumbs instead of under the steering and Brake.
 - **Sizes**, in the Controls sheet's Touch tab and kept in this browser: **Control size** for the touch controls, and
@@ -109,10 +116,10 @@ While you drive:
 | Left Shift, left Ctrl | Gear up, gear down (manual gearbox) |
 | C, B | Camera, look back |
 | R | Respawn |
-| H, J | Hydraulics, with the Hydraulics part (Car Specialties): hold H to pressurize or J to bounce, then the arrows pick the corners; under 10 mph |
+| H, J | Hydraulics, with the Hydraulics part (Car Specialties): hold H to pressurize or J to bounce, then the arrows pick the corners; under 10 mph; on a touch screen the Pressurize and Bounce buttons |
 | N | Horn (free roam and races with other players) |
 | X | Drift mode in free roam: drift handling, the drift camera and a drift score (see below); on a touch screen the Drift button |
-| 1 to 4, then 1 to 4 | Quick chat in free roam with other players: a group, then a phrase (see section 6) |
+| 1 to 4, then 1 to 4 | Quick chat in free roam and in races with other players: a group, then a phrase (see section 6) |
 | I | Message a friend in free roam: the answer to the newest message, or a friend to pick (see section 6, Friends) |
 | M, Tab | Map, messages |
 | T | Career status: what the stage still needs |
@@ -157,8 +164,11 @@ The start page shows these keys under **Controls**, and F9, Controls shows them 
   brake, the left stick steers, LB is nitrous, RB the handbrake, A and X shift, Y and B are camera and look back, View
   respawns, Start pauses; D-pad up starts an event or takes an outrun, left and right are the map and messages. A
   click of the left stick is the horn, unless your car has hydraulics: then the stick clicks are the game's hydraulics
-  (left: pressurize, right: bounce). In free roam with other players the right stick is quick chat: a flick for a
-  group, another for its phrase.
+  (left: pressurize, right: bounce). In free roam and in races with other players the right stick is quick chat: a
+  flick for a group, another for its phrase. In the garage, the shops and the main menu the right stick turns the car
+  round and tilts the view, as the middle-button drag does: right turns the view right, as in photo mode (and as a
+  drag to the right), down looks down on the car; full stick turns about 60° a second. Each screen starts at the
+  game's own angle.
 - **Steering wheel:** a Logitech G29, G920 or G923, and other wheels the browser shows as a game controller. The wheel
   steers, the pedals are throttle and brake (and reverse), the paddles shift down and up, Cross (A) is nitrous, Square
   (X) the handbrake, Circle and Triangle (B and Y) look back and camera, Share respawns, Options pauses, PS opens the
@@ -215,10 +225,10 @@ that room.
 | Controls, Controller | rumble; more: controller (on, hotplug or off), menu buttons, dead zones, trigger full press |
 
 - **Language:** English, French, German, Italian, Spanish, Dutch, Swedish, Danish, Korean, Chinese, Japanese, Russian,
-  Thai, Portuguese (Brazil), Polish, Turkish or Hungarian, for the menus and all the game's text. Where the server
-  has the language packs, French, German, Italian, Spanish, Japanese and Russian also play with
+  Thai, Portuguese (Brazil), Polish, Turkish, Hungarian or Ukrainian, for the menus and all the game's text. Where the
+  server has the language packs, French, German, Italian, Spanish, Japanese and Russian also play with
   their dubbed voices and movies, Chinese, Japanese and Thai with their full text, and Russian, Portuguese, Polish,
-  Turkish and Hungarian with their text at all. Without the packs those five play in English, and the other
+  Turkish, Hungarian and Ukrainian with their text at all. Without the packs those six play in English, and the other
   languages with English voices and movies. Your browser fetches only your language's files: the dubbed voices are
   about 50 MB (Russian 94 MB), and the dubbed movies are smaller than the English ones they replace. Hungarian's
   text writes ő and ű as õ and û, as its translation does: the game's fonts have no ő or ű. The start page follows the
@@ -275,6 +285,11 @@ that room.
   profile with its first 5 cars, driving the first one when yours was one of the other 5. A profile changed
   elsewhere (played in the PC game) loads here with its 5 too: the other 5 are kept aside in the profile's folder,
   as `GARAGE.OLD`.
+- **Unique parts after Caleb:** the outruns' unique visual parts (the wide body kits, and the unique hoods, spoilers,
+  rims and vinyls) go, as in the original game, to the one car you drive to their star, and the wide body's star
+  (11 outrun wins in stage 5) comes only before the last URL race. Once you have beaten Caleb, the shops have all of
+  them for every car in your career, as the original game's ending has them in Customize mode, whose cars free roam
+  never drives. The unique performance parts stay one per stage.
 - **Power Units:** the game's Options, Gameplay (also in the pause menu's) has a row after Speedometer Units: the
   engine's power in bhp or kW wherever the game shows it (the dyno, the performance shop's parts), whatever the
   speedometer shows. Until you change it, it follows Speedometer Units, as in the original game (kW with km/h).
@@ -390,7 +405,7 @@ or use a Room to keep to a group.
 
 Good to know:
 
-- **How many:** up to 12000 players on a server set up with `web/deploy/` (2000 with the older Node server), 128 on
+- **How many:** up to 14000 players on a server set up with `web/deploy/` (2000 with the older Node server), 128 on
   one started by hand (its owner can change that). Only free roam and the LAN and Online screens take a place;
   single-player takes none. When it is full, you wait in line for a place, first come first served: the top of the
   screen shows your place and, once a few went in, about how long it takes. You play alone meanwhile and join the
@@ -417,8 +432,8 @@ Good to know:
 - **Ghost mode:** Online, Ghost mode. **Off** (the default): you collide with the other players' cars. **Players**: you
   drive through them, and they through yours. **Everything**: traffic and the game's tuners pass through you as well
   (and through the other players' cars on your screen), in free roam with others only: races stay as the game has
-  them, and an outrun's opponent is solid while it runs, as in the game: the tuner you race, or a player whose Ghost
-  mode is Off or Everything too (with Players, or on an older version, you two drive through each other as before).
+  them, and the tuner you race in an outrun is solid while it runs, as in the game. An outrun with another player is
+  solid only when you both have Ghost mode Off; with Players or Everything you two drive through each other.
   Traffic and tuners are in your game only, so this changes nothing for the others. The page menu (F9) switches
   between the three while you play, at once, and keeps it for your next games. With Off, a car that appears on top
   of yours, at a garage or after a jump, lets you through until you are apart. Each
@@ -460,17 +475,32 @@ Good to know:
   | Hey! | Yes | Follow me! | Race? |
   | Nice car! | No | Wait up! | Join my race! |
   | Thanks! | Sorry! | Let's go! | gg |
-  | Bye! | lol | Nice! | One more? |
+  | Bye! | lol | Nice! | Countdown (special) |
 
   Online, Your phrases, Choose phrases puts any of about 150 phrases in each place (greetings, replies,
   thanks and sorry, compliments, driving together, car meets, races, reactions, help) and names each group.
+
+  **Countdown** is a special phrase, with a stopwatch in the picker (in Choose phrases under Special; in the sixteen
+  you start with in One more?'s place, since 2026-11-03): a start for the players lined up behind you in free roam.
+  It counts 5, 4, 3, 2, 1 and GO!, big in the middle of the picture for you and the players within 50 m of you, over
+  your car for the others who see your phrases. While one is on near you, and for 10 seconds after its GO!, nobody
+  else's shows and yours waits. In a race it is dimmed and does nothing (the race has its own start).
 
   A phrase shows over your car and in the chat log on the left, for the players within 250 m (where they hear your
   horn) and everyone in your race lobby, wherever they are; in the lobby's card it shows beside your name. Over a car
   only while its name shows (within 100 m, in front of you, the game's player-names option on). Three phrases in six
   seconds at most; then the picker asks you to wait. Online, Quick chat turns it off: you then neither see
   nor send phrases, and the others' games send you none. Players on an older version neither see yours nor send any,
-  and those who have not reloaded the page since the phrases came see only the first sixteen.
+  and those who have not reloaded the page since the phrases came see only the first sixteen (since the countdown
+  came: no countdown).
+
+  It works in races with other players too: the races of free roam's lobbies, the game's Online races and its LAN
+  races, with free roam on or off, while you drive and on the results (free roam's trips leave those after about
+  10 seconds; an Online race goes back to the game room, which has its own chat). Same keys, stick and chat button,
+  never in a race of your career or a Quick Race. A phrase goes to everyone in the race and shows in the chat log on
+  the left, not over the cars; the race's creator passes each player's on to the others, so with a creator on an older
+  version you hear only the creator's. Players you block (Online, More online settings, Blocked players) are not
+  shown. With Quick chat off you neither see nor send phrases in races either.
 - **Engines:** the others hear your engine from your car, as you hear it yourself: the game's own recordings of your
   car's engine (each car has its own, and the engine upgrades change it), pulling as you accelerate and letting off as
   you lift, at your revs, with the limiter and a launch's wheelspin as your game plays them; louder the nearer they
@@ -488,15 +518,15 @@ Good to know:
 - **Headlights:** the other players' headlights light the road in front of their cars, as yours do, a little dimmer
   and in their own colour; in Online and LAN races too. Display, more: Other cars' headlights (All cars: AI racers and
   traffic too; Off: only yours, as in the original game). The Windows plugin draws only your own.
-- **Outruns:** stay within about 25 m of another player for 4 seconds, away from the shops' and the garage's doors
-  and from either player's open events (20 m), and the game offers an outrun, as it does with
-  its own tuners: the outrun icon lights up and the top of the screen says "Press Enter to challenge ... to an
-  outrun" (on a controller, D-pad up, the game's Engage). The other player sees "... challenges you to an outrun" and
-  takes it with Enter as well, or lets it go: a challenge lapses after 15 seconds, or when you are more than 60 m
-  apart. Then both games run the game's own outrun against each other's car: its "Feet" meter, and whoever gets
-  1,000 feet (300 m) ahead of the other wins, and the bank pays or charges as in an outrun against a tuner. Leaving it
-  (back to the menus, quitting, losing the connection) loses it. The other players' cars stay, and they see the two
-  drive. Players on the Windows plugin are not offered outruns.
+- **Outruns:** stay within about 25 m of another player for 4 seconds, away from the shops' and the garage's doors and
+  from either player's open events (20 m), and not in a crowd (4 or more other players within 25 m of you, as at a car
+  meet), and the game offers an outrun, as it does with its own tuners: the outrun icon lights up and the top of the
+  screen says "Press Enter to challenge ... to an outrun" (on a controller, D-pad up, the game's Engage). The other
+  player sees "... challenges you to an outrun" and takes it with Enter as well, or lets it go: a challenge lapses
+  after 15 seconds, or when you are more than 60 m apart. Then both games run the game's own outrun against each
+  other's car: its "Feet" meter, and whoever gets 1,000 feet (300 m) ahead of the other wins, and the bank pays or
+  charges as in an outrun against a tuner. Leaving it (back to the menus, quitting, losing the connection) loses it.
+  The other players' cars stay, and they see the two drive. Players on the Windows plugin are not offered outruns.
 - **The game's own tuners** come out to challenge you in free roam with other players around, as they do offline, so
   their outruns and what winning them opens up (the unique parts) are there online too. The other players' cars stay
   while you race a tuner; they see your car, not the tuner, which is in your game only. Both are offered: a tuner
@@ -507,7 +537,8 @@ Good to know:
   in or by a race lobby. On the Windows plugin the tuners stay away while other players are about.
 - **Races with other players:** a race of your career can be raced with the players around you, as the game's own LAN
   race on its track, in your career car. That takes a car of your own: in a new career's prologue (the 350Z you
-  start in) you cannot join or open a lobby, and the panel says so; from your first car on you can.
+  start in) you cannot join or open a lobby, and the panel says so; from your first car on you can. Lobbies are
+  joined from your career's free roam only: in Quick Race's Free Run the panel says so too.
   - **An open race** (its marker in the street): its card asks Accept or Decline as always, and Accept asks once more:
     **Solo** (the career race, as before) or **Multiplayer**.
   - **A race that is not open** in your career has no marker of the game's. Within about 50 m its start shows
@@ -520,7 +551,7 @@ Good to know:
     Multiplayer as above.
   - **Multiplayer opens a lobby** at the start: the panel shows it, its race, career stage, track and laps and its six
     places (drag 4, 3 on the three-lane track) with the players in them, the host first and yours marked. The players
-    near see "Thom's circuit (1/6)" over the start (from about 250 m); everyone in free roam sees its race's icon on
+    near see "Ann's circuit (1/6)" over the start (from about 250 m); everyone in free roam sees its race's icon on
     the world map (M), and the nearest four lobbies their words beside it ("Circuit 1/6") where these cover no other
     icon (the legend's Players' races row hides them). They join at the start:
     within 15 m of it the panel shows the lobby and Enter joins (at an open race: its card's Accept, then **Join**).
@@ -570,7 +601,7 @@ Good to know:
   joins, but other players never learn your crews: the server tells each game which players near it share one. A
   player on an older version is in no crew.
 - **Friends:** touch front bumpers with another player (nose to nose, both cars' fronts) for 3 seconds, solid or in
-  ghost mode, and a note at the top offers **Add Bo as a friend**: press **F**, click or tap the
+  ghost mode, and a line above the outrun one offers **Add Bo as a friend**: press **F**, click or tap the
   line, or use the page menu (F9, ☰, or Home on a controller). The other player's line then says **Al wants to be
   friends: accept**; once both said yes you are friends. Touching the side or the back of a car offers nothing, nor
   does a race, an outrun or a race lobby. Both of you need a claimed name ("Your name": a claim needs cloud saves);
@@ -609,7 +640,8 @@ Good to know:
   by commas, up to 32 (capitals don't count). You and they never see each other in free roam, wherever you are: no
   car, no name, no horn, no quick chat or outrun, no message about them, nobody on the world map. Neither of you sees
   a race lobby the other hosts or is in, so you don't race each other from free roam (unless you both join one at
-  the same moment). It takes effect the next time you press Play. It goes by name: a player who changes a claimed
+  the same moment). In a race you are both in anyway (an Online or LAN race), your page shows none of their quick
+  chat phrases. It takes effect the next time you press Play. It goes by name: a player who changes a claimed
   name stays blocked while the old name is still theirs (14 days); after that, or for a name nobody claimed, block
   the new name. The game's Online menu has its own: block a player in EA Messenger there. The server's log says whom
   you block, so its operator sees who many players block (and can ban them). A server of before this version takes
@@ -659,7 +691,8 @@ Good to know:
   terror and sexual violence. Swear words are fine.
 - **Chat in the Lobby and in a game room** is read the same way, word by word: a line with a slur in it reaches no
   one but you, and after three of them in ten minutes you cannot chat for ten minutes. Swear words are fine. A player
-  you block in EA Messenger is not heard there either.
+  you block in EA Messenger is not heard there either. In the race itself and on its results, quick chat's set
+  phrases work (1 to 4, then 1 to 4; section 6, Quick chat).
 - **Submit Complaint** (choose a player in a game room) tells the server's operator about that player, with their
   last few chat lines (of the last ten minutes) that you could see; the operator decides what happens. Without a
   complaint no chat is written down anywhere, only the word that kept a line from the others.
@@ -723,7 +756,8 @@ Good to know:
   way when the race ended) sent the same finishing order (every game sends its own at the results screen), so a race
   counts even when only its winner finished. A player who left the race decides nothing: their game counts every
   player as gone. Each player races from their own browser. **Monthly Point Leaders** (Online Main Menu) shows this
-  month's two leaders of each race type and, on its other page, last month's.
+  month's two leaders of each race type and, on its other page, last month's (from 1 December 2026, with November's
+  leaders first: the server kept no whole month before it).
 - **EA Messenger** (the Online Main Menu's button): Search finds the players online on this server and those with a
   race in Rankings. **Send Friend Request** reaches the other player now, or when they next come online: they see you
   in their list with a green arrow and pick **Answer Friend Request**: Accept, Decline or Block. Your friends stay on

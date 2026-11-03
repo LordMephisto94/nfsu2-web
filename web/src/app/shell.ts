@@ -35,19 +35,20 @@ import { TouchControls } from './touch';
 import { TextField } from './textentry';
 import { PauseHint } from './pausehint';
 import { DriftPanel } from './drift';
-import { PhotoMode } from './photo';
+import { PhotoMode, photoMark } from './photo';
 import type { PadPage } from '../input/gamepad';
-import type { NetQueue, NetRemoved } from '../net';
+import type { NetQueue, NetRaces, NetRemoved, NetRename } from '../net';
 import { blockList, checkSetting, HOST_FIXED, pageOnly, resolveEnv, settingsUpgrade, TEMPLATE, type Resolved } from './settings';
-import { exists, filesOf, listProfiles, PROFILES_DIR, readText, removeSaveDir, writeFile } from './savefs';
-import { newProfileName, turnOnAutosave } from './profile';
+import { exists, filesOf, listProfiles, PROFILES_DIR, readText, removeSaveDir, settleStaged, writeFile } from './savefs';
+import { coverOf, newProfileName, turnOnAutosave } from './profile';
 import { crewControl, putKey, SettingsPanel, showCrewCounts } from './settings-ui';
 import { askCrews, PlayersPanel, queueText, roomHash, roomLine, roomText, serverAnswers, watchPlayers, type PlayerCounts, type Reach } from './players';
 import { panelTabs } from './tabs';
 import { CREW_MAX, crewList, crewsOf, crewsValue, freeColour, rgbsValue, rgbWords, type Crew } from './crews';
 import { checkInvite, inviteLink, readInvite, sameName, type Invite } from './invite';
 import { privacy, SCRUB_NOTE } from './privacy';
-import { exportSaves, SavesPanel } from './saves-ui';
+import { exportSaves, oneWriter, SavesPanel, snapshotFile, snapshotSaves, type FileIn } from './saves-ui';
+import { zip } from './zip';
 import { saveScreenshot } from './shots';
 import { forgetLink, OFFER_TIMES, VaultPanel } from './vault-ui';
 import { Radio, MODES, radioWasOn, type Mode } from '../radio';
@@ -66,7 +67,7 @@ import { playedMs, PlayTime, SMS_AFTER_MS } from './playtime';
 import { canKeep } from './pwkeep';
 import { keepPageId, PAGE_ID_FILE, pageId, seen } from './page-id';
 import { NameClaims, onlineName } from './claim';
-import { claimQuietly, NameRow, quietCheck, settleName, type PlayNameDeps } from './claim-ui';
+import { claimQuietly, NameRow, quietCheck, renamePick, settleName, type PlayNameDeps } from './claim-ui';
 import { RenderCheck, RENDER_CHECK_TIMES, type RenderCheckTimes } from './rendercheck';
 import { moviesKept, Predownload } from './predownload';
 import { movieCodec } from '../host/movie';
@@ -137,6 +138,7 @@ const checks = new Map<string, Check>();
 let instance: ReturnType<typeof claimInstance>;
 let settingsText: string | null = null;
 let starting = false;                    // Play pressed, the session not there yet
+let savesLocked = false;                 // the game about to start reads the saves: no cloud version comes in (VaultPanel's playing)
 let fatal: { what: string; code?: string } | null = null;   // why the running game had to be stopped (English, for t())
 // the last game lost its graphics (GPU-LOST): Safari's WebGPU gives this page no adapter any more, so Play reloads it
 let gpuGone = false;
@@ -148,7 +150,7 @@ let radio: Radio | null = null;          // made at the first click on Radio: a 
 const theRadio = () => radio ??= new Radio(radioPort, l => log.add(`[radio] ${l}`));
 let lobbyPanel: LobbyPanel;
 let quickChat: QuickChat;                // free roam's fixed phrases (quickchat.ts)
-let friendPrompt: FriendPrompt;          // free roam's friends: Add friend in the toasts when front bumpers touch (friends.ts)
+let friendPrompt: FriendPrompt;          // free roam's friends: Add friend over the game when front bumpers touch (friends.ts)
 let friendsPanel: FriendsPanel;          // ...and the friends on the start page
 const msgStore = new MessageStore();      // messages between friends (messages.ts): the conversations in this browser
 let friendMessages: FriendMessages;       // ...in the game: the log's lines, I and its card
@@ -173,6 +175,9 @@ let reach: Reach = 'ok';
 let misses = 0, answered = false;
 /** the profile the running (or last) game saved last, when, and how often it saved one */
 let saved: { name: string; at: number; count: number } | null = null;
+/** the save folder as this game's start had it (saves-ui.ts snapshotSaves): what comes back if the browser deletes the
+ *  site's data during the game and there are no cloud saves (saveGone) */
+let playStart: FileIn[] = [];
 
 // ------------------------------------------------------------- progress --
 function setProgress(f: number) {
@@ -357,7 +362,8 @@ async function askRoam(): Promise<boolean> {
   let text = putKey(settingsText ?? TEMPLATE, 'roam', on ? 'on' : 'off').text;
   const typed = field?.value.trim() ?? name;
   if (on && typed !== name) text = putKey(text, 'roam_name', typed || null).text;
-  await writeFile(SAVE, 'settings.ini', text);
+  // (not written, the browser's storage full: this game plays as answered, and the next Play asks again)
+  await writeFile(SAVE, 'settings.ini', text).catch(e => log.add(`[app] free roam with others: the answer was not written (${e})`));
   settingsText = text;
   void settings.refresh();
   log.add(`[app] free roam with others: ${on ? 'on' : 'off'} (asked at the first Play${c?.full === true ? ', the server full' : ''})${on && typed !== name ? `, name ${typed || '(the profile\'s)'}` : ''}`);
@@ -381,10 +387,16 @@ async function askCloud() {
   body.append(p(t('Your career is saved only in this browser, and browsers sometimes clear site data (low disk space, cleared history).')),
     await vault.stake(playedMs()),
     p(t('Cloud saves keep a copy on this server under a passphrase only you have, so you can get your saves back here or in another browser.')));
-  // the name, when it is free to claim: the new keyphrase claims it at once, and its popup says so
+  // the name, when it is free to claim: the new keyphrase claims it at once, and its popup says so; another player's:
+  // the keyphrase does not hold it, said before Play's question about the name (2026-11-02, a player's report: given a
+  // passphrase, then told the name was claimed)
   const name = onlineName(await typedName());
   const info = name ? await claims.check(name) : null;
+  const taken = name && info?.state === 'taken' ? info.name ?? name : null;
   if (name && info?.state === 'free' && !info.mine) body.append(p(t('It also claims your name {name}, so no one else can play under it.', { name })));
+  // (the other player may be this one, its passphrase in another browser: a new one here could not get the name back)
+  if (taken) body.append(p(t('{name} is claimed by another player, so this passphrase keeps your saves but not that name.', { name: taken })),
+    p(t('If it\'s yours, choose Not now and enter your passphrase under Cloud saves.')));
   body.append(p(t('You can change this under Cloud saves on the start page.')));
   // or a file of them, kept where the player likes (Saves, Download backup)
   const backup = Object.assign(document.createElement('button'), { type: 'button', className: 'text-btn', textContent: t('Download backup') });
@@ -409,7 +421,7 @@ async function askCloud() {
   const phrase = await enableCloud();
   if (!phrase) return;
   const claimed = name && info?.state === 'free' && !info.mine ? await claimQuietly(playDeps(), name, info, quietCheck) : null;
-  await showPassphrase(phrase, claimed?.name ?? null);
+  await showPassphrase(phrase, claimed?.name ?? null, taken);
 }
 
 /** Cloud saves turned on (Play's question, or Claim under Your name without a keyphrase): the keyphrase made, or
@@ -425,8 +437,8 @@ async function enableCloud(): Promise<string | null> {
 }
 
 /** A keyphrase just made, shown whole to keep (copy, download): for the saves, and for the name it claimed (null:
- *  none), which it is the only way back to as well */
-async function showPassphrase(phrase: string, claimed: string | null) {
+ *  none), which it is the only way back to as well; taken: the name another player claimed, which it does not hold */
+async function showPassphrase(phrase: string, claimed: string | null, taken: string | null = null) {
   const p = (text: string) => Object.assign(document.createElement('p'), { textContent: text });
   const box = Object.assign(document.createElement('p'), { className: 'keyphrase', textContent: phrase });
   const copy = Object.assign(document.createElement('button'), { type: 'button', className: 'text-btn', textContent: t('Copy') });
@@ -446,6 +458,7 @@ async function showPassphrase(phrase: string, claimed: string | null) {
   } else {
     kept.append(p(t('Passphrase made. Keep it safe: it is the only way back to these saves.')), box, row,
       p(t('To load your saves, enter it under Cloud saves on the start page.')));
+    if (taken) kept.append(p(t('{name} is claimed by another player, so this passphrase keeps your saves but not that name.', { name: taken })));
   }
   // its "Save password?" (vault-ui.ts asked it as the keyphrase was made)
   if (canKeep()) kept.append(p(t('Your browser may also offer to save it with your passwords: choose Save.')));
@@ -514,7 +527,24 @@ async function play() {
   if (gpuGone) { log.add('[app] the last game lost its graphics: reloading the page (Play)'); await reload(); return; }
   if (updated) { updated = false; showNewer(); }
   starting = true; updatePlay();
-  try { await startGame(); } finally { starting = false; updatePlay(); }
+  try { await startGame(); }
+  catch (e) { startFailed(e); }
+  finally { starting = false; savesLocked = false; if (!session) vault.noGame(); updatePlay(); }
+}
+
+/** the sound of a game being started, until its session has it (startFailed closes it) */
+let startAudio: AudioContext | null = null;
+/** Play stopped by an error before the game ran (the stage is up from the click on: Play's questions show over it): the
+ *  start page back, usable, with what happened */
+function startFailed(e: unknown) {
+  // (String(e): its name and message in every browser; Firefox's stack has neither)
+  log.add(`[app] the game could not start: ${String(e)}${e instanceof Error && e.stack ? `\n${e.stack}` : ''}`);
+  if (session) return;
+  void startAudio?.close().catch(() => {}); startAudio = null;
+  endStage();
+  setPhase('exited', T('Did not start'), T('The game could not start: {error}', { error: String(e) }), 'GAME-START');
+  $('#log-btn').hidden = $('#report').hidden = false;
+  download.resume();
 }
 
 async function startGame() {
@@ -536,25 +566,15 @@ async function startGame() {
     showNewer();
     return;
   }
-  // a cloud-saves conflict waiting (nothing syncs until it is settled): settled first, or no game; before the questions
-  // that write settings.ini, which the cloud's saves would replace
-  const cloud = await vault.askAtPlay();
-  if (cloud === 'stop') return;
-  if (cloud === 'taken') await loadSettings().catch(e => log.add(`[app] settings.ini not read again: ${e}`));
-  // (the free-roam question says when the server is full: answered, it is not asked again what to do about that)
-  const roamAsked = await askRoam();
-  if (!roamAsked) await askCloud();
-  const alone = !roamAsked && await askFull(counts);
-  // the name this game plays under, by the claims: before full screen, for its questions
-  const playAs = alone ? null : await playName();
+  // inside the click: things that need a user gesture (the click's activation: a slow pull of the cloud saves below
+  // would spend it), the questions before the game showing over the stage.  The context runs at the mixer's own rate
+  // (44.1 kHz), so the worklet does not resample.
   const pre = resolved();
-  // inside the click: things that need a user gesture.  The context runs at the
-  // mixer's own rate (44.1 kHz), so the worklet does not resample.
   let audio: AudioContext | null = null;
   try {
     const lat = pre.env.NFSU2_AUDIO_LATENCY ?? 'interactive';
     const hint: AudioContextLatencyCategory | number = /^[0-9.]+$/.test(lat) ? Math.min(0.5, Math.max(0.001, +lat / 1000)) : lat as AudioContextLatencyCategory;
-    audio = new AudioContext({ latencyHint: hint, sampleRate: 44100 });
+    audio = startAudio = new AudioContext({ latencyHint: hint, sampleRate: 44100 });
     void audio.resume().catch(() => {});
   } catch (e) { log.add(`[app] no AudioContext: ${e}`); }
   const full = pre.env.NFSFULL !== '0';
@@ -565,7 +585,6 @@ async function startGame() {
   untrack = trackCanvasSize(canvas);
   awake = keepScreenOn(logLine);
   $('#stage-menu').hidden = !touchFirst();
-  setPhase('starting', T('Starting'), full && canFullscreen() ? T('Going full screen and starting the game.') : T('Starting the game.'));
   let fsNote = '';
   // an iPhone has no full screen for the page (from the Home Screen it has no browser bars to hide)
   if (full && homeScreenInstead()) fsNote = t(HOME_SCREEN);
@@ -574,13 +593,29 @@ async function startGame() {
     if (!fs.ok) fsNote = t('Full screen was not allowed here; {menu} has it.', { menu: menuName() });
     else if (!fs.locked && !touchFirst()) fsNote = t('Esc leaves full screen in this browser (no keyboard lock).');
   }
+  // the keyphrase's newer saves from another browser (4 s at most: what they bring may be a conflict), then a
+  // cloud-saves conflict waiting (nothing syncs until it is settled): settled, or no game (the page as it was); before
+  // the questions that write settings.ini, which the cloud's saves would replace.  (A first check of the server still
+  // under way: its answer first, 5 s at most, so the pull and the questions know the passphrase's sync.)
+  await vault.started();
+  const pulled = await vault.beforePlay();
+  const cloud = await vault.askAtPlay();
+  if (cloud === 'stop') { void audio?.close().catch(() => {}); startAudio = null; endStage(); return; }
+  if (cloud === 'taken' || pulled) await loadSettings().catch(e => log.add(`[app] settings.ini not read again: ${e}`));
+  // (the free-roam question says when the server is full: answered, it is not asked again what to do about that)
+  const roamAsked = await askRoam();
+  if (!roamAsked) await askCloud();
+  const alone = !roamAsked && await askFull(counts);
+  // the name this game plays under, by the claims
+  const playAs = alone ? null : await playName();
+  setPhase('starting', T('Starting'), full && canFullscreen() ? T('Going full screen and starting the game.') : T('Starting the game.'));
   const size = await settledSize(canvas);
   await Promise.race([refreshMeasured, new Promise(r => setTimeout(r, 2000))]);
   canvas.focus();
 
-  // the keyphrase's newer saves from another browser (4 s at most), then what the Saves section is writing (a rename,
-  // a restore) ends first
-  if (await vault.beforePlay()) await loadSettings();
+  // what the Saves section is writing (a rename, a restore) and every restore asked for end first, and no cloud version
+  // comes in from here on (VaultPanel's playing): the game reads the saves as they are now
+  savesLocked = true;
   await saves.settled();
   // the save overlay: registry seed (bundle.m app_seed_registry), test inputs
   const host: Record<string, string> = {
@@ -654,7 +689,7 @@ async function startGame() {
   if (scripted) log.add('[app] autosave: an input script drives this game, the profiles are left as they are');
   else if (r.env.NFSU2_AUTOSAVE !== '0') {
     try {
-      const a = await turnOnAutosave(filesOf(SAVE), PROFILES_DIR);
+      const a = await oneWriter(() => turnOnAutosave(filesOf(SAVE), PROFILES_DIR));     // (after any restore, never beside one)
       autosaved = a.turnedOn;
       for (const n of a.notes) log.add(`[app] autosave: ${n}`);
     } catch (e) { log.add(`[app] autosave: the profiles were not checked: ${e}`); }
@@ -680,6 +715,7 @@ async function startGame() {
   fatal = null;
   quitAt = null;
   saved = null;
+  playStart = await snapshotSaves(SAVE).catch(() => []);
   try {
     // the callbacks are module-level functions, not closures made here: the
     // session's subsystems keep them (some, like a closed AudioContext, a little
@@ -689,8 +725,8 @@ async function startGame() {
     session = await GameSession.start({
       module: loaded!.module, info: loaded!.info, saveDir: SAVE, env: r.env, canvas, stage, audio, displayHz, netName, notice, lobby, say, marks, bump,
       friend: friendMsg,
-      netBack, netQueue, onSaved,
-      netId: ids?.id, netWas: ids?.was, netClaim: net ? testClaim() ?? await vault.token().catch(() => null) ?? undefined : undefined, netRemoved,
+      netBack, netQueue, onSaved, onSaveGone: saveGone, onRemoved, onLost,
+      netId: ids?.id, netWas: ids?.was, netClaim: net ? testClaim() ?? await vault.token().catch(() => null) ?? undefined : undefined, netRemoved, netRaces, netRename,
       netBlock: net && r.env.NFSU2_ROAM === '1' ? blockList(r.env.NFSU2_ROAM_BLOCK ?? '') : undefined,
       artifacts: q.get('artifacts') ?? undefined, dumpScale: q.get('dumpscale') ? +q.get('dumpscale')! : undefined,
       toggleFullscreen, padPage: PAD_PAGE, log: logLine, onFatal: stopFatal, onOtherBuild: otherBuild,
@@ -704,6 +740,7 @@ async function startGame() {
     download.resume();
     return;
   }
+  startAudio = null;                      // the session's now
   setPhase('playing', T('Playing'), () => '');
   if (!offline && !testPage()) seen('play');   // counted for the server's day (page-id.ts)
   keeper.start(loaded!.info.rev, gameHeld);
@@ -720,8 +757,10 @@ async function startGame() {
   photo.start(session);
   friendPrompt.start(session, net && r.env.NFSU2_ROAM === '1');
   friendMessages.start(session, net && r.env.NFSU2_ROAM === '1');
-  quickChat.start(session, net && r.env.NFSU2_ROAM === '1' && r.env.NFSU2_ROAM_SAY !== '0',
-    phrasesOf(r.env.NFSU2_ROAM_SAY_PHRASES), groupsOf(r.env.NFSU2_ROAM_SAY_GROUPS));
+  // (the races' between players free roam on or not; free roam's only with it on: the career's free roam alone keeps
+  // 1-4, Esc and the right stick for the game)
+  quickChat.start(session, net && r.env.NFSU2_ROAM_SAY !== '0', net && r.env.NFSU2_ROAM === '1',
+    phrasesOf(r.env.NFSU2_ROAM_SAY_PHRASES), groupsOf(r.env.NFSU2_ROAM_SAY_GROUPS), blockList(r.env.NFSU2_ROAM_BLOCK ?? ''));
   fps.memory = session.proc.memory;
   const st = session;
   let tries = 0;
@@ -927,6 +966,7 @@ function endStage() {
   $('#stage').hidden = true;
   $('#stage').querySelector('canvas')?.remove();
   $('#app').inert = false;
+  clearToasts();
 }
 
 function onExit(s: GameSession, code: number) {
@@ -974,8 +1014,54 @@ function onExit(s: GameSession, code: number) {
   void checkNewer();
 }
 
+/**
+ * The browser deleted this site's data during the game (low disk space, or its own settings; Discord 2026-10-31: every
+ * save after it failed): the I/O worker made the save folder again, empty, and holds the game's saves until the saves
+ * are back in it (io-worker.ts recover): the cloud's, else those of the game's start (VaultPanel.refill).  The player
+ * is told what came back.
+ */
+async function saveGone(): Promise<void> {
+  log.add('[app] the browser deleted this site\'s data during the game: the saves go back into the empty save folder');
+  // settings.ini as the page has it now (it writes the file whenever it changes it)
+  if (settingsText !== null) void snapshotFile(playStart, SAVE, 'settings.ini', new TextEncoder().encode(settingsText));
+  let msg: string;
+  try {
+    const r = await vault.refill(playStart);
+    log.add(`[app] the saves are back (${r.files} files): ${r.from === 'cloud' ? 'the cloud\'s, with this device\'s own files' : 'as the game\'s start had them'}`);
+    msg = r.from === 'cloud'
+      ? t('The browser deleted this site\'s data during the game. Your cloud saves are back, and the game saves on top of them. Screenshots and covers are gone.')
+      : vault.linked() ? t('The browser deleted this site\'s data during the game. Your profiles and settings are back as this game last saved them; screenshots and covers are gone.')
+      : t('The browser deleted this site\'s data during the game. Your profiles and settings from the start of this game are back; screenshots and covers are gone. Cloud saves or a backup (Saves) keep your progress safe.');
+  } catch (e) {
+    // the saves of the game's start as a backup in the downloads: Restore takes it back
+    log.add(`[app] the saves could not be put back: ${e}; their backup downloaded`);
+    try { downloadBlob(zip(playStart.map(f => ({ name: f.path, data: f.data, mtime: f.mtime }))) as BlobPart, `nfsu2-saves-${stamp()}.zip`, 'application/zip'); }
+    catch { /* nothing more to do */ }
+    msg = t('The browser deleted this site\'s data during the game, and the saves could not all be put back ({error}). A backup of them was downloaded: Restore takes it back (Saves).', { error: String(e) });
+  }
+  if (session) toast(msg, 15000, true);
+}
+
+/** a file the game wrote as the browser deleted the save folder, not kept (its bytes went with the folder): the player
+ *  saves again, as no "Progress saved" said so */
+function onLost(path: string) {
+  log.add('[app] a save the game wrote as the browser deleted the save folder was not kept: asked to save again');
+  if (session && path.startsWith(PROFILES_DIR + '/')) toast(t('Your last save may not have been kept: the browser deleted this site\'s data as it was written. Save again in the game.'), 15000, true);
+}
+
+/** the game deleted a file of the save folder: a profile's (its own Delete), which no refill brings back then */
+function onRemoved(path: string) {
+  const p = path.split('/');
+  if (p.length !== 3 || p[0] !== PROFILES_DIR || p[2].toLowerCase() !== p[1].toLowerCase() || coverOf(p[1])) return;
+  log.add(`[app] the game deleted profile ${p[1]}`);
+  const i = playStart.findIndex(f => f.path === path);
+  if (i >= 0) playStart.splice(i, 1);
+  vault.removed();
+}
+
 /** the game finished writing a file of the save folder: a profile is the player's progress */
 function onSaved(path: string) {
+  void snapshotFile(playStart, SAVE, path);                // what comes back if the browser deletes the folder (saveGone)
   const p = path.split('/');
   if (p.length !== 3 || p[0] !== PROFILES_DIR || p[2].toLowerCase() !== p[1].toLowerCase()) return;
   saved = { name: p[1], at: Date.now(), count: (saved?.count ?? 0) + 1 };
@@ -1048,7 +1134,8 @@ function friendNotice(name: string, text: string) {
   placeNotices();
   iconLine('chat', FRIEND_ICON, at < 0 ? [text] : [text.slice(0, at), b, text.slice(at + name.length)]);
 }
-/** free roam: quick chat (quickchat.ts), a phrase said, from the game; and the lines over the cars in each frame */
+/** quick chat (quickchat.ts) in free roam and races between players: a phrase said, from the game; and free roam's
+ *  lines over the cars in each frame */
 function say(json: string) {
   placeNotices();
   quickChat.said(json);
@@ -1148,14 +1235,53 @@ function netQueue(q: NetQueue | null) {
  *  the player plays on (an input REMOVED_MS after it came up) */
 const REMOVED_MS = 8000;
 let removedTimer: ReturnType<typeof setInterval> | null = null;
+/** an end the operator set, in the page's language: "4 Nov 2026, 14:05" */
+const until = (ms: number) => new Date(ms).toLocaleString(dateLocale(), { dateStyle: 'medium', timeStyle: 'short' });
+/** the operator's message (in its own words), as a sentence after the page's */
+const said = (msg: string) => msg ? ` ${msg}${/[.!?]$/.test(msg) ? '' : '.'}` : '';
 function netRemoved(r: NetRemoved) {
-  const why = r.msg ? `: ${r.msg}${/[.!?]$/.test(r.msg) ? '' : '.'}` : '.';
-  const head = !r.ban ? 'You were removed from playing with others'
-    : r.until ? `You can't play with others until ${new Date(r.until).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}`
-    : "You can't play with others any more";
-  const t = $('#removed');
-  t.textContent = `${head}${why} You can keep playing on your own.`;
-  t.hidden = false;
+  const head = !r.ban ? t('You were removed from playing with others.')
+    : r.until ? t('You can\'t play with others until {when}.', { when: until(r.until) })
+    : t('You can\'t play with others any more.');
+  removedLine(`${head}${said(r.msg)} ${t('You can keep playing on your own.')}`);
+}
+/** the operator's race ban (net/index.ts onRaces): why and until when, over the game (again when the LAN or Online
+ *  screens open); null: lifted */
+function netRaces(r: NetRaces | null) {
+  if (!r) { toast(t('You can race other players again.'), 6000); return; }
+  const head = r.until ? t('You can\'t race other players until {when}.', { when: until(r.until) }) : t('You can\'t race other players any more.');
+  toast(`${head}${said(r.msg)} ${t('Free roam stays open.')}`, 12_000);
+}
+/** the operator took the player's name away (net/index.ts onRename): a question for another (claim-ui.ts renamePick);
+ *  picked, the game plays under it at once (the input's name) and the page goes back to the others; Not now: playing
+ *  with others waits for another name, as the line over the game says */
+let renaming = false;
+async function netRename(r: NetRename) {
+  privacy.name(r.name, 'you');
+  if (renaming) return;
+  renaming = true;
+  try {
+    const name = await renamePick(playDeps(), r.name, r.msg);
+    if (!name) {
+      log.add('[app] your name: none picked (playing with others waits for another name)');
+      removedLine(t('Playing with others waits for another name: change it under Online on the start page.'));
+      return;
+    }
+    privacy.name(name, 'you');
+    log.add(`[app] your name: another picked (${session?.input?.name?.(name) ? 'the game plays under it now' : 'the game did not take it'})`);
+    session?.net?.rename?.(name);
+    hideRemoved();
+    void settings.refresh();
+  } finally {
+    renaming = false;
+  }
+}
+/** the line over the game for a player off the others, until the player plays on (an input REMOVED_MS after it came
+ *  up) */
+function removedLine(text: string) {
+  const box = $('#removed');
+  box.textContent = text;
+  box.hidden = false;
   const from = performance.now() + REMOVED_MS;
   if (removedTimer) clearInterval(removedTimer);
   removedTimer = setInterval(() => {
@@ -1192,20 +1318,47 @@ function renderCheckTimes(): RenderCheckTimes {
   return { warmupMs: ms(warmS, RENDER_CHECK_TIMES.warmupMs), decideMs: ms(decideS, RENDER_CHECK_TIMES.decideMs) };
 }
 
-function toast(msg: string, ms: number) {
-  const t = $('#toast');
-  t.textContent = msg; t.hidden = false;
-  clearTimeout((toast as any).timer);
-  (toast as any).timer = setTimeout(() => { t.hidden = true; }, ms);
+/**
+ * A short message on the game, on the first of its two lines that holds none the player must read.  keep: one the
+ * player must read (the saves came back after the browser deleted them, a save not kept): nothing replaces it before
+ * its time is up ("Progress saved", which the recovery lets go just after it, shows on the other line).  Both lines
+ * holding such ones, it waits (another to read in turn; of the others the newest only).
+ */
+const TOAST_LINES = ['toast', 'toast-also'];
+const toastTimers = new Map<string, ReturnType<typeof setTimeout>>(), toastKept = new Set<string>();
+const toastsWaiting: { msg: string; ms: number; keep: boolean }[] = [];
+function toast(msg: string, ms: number, keep = false) {
+  const line = TOAST_LINES.find(id => !toastKept.has(id));
+  if (line) { showToast(line, msg, ms, keep); return; }
+  if (keep) toastsWaiting.splice(toastsWaiting.filter(w => w.keep).length, 0, { msg, ms, keep });
+  else toastsWaiting.splice(0, toastsWaiting.length, ...toastsWaiting.filter(w => w.keep), { msg, ms, keep });
+}
+function showToast(id: string, msg: string, ms: number, keep: boolean) {
+  const el = $(`#${id}`);
+  el.textContent = msg; el.hidden = false;
+  if (keep) toastKept.add(id); else toastKept.delete(id);
+  clearTimeout(toastTimers.get(id));
+  toastTimers.set(id, setTimeout(() => {
+    el.hidden = true; toastKept.delete(id);
+    const next = toastsWaiting.shift();
+    if (next) showToast(id, next.msg, next.ms, next.keep);
+  }, ms));
+}
+/** no toast left over from a game that ended */
+function clearToasts() {
+  for (const t of toastTimers.values()) clearTimeout(t);
+  toastTimers.clear(); toastKept.clear(); toastsWaiting.length = 0;
+  for (const id of TOAST_LINES) $(`#${id}`).hidden = true;
 }
 
-/** F12 (photo.ts: photo mode's picture, or where it cannot open): the next frame the renderer draws, as a PNG beside the
- *  saves (Saves on the start page shows it) */
-async function screenshot() {
+/** F12 (photo.ts: photo mode's picture, or where it cannot open): the next frame the renderer draws (photo mode's: its
+ *  still picture once it has all its frames, with its look and crop), as a PNG beside the saves (Saves on the start
+ *  page shows it), with the site's address in a corner unless photo mode's panel turned it off */
+async function screenshot(photo = false) {
   const r = session?.renderer;
   if (!r?.dump) { toast(t('No screenshot: nothing on screen yet.'), 2500); return; }
   try {
-    const png = await r.dump('screenshot');
+    const png = await (photo && r.photo ? r.photo('screenshot', photoMark()) : r.dump('screenshot', photoMark()));
     if (!png.size) throw new Error('the game ended first');
     const name = await saveScreenshot(SAVE, png);
     log.add(`[app] screenshot ${name}, ${fmtBytes(png.size)}`);
@@ -1600,15 +1753,22 @@ function confirmBox(title: string, body: Node | string, ok: string, danger = fal
   return choiceBox(title, body, ok, cancel, danger, about).then(v => v === 'ok');
 }
 /** the same, with which way it closed: 'ok', 'cancel' (the cancel button, none when cancel is ''), '' (Esc) */
-function choiceBox(title: string, body: Node | string, ok: string, cancel: string, danger = false, about = ''): Promise<string> {
+function choiceBox(title: string, body: Node | string, ok: string, cancel: string, danger = false, about = '', cancelDanger = false): Promise<string> {
   const d = $<HTMLDialogElement>('#confirm');
   d.dataset.about = about;            // 'quit': closed when the game ends (endStage)
   $('#confirm-title').textContent = title;
   const b = $('#confirm-body'); b.replaceChildren(typeof body === 'string' ? Object.assign(document.createElement('p'), { textContent: body }) : body);
   const okb = $<HTMLButtonElement>('#confirm-ok'); okb.textContent = ok; okb.className = danger ? 'btn danger' : 'btn selected';
+  okb.hidden = !ok;                                  // '' (cancel '' too): the body's buttons answer (vault-ui.ts askAtPlay)
+  okb.parentElement!.hidden = !ok && !cancel;
   const cb = $('#confirm-cancel'); cb.textContent = cancel; cb.hidden = !cancel;     // '': the one button
+  cb.className = cancelDanger ? 'btn danger' : 'btn';
   d.returnValue = '';
   d.showModal();
+  if (!ok && !cancel) {                              // nothing focused: Enter picks none of them
+    d.tabIndex = -1; d.focus();
+    d.addEventListener('close', () => d.removeAttribute('tabindex'), { once: true });
+  } else if (cancelDanger && !danger) okb.focus();   // the safe one first
   return new Promise(res => d.addEventListener('close', () => res(d.returnValue), { once: true }));
 }
 // A frozen game's log: players download it before the stall report's 15 s (2026-10-24: 13 s, no report), so the
@@ -1876,7 +2036,7 @@ export async function boot() {
   download = new Predownload(s => saves.showData(s), logLine, () => language(), () => texpack());
   saves = new SavesPanel($('#saves'), $('#game-data'), {
     saveDir: SAVE, busy: () => !!session || starting || !instance.owner, confirm: confirmBox,
-    onRestored: () => { void loadSettings(); void settings.refresh(); }, download, onChanged: () => vault.changed(),
+    onRestored: () => { void loadSettings(); void settings.refresh(); }, download, onChanged: () => vault.changedSaves(),
   });
   // keyphrase saves (on a server that keeps them): synced by the tab that owns the saves, once its settings are loaded
   // the claimed names: asked with the keyphrase's token (claim.ts); the line under Your name (claim-ui.ts)
@@ -1890,8 +2050,8 @@ export async function boot() {
     say: pageToast, log: logLine,
   });
   vault = new VaultPanel($('#vault'), {
-    saveDir: SAVE, owner: () => instance.owner, playing: () => !!session, busy: () => !!session || starting || !instance.owner,
-    confirm: confirmBox, choose: (title, body, ok, cancel) => choiceBox(title, body, ok, cancel),
+    saveDir: SAVE, owner: () => instance.owner, playing: () => !!session || savesLocked, busy: () => !!session || starting || !instance.owner,
+    confirm: confirmBox, choose: (title, body, ok, cancel, danger, cancelDanger) => choiceBox(title, body, ok, cancel, danger, '', cancelDanger),
     onRestored: () => { void loadSettings(); void settings.refresh(); void saves.refresh(); }, log: logLine,
     // another passphrase here (or none): the line under Your name asks again with it, and the friends
     onLink: () => { void nameRow.ask(); void friendsPanel.refresh(true); },
@@ -1976,7 +2136,7 @@ export async function boot() {
   });
   touch = new TouchControls($('#stage'), { toast, log: logLine, chat: () => quickChat.toggle(), chatOn: () => quickChat.enabled,
     settings: () => openHelp('keys') });
-  friendPrompt = new FriendPrompt($('#stage .toasts'), {
+  friendPrompt = new FriendPrompt($('#stage'), {
     send: m => session?.net?.friend?.(m) ?? false, room: () => roamRoom ?? '', toast: s => toast(s, 5000), log: logLine,
     notice: friendNotice, menu: menuName, placed: () => { if ($<HTMLDialogElement>('#friends-pop').open) drawPopFriends(); },
   });
@@ -1991,7 +2151,7 @@ export async function boot() {
     fullscreen: () => canFullscreen() || !fromHomeScreen(),
   });
   driftPanel = new DriftPanel($('#stage'), { toast, wide: () => hudWide, log: logLine });
-  photo = new PhotoMode($('#stage'), { shoot: screenshot, screenshot: () => void screenshot(), log: logLine });
+  photo = new PhotoMode($('#stage'), { shoot: () => screenshot(true), screenshot: () => void screenshot(), log: logLine });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { void checkNewer(); vault.shown(); } });
   setInterval(() => { if (document.visibilityState === 'visible') void checkNewer(); }, NEWER_EVERY_MS);
 
@@ -2010,7 +2170,13 @@ export async function boot() {
   void settings.refresh();
   void saves.refresh();
   void vault.start().then(() => friendsPanel.refresh(true));
-  void instance.whenOwner.then(async () => { await loadSettings(); evaluate(); void settings.refresh(); void saves.refresh(); vault.ownerNow(); syncPicker(); });
+  void instance.whenOwner.then(async () => {
+    // a restore a closed tab left halfway is undone, before anything reads the saves (savefs.ts writeTogether)
+    await oneWriter(async () => {
+      if (!await settleStaged(SAVE)) log.add('[app] a restore that stopped halfway could not be undone yet: tried again before the next restore');
+      await vault.settleKept();
+    }).catch(e => log.add(`[app] a restore that stopped halfway could not be undone: ${e}`));
+    await loadSettings(); evaluate(); void settings.refresh(); void saves.refresh(); vault.ownerNow(); syncPicker(); });
   // invite links: the one this page was opened with, one pasted into its address later, one another tab took for it
   hearInvites();
   takeInvite();

@@ -174,6 +174,14 @@ pub struct RoamOptions {
     /// a player's view point, this far ahead of where its car points (m): a car in front counts from there too, so it
     /// is linked from farther away than one beside or behind
     pub view_m: f64,
+    /// a gap in height between two players that no road explains (a highway over a street, a tunnel under a hill):
+    /// up to level_slack_m (m) plus level_grade of the way across (a hill, a ramp, a jump) it counts as it is, and
+    /// each metre past that counts level_k metres more.  Two cars on one road weigh as before, one on a road above or
+    /// below as one far off (10 m under a highway: as a car 135 m away), so its link goes to a car on the player's
+    /// own road when there are more players near than links (links.rs `Level`)
+    pub level_slack_m: f64,
+    pub level_grade: f64,
+    pub level_k: f64,
     /// the world map (MAPREQ): at most this many players a answer, one answer a browser every map_gap_ms at most, of
     /// the players in free roam (or paused there) with a position younger than map_fresh_ms
     pub map_max: usize,
@@ -185,6 +193,9 @@ pub struct RoamOptions {
     /// thread among them: by default a quarter of the cores, 1 to 4; 1, on the hub's thread alone.  The links are the
     /// same either way.
     pub link_threads: usize,
+    /// the names the operator took away (nfsu2-bans `rename`): a player under one plays alone, as under a name another
+    /// keyphrase claimed; None: none
+    pub deny: Option<std::sync::Arc<nfsu2_names::Deny>>,
 }
 
 impl Default for RoamOptions {
@@ -197,7 +208,7 @@ impl Default for RoamOptions {
             keep: 0.5,
             hold_ms: 5_000.0,
             max_per_vip: 2,
-            max_players: 12288,
+            max_players: 14336,
             exact_room: 256,
             min_degree: 8,
             busy_high: 0.85,
@@ -209,11 +220,15 @@ impl Default for RoamOptions {
             look_ms: 4_000.0,
             away_m: 100.0,
             view_m: 150.0,
+            level_slack_m: 5.0,
+            level_grade: 0.2,
+            level_k: 25.0,
             map_max: 2048,
             map_gap_ms: 250.0,
             map_fresh_ms: 5_000.0,
             near_gap_ms: 150.0,
             link_threads: std::thread::available_parallelism().map_or(1, |n| (n.get() / 4).clamp(1, 4)),
+            deny: None,
         }
     }
 }
@@ -255,6 +270,7 @@ enum Cmd {
     OtherNames(oneshot::Sender<HashMap<u32, Vec<String>>>),
     Friends(u32, Arc<str>, Vec<Arc<str>>),
     RoomName(u32, String),
+    Flew(u32, f64),
     Linked(u32, String, oneshot::Sender<Option<(u32, Option<Arc<str>>)>>),
     Where(Vec<Arc<str>>, oneshot::Sender<Vec<Option<hub::Whereabouts>>>),
     Stop,
@@ -363,6 +379,12 @@ impl RoamHub {
         let _ = self.tx.send(Cmd::RoomName(vip, name));
     }
 
+    /// browser `vip`'s game says its car was in the air in free roam for `secs`, and its page leaves the switch:
+    /// `Hub::flew`
+    pub fn flew(&self, vip: u32, secs: f64) {
+        let _ = self.tx.send(Cmd::Flew(vip, secs));
+    }
+
     /// the browser and keyphrase of the player under `name` that browser `vip`'s player is linked with now:
     /// `Hub::linked_with`
     pub fn linked_with(&self, vip: u32, name: String) -> oneshot::Receiver<Option<(u32, Option<Arc<str>>)>> {
@@ -459,6 +481,7 @@ fn run(
             }),
             Cmd::Friends(vip, me, owners) => guard(|| hub.friends(vip, me, owners)),
             Cmd::RoomName(vip, name) => guard(|| hub.room_name(vip, name)),
+            Cmd::Flew(vip, secs) => guard(|| hub.flew(vip, secs)),
             Cmd::Linked(vip, name, tx) => guard(|| {
                 let _ = tx.send(hub.linked_with(vip, &name));
             }),
@@ -542,7 +565,7 @@ mod tests {
             in_rooms: Arc::new(Mutex::new(HashMap::new())),
             in_crews: Arc::new(Mutex::new(Vec::new())),
         };
-        let ctx = FrameCtx { group: Arc::from("client"), site: None, cause: None, slot: None, owner: None };
+        let ctx = FrameCtx { group: Arc::from("client"), site: None, cause: None, slot: None, owner: None, no_races: false };
         for _ in 0..100_000 {
             hub.frame(0x0A4D_0005, Bytes::from_static(b"a frame"), ctx.clone());
         }

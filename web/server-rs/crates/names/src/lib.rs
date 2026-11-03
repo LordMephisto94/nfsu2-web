@@ -23,7 +23,7 @@
 //! The other offensive names go the same way (picked from the live server's names, 2026-10-26 and 2026-11-02): Nazi
 //! ones and their nicknames, hate aimed at a group, terror, sexual violence; and a name with 1488 in it (the neo-Nazi
 //! code).  A swear word is no such name.  A "pid" word (pidor, pidar, pidr) right after the start of an English word
-//! that ends in "pid" (rapid, cupid, stupid), or after a vowel when it runs into the next part ("PepiDroga"), is no
+//! that ends in "pid" (rapid, cupid, stupid), or after a vowel when it runs into the next part ("TopiDrift"), is no
 //! slur ("RapidRacer"; "dapidor", "YaPidor" are).
 //!
 //! The Online lobby's chat is read with the same lists, a word at a time ([`chat_slur`]); here only.
@@ -454,7 +454,7 @@ impl Letters {
 
 /// A "pid" word of the anywhere list (pidor, pidar, pidr) at s[i] is the end of an English word: not at the start of
 /// a part (starts[j]: a part starts at s[j]), and right after the start of one of those words ("RapidRacer",
-/// "Stupidrift"), or after a vowel and into the next part ("PepiDroga"); "vladpidr", "dapidor", "YaPidor" are slurs.
+/// "Stupidrift"), or after a vowel and into the next part ("TopiDrift"); "vladpidr", "dapidor", "YaPidor" are slurs.
 fn english_pid(s: &[u8], i: usize, w: &[u8], starts: &[bool]) -> bool {
     if !w.starts_with(b"pid") || starts[i] {
         return false;
@@ -611,4 +611,55 @@ pub fn chat_slur(line: &str) -> Option<&str> {
         k += n.max(1);
     }
     None
+}
+
+/// A name's letters as the lists read it (above: the digits and signs that stand for letters as those, numbers and
+/// everything else left out): what names that read the same have in common ("B4d_Name", "bad name", "BadName99").
+/// The names the operator took away ([`Deny`]) are compared by it.
+pub fn letters(name: &str) -> String {
+    let str = read(name);
+    let mut out = String::with_capacity(str.len());
+    let mut i = 0;
+    while i < str.len() {
+        let r = str[i..].iter().take_while(|c| c.is_ascii_digit()).count();
+        if r > 0 && number(&str, i, r) {
+            i += r;
+            continue;
+        }
+        if let Some(c) = letter(str[i]) {
+            out.push(char::from(c));
+        }
+        i += 1;
+    }
+    out
+}
+
+/// The names the server's operator took away (nfsu2-bans: `rename`), by their [`letters`]: nobody plays under one, or
+/// under a name that reads the same.  The switch's hello, the Online lobby and free roam's hub look a name up here;
+/// the bans write it (`set`), and each change moves `generation` on (the hub looks at a player's name again then).
+#[derive(Default, Debug)]
+pub struct Deny {
+    set: std::sync::RwLock<std::collections::HashSet<String>>,
+    generation: std::sync::atomic::AtomicU64,
+}
+
+impl Deny {
+    /// the names taken away now (as they were typed, or their letters already: the same)
+    pub fn set(&self, names: impl IntoIterator<Item = String>) {
+        let set = names.into_iter().map(|n| letters(&n)).filter(|l| !l.is_empty()).collect();
+        *self.set.write().unwrap_or_else(|e| e.into_inner()) = set;
+        self.generation.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    }
+    /// whether `name` reads as one of them
+    pub fn has(&self, name: &str) -> bool {
+        let set = self.set.read().unwrap_or_else(|e| e.into_inner());
+        !set.is_empty() && {
+            let l = letters(name);
+            !l.is_empty() && set.contains(&l)
+        }
+    }
+    /// moves on with each `set`
+    pub fn generation(&self) -> u64 {
+        self.generation.load(std::sync::atomic::Ordering::Relaxed)
+    }
 }

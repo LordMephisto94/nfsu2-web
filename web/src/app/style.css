@@ -461,6 +461,15 @@ summary:hover { color: var(--text); }
 .eye[aria-pressed="true"] .off { display: block; }
 #vault-about, #vault-status { margin-top: 8px; }
 #vault-conflict { margin-top: 12px; }
+/* a conflict's two sides as the choice (vault-ui.ts choiceOf): each card with its own button under it, side by side,
+ * or stacked (each button under its card) where they do not fit */
+.vault-choice { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin: 8px 0 0; }
+/* (the two columns share their rows: the cards as tall as each other, the buttons too) */
+.vault-pick { display: grid; grid-row: span 2; grid-template-rows: subgrid; gap: 8px; min-width: 0; }
+.vault-pick .vault-sides { margin: 0; grid-template-columns: 1fr; }
+.vault-pick .btn { width: 100%; height: auto; min-height: 40px; padding-block: 6px; white-space: normal; text-align: center; }
+.dlg .vault-choice { margin: 0 0 16px; }
+.dlg .vault-pick ul.vault-sides { margin: 0; }
 #vault-on { margin-top: 4px; gap: 4px 16px; }
 #vault-on .text-btn { padding: 0; height: 24px; }
 /* a conflict's two sides (vault-ui.ts sidesOf), in the section and in its questions: two cards side by side, where on
@@ -531,8 +540,9 @@ html:has(> body > .stage:not([hidden])) { overflow: hidden; }
 }
 .stage-menu svg { display: block; width: calc(24px * var(--ts)); height: calc(24px * var(--ts)); fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
 .stage-menu:active { background: rgba(0, 0, 0, 0.72); color: var(--lime); }
-/* touch controls (touch.ts) while the player drives: dim and see-through like the menu's button, lime while
- * pressed.  The small round ones in a row after the menu's button (the mode button and tilt's straight-ahead top
+/* touch controls (touch.ts) while the player drives: see-through, lighter than the menu's button (which, with the
+ * Steering switch, keeps the darker fill so both stay easy to find), back to full and lime while pressed or on (lit).
+ * The menus' arrows and OK/Back, in the black bars beside the menus, keep the darker fill.  The small round ones in a row after the menu's button (the mode button and tilt's straight-ahead top
  * right), the steering's group bottom left, the pedals' bottom right; free roam adds a row's end and Start.
  * The two groups are placed from the inline start (the steering's side) and end (the pedals'): steering on the right
  * (touch.ts position, [data-right]) turns the direction round, so they swap sides as mirror images, and their
@@ -556,6 +566,10 @@ html:has(> body > .stage:not([hidden])) { overflow: hidden; }
 .tc svg { width: calc(24px * var(--ts)); height: calc(24px * var(--ts)); fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .tc svg .fill { fill: currentColor; stroke: none; }
 .tc.on { background: rgba(0, 0, 0, 0.72); color: var(--lime); }
+/* driving: black 20 % and white 55 % (the Steering switch keeps the 40 % and 72 % above), pressed as above */
+.touch[data-mode="drive"] .tc:not([data-ctl="mode"]) { background: rgba(0, 0, 0, 0.2); color: rgba(255, 255, 255, 0.55); }
+.touch[data-mode="drive"] .tc.lit:not([data-ctl="mode"]) { color: var(--lime); }
+.touch[data-mode="drive"] .tc.on:not([data-ctl="mode"]) { background: rgba(0, 0, 0, 0.72); color: var(--lime); }
 .tc.small { top: var(--t); width: calc(48px * var(--ts)); height: calc(48px * var(--ts)); border-radius: 50%; }
 .tc.big { bottom: var(--b); border-radius: calc(16px * var(--ts)); }
 .tc.big svg { width: calc(32px * var(--ts)); height: calc(32px * var(--ts)); }
@@ -576,7 +590,15 @@ html:has(> body > .stage:not([hidden])) { overflow: hidden; }
 .tc[data-ctl="status"] { left: calc(var(--l) + 392px * var(--ts)); }
 .tc[data-ctl="horn"] { left: calc(var(--l) + 448px * var(--ts)); }
 .tc[data-ctl="chat"] { left: calc(var(--l) + 504px * var(--ts)); }
-/* drift mode on: its button lime, with a ring */
+/* a car with hydraulics (touch.ts): Pressurize and Bounce after the career status in free roam, the horn and quick
+ * chat after them; after reset in a race */
+.tc[data-ctl="lift"] { left: calc(var(--l) + 448px * var(--ts)); }
+.tc[data-ctl="bounce"] { left: calc(var(--l) + 504px * var(--ts)); }
+.touch[data-hyd] .tc[data-ctl="horn"] { left: calc(var(--l) + 560px * var(--ts)); }
+.touch[data-hyd] .tc[data-ctl="chat"] { left: calc(var(--l) + 616px * var(--ts)); }
+.touch:not([data-roam]) .tc[data-ctl="lift"] { left: calc(var(--l) + 224px * var(--ts)); }
+.touch:not([data-roam]) .tc[data-ctl="bounce"] { left: calc(var(--l) + 280px * var(--ts)); }
+/* drift mode on, Pressurize or Bounce on: the button lime, with a ring */
 .tc.lit { color: var(--lime); box-shadow: inset 0 0 0 calc(2px * var(--ts)) var(--lime); }
 .tc[data-ctl="mode"] { right: var(--r); }
 .tc[data-ctl="center"] { right: calc(var(--r) + 56px * var(--ts)); }
@@ -622,7 +644,19 @@ html:has(> body > .stage:not([hidden])) { overflow: hidden; }
 .touch:not([data-roam]) .roam,
 .touch[data-no-engage] [data-ctl="start"],
 .touch[data-alone] :is([data-ctl="horn"], [data-ctl="chat"]),
-.touch[data-no-chat] [data-ctl="chat"] { display: none; }
+.touch[data-no-chat] [data-ctl="chat"],
+.touch:not([data-hyd]) .hyd { display: none; }
+/* a race between players (touch.ts netrace): Quick chat in the first row after Reset while driving (after Pressurize
+ * and Bounce in landscape when the car has hydraulics; upright those are in the second row), beside the menu's button
+ * on the results (the menus' controls).  Upright, right: auto over the second row's inline start, which a Position on
+ * the right (direction rtl) would take instead of left */
+.touch[data-netrace]:not([data-no-chat]) .tc[data-ctl="chat"] { display: flex; top: var(--t); left: calc(var(--l) + 224px * var(--ts)); }
+.touch[data-netrace][data-hyd]:not([data-no-chat]) .tc[data-ctl="chat"] { left: calc(var(--l) + 336px * var(--ts)); }
+.touch[data-netrace][data-mode="menu"]:not([data-no-chat]) .tc[data-ctl="chat"] { left: calc(var(--l) + 56px * var(--ts)); }
+@media (orientation: portrait) {
+  html[data-touch] .touch[data-netrace]:not([data-no-chat]) .tc[data-ctl="chat"] { top: var(--t); left: calc(var(--l) + 224px * var(--ts)); right: auto; }
+  html[data-touch] .touch[data-netrace][data-mode="menu"]:not([data-no-chat]) .tc[data-ctl="chat"] { left: calc(var(--l) + 56px * var(--ts)); }
+}
 /* the menus': the arrows as a D-pad bottom left, Back over OK bottom right, in the bars beside the game's 4:3 menus
  * (--bar wide): the keys as big as the bar leaves room for, 44 to 52 px.  A faint rim: the bars are black behind the
  * movies and the profile screens */
@@ -647,12 +681,12 @@ html:has(> body > .stage:not([hidden])) { overflow: hidden; }
 .stick-base {
   position: absolute; left: calc(var(--steer) + 60px * var(--ts)); top: calc(100% - var(--b) - 60px * var(--ts));
   width: calc(120px * var(--ts)); height: calc(120px * var(--ts));
-  border-radius: 50%; transform: translate(-50%, -50%); border: 2px solid rgba(255, 255, 255, 0.24); background: rgba(0, 0, 0, 0.24);
+  border-radius: 50%; transform: translate(-50%, -50%); border: 2px solid rgba(255, 255, 255, 0.16); background: rgba(0, 0, 0, 0.12);
 }
 .touch[data-right] .stick-base { left: calc(100% - var(--steer) - 60px * var(--ts)); }
 .stick-knob {
   position: absolute; left: 50%; top: 50%; width: calc(52px * var(--ts)); height: calc(52px * var(--ts)); border-radius: 50%;
-  transform: translate(calc(-50% + var(--dx, 0px)), -50%); background: rgba(0, 0, 0, 0.4); border: 2px solid rgba(255, 255, 255, 0.5);
+  transform: translate(calc(-50% + var(--dx, 0px)), -50%); background: rgba(0, 0, 0, 0.2); border: 2px solid rgba(255, 255, 255, 0.36);
 }
 /* the field for a phone's keyboard while the game asks for text (textentry.ts): a value box at the top, where the
  * keyboard coming up from below leaves it in sight; the stage's no-select would keep WebKit from typing into it */
@@ -681,16 +715,31 @@ html:has(> body > .stage:not([hidden])) { overflow: hidden; }
   html[data-touch] .tc[data-ctl="drift"] { inset-inline-start: calc(var(--start) + 112px * var(--ts)); }
   html[data-touch] .tc[data-ctl="horn"] { inset-inline-start: calc(var(--start) + 168px * var(--ts)); }
   html[data-touch] .tc[data-ctl="chat"] { inset-inline-start: calc(var(--start) + 224px * var(--ts)); }
+  /* Pressurize and Bounce in the second row: after drift mode in free roam (the horn and quick chat after them, the
+   * row then as wide as the steering beside the pedals), at its start in a race */
+  html[data-touch] .tc.hyd { left: auto; top: calc(var(--t) + 56px * var(--ts)); }
+  html[data-touch] .tc[data-ctl="lift"] { inset-inline-start: calc(var(--start) + 168px * var(--ts)); }
+  html[data-touch] .tc[data-ctl="bounce"] { inset-inline-start: calc(var(--start) + 224px * var(--ts)); }
+  html[data-touch] .touch[data-hyd] .tc[data-ctl="horn"] { inset-inline-start: calc(var(--start) + 280px * var(--ts)); }
+  html[data-touch] .touch[data-hyd] .tc[data-ctl="chat"] { inset-inline-start: calc(var(--start) + 336px * var(--ts)); }
+  html[data-touch] .touch:not([data-roam]) .tc[data-ctl="lift"] { left: auto; inset-inline-start: var(--start); }
+  html[data-touch] .touch:not([data-roam]) .tc[data-ctl="bounce"] { left: auto; inset-inline-start: calc(var(--start) + 56px * var(--ts)); }
   html[data-touch] .stick { top: calc(var(--pic-h) + 12px + 52px * var(--ts)); height: auto; width: 50%; }
   /* below the picture, on black: a light backing, and room for bigger pedals and steering */
   html[data-touch] :is(.tc, .stage-menu) { background: rgba(255, 255, 255, 0.1); }
   html[data-touch] :is(.tc.on, .stage-menu:active) { background: rgba(255, 255, 255, 0.2); }
-  html[data-touch] .stick-base { background: rgba(255, 255, 255, 0.06); }
+  html[data-touch] .touch[data-mode="drive"] .tc:not([data-ctl="mode"]) { background: rgba(255, 255, 255, 0.05); }
+  html[data-touch] .touch[data-mode="drive"] .tc.on:not([data-ctl="mode"]) { background: rgba(255, 255, 255, 0.2); }
+  html[data-touch] .stick-base { background: rgba(255, 255, 255, 0.03); }
   html[data-touch] .tc[data-ctl="left"] { width: calc(88px * var(--ts)); height: calc(120px * var(--ts)); }
   html[data-touch] .tc[data-ctl="right"] { inset-inline-start: calc(var(--steer) + 96px * var(--ts)); width: calc(88px * var(--ts)); height: calc(120px * var(--ts)); }
   html[data-touch] .tc[data-ctl="gas"] { width: calc(88px * var(--ts)); height: calc(200px * var(--ts)); }
   html[data-touch] .tc[data-ctl="brake"] { inset-inline-end: calc(var(--pedal) + 96px * var(--ts)); width: calc(88px * var(--ts)); height: calc(140px * var(--ts)); }
   html[data-touch] .tc[data-ctl="nitro"] { inset-inline-end: calc(var(--pedal) + 12px * var(--ts)); bottom: calc(var(--b) + 212px * var(--ts)); width: calc(64px * var(--ts)); height: calc(64px * var(--ts)); }
+  /* free roam's second row out to the pedals' side (Pressurize and Bounce, then the horn and quick chat): Nitro there
+   * 8 px lower, still clear of Gas, so the row's end never covers it at auto's size (which leaves the controls 372 px
+   * of height; the row's bottom and Nitro's top took 380) */
+  html[data-touch] .touch[data-roam][data-hyd]:not([data-alone]):not([data-nitro]):not([data-steering="tilt"]) .tc[data-ctl="nitro"] { bottom: calc(var(--b) + 204px * var(--ts)); }
   html[data-touch] .tc[data-ctl="hb"] { inset-inline-end: calc(var(--pedal) + 110px * var(--ts)); bottom: calc(var(--b) + 152px * var(--ts)); width: calc(60px * var(--ts)); height: calc(60px * var(--ts)); }
   html[data-touch] .tc[data-ctl="start"] { bottom: calc(var(--b) + var(--gb)); }
   html[data-touch] .touch { --gb: calc(132px * var(--ts)); }
@@ -745,16 +794,32 @@ html:has(> body > .stage:not([hidden])) { overflow: hidden; }
 }
 .pause-hint-list { color: var(--muted); }
 .pause-hint-list::before { content: " · "; }
-/* free roam's friends (friends.ts): the line in the toasts at the top while front bumpers touch, a toast with the key
- * cap; one that offers nothing (a request sent, or why not) is no button.  On the start page (and in the page menu's Friends) a
- * line a friend: the name, where it plays after it in small text (lime while it plays; the name dimmed while it does
- * not), the icons at its end (Message an envelope, lime with a dot while messages wait to be read: messages.ts; Remove
- * a grey can, red under the pointer); the friend's own line under it */
-.friend-prompt { border: 0; -webkit-tap-highlight-color: transparent; }
+/* free roam's friends (friends.ts): the line while front bumpers touch, in quick chat's look over the cars (.qc-b: bold
+ * italic lime, an icon first, its size with the HUD, its shadow, its pop), in the middle of the picture just above the
+ * game's outrun line (friends.ts place: --y its top, --u one HUD unit), the key cap after the icon; one that offers
+ * nothing (a request sent, or why not) is grey and no button.  On a touch screen on its side it keeps under the row of
+ * small buttons, as the toasts do.  On the start page (and in the page menu's Friends) a line a friend: the name, where
+ * it plays after it in small text (lime while it plays; the name dimmed while it does not), the icons at its end
+ * (Message an envelope, lime with a dot while messages wait to be read: messages.ts; Remove a grey can, red under the
+ * pointer); the friend's own line under it */
+.friend-prompt {
+  --u: 1px;
+  position: absolute; left: 50%; top: var(--y, 16px); z-index: 4; translate: -50% 0; max-width: calc(100% - 32px);
+  display: flex; align-items: center; gap: calc(3 * var(--u)); padding: 0; border: 0; background: none;
+  font: italic 700 max(14px, calc(16 * var(--u))) / 1.2 var(--font); color: var(--lime); text-align: center;
+  text-shadow: 0 0 2px #000, 0 1px 3px #000, 0 0 calc(5 * var(--u)) rgba(0, 0, 0, 0.6);
+  pointer-events: none; -webkit-tap-highlight-color: transparent;
+  transform-origin: 50% 100%; animation: qc-pop 0.22s ease-out both;
+}
+.friend-prompt svg { width: 1.1em; height: 1em; flex: none; fill: currentColor; filter: drop-shadow(0 1px 2px #000); }
+.friend-prompt kbd { flex: none; min-width: 1.4em; padding: 0 0.35em; border-radius: 3px; font: italic 700 0.75em/1.45 var(--font); text-shadow: none; }
 .friend-prompt.offer { pointer-events: auto; cursor: pointer; }
-.friend-prompt.offer:active { color: var(--lime); }
+.friend-prompt.offer:active { color: var(--text); }
 .friend-prompt:not(.offer) { color: var(--muted); }
-.friend-prompt kbd { min-width: 0; margin-right: 8px; padding: 0 6px; border-radius: 3px; font: 700 0.85em/1.5 var(--font); vertical-align: 1px; }
+.stage:has(> .touch[data-mode="drive"]) > .friend-prompt { top: max(var(--y, 0px), calc(max(12px, env(safe-area-inset-top)) + 12px + 48px * var(--ts))); }
+@media (orientation: portrait) {
+  html[data-touch] .stage:has(> .touch[data-mode="drive"]) > .friend-prompt { top: var(--y, 16px); }   /* the buttons are under the picture */
+}
 .fl, .dlg ul.fl { list-style: none; margin: 0; padding: 0; color: inherit; font-size: inherit; line-height: inherit; }
 .fl li { display: flex; flex-wrap: wrap; align-items: center; column-gap: 8px; min-height: 40px; }
 .fl li + li { box-shadow: inset 0 1px var(--line); }
@@ -883,8 +948,21 @@ html:has(> body > .stage:not([hidden])) { overflow: hidden; }
 .ph-mode { display: inline-flex; border: 1px solid var(--edge); border-radius: 6px; overflow: hidden; }
 .ph-mode button { padding: 2px 10px; border: 0; background: none; color: var(--muted); cursor: pointer; }
 .ph-mode button.on { background: var(--lime-fill); color: var(--lime); }
-.ph-slider { display: flex; flex-direction: column; gap: 2px; color: var(--muted); }
-.ph-slider input { width: 100%; margin: 0; accent-color: var(--lime); }
+/* a slider or a list: its name left, the control right (as wide as the lists) */
+.ph-slider { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); }
+.ph-slider input { flex: 0 1 136px; min-width: 96px; margin: 0; accent-color: var(--lime); }
+.ph-slider > span, .ph-pick > span { min-width: 0; overflow-wrap: anywhere; }
+.ph-slider:has(input:disabled) { opacity: 0.4; }
+/* a list in the mode buttons' frame */
+.ph-pick { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); }
+.ph-pick select {
+  appearance: none; flex: 0 1 136px; min-width: 96px; height: 28px; padding: 0 24px 0 8px; border: 1px solid var(--edge); border-radius: 6px;
+  background: linear-gradient(45deg, transparent 50%, var(--lime) 50%) calc(100% - 14px) 50% / 5px 5px no-repeat,
+    linear-gradient(135deg, var(--lime) 50%, transparent 50%) calc(100% - 9px) 50% / 5px 5px no-repeat, var(--field);
+  color: var(--text); font: 400 14px/20px var(--font); cursor: pointer;
+}
+.ph-pick select:hover { border-color: var(--lime); }
+.ph-pick select option { background: var(--field); color: var(--text); }
 .ph-check { display: flex; align-items: center; gap: 8px; color: var(--muted); cursor: pointer; }
 .ph-check input { margin: 0; accent-color: var(--lime); }
 .ph-buttons { display: flex; flex-direction: column; gap: 8px; }
@@ -893,7 +971,11 @@ html:has(> body > .stage:not([hidden])) { overflow: hidden; }
   font-style: italic; font-weight: 700; cursor: pointer;
 }
 .ph-buttons button:hover { border-color: var(--lime); }
-.ph-buttons .ph-shoot { order: -1; padding: 9px 16px; border-color: var(--lime); color: var(--lime); }
+/* Take photo fills as the still picture's frames come (photo.ts --ph-p, 0 .. 1) */
+.ph-buttons .ph-shoot {
+  order: -1; padding: 9px 16px; border-color: var(--lime); color: var(--lime);
+  background: linear-gradient(to right, var(--lime-fill) calc(var(--ph-p, 0) * 100%), var(--field) 0);
+}
 .ph-hints {
   display: flex; flex-direction: column; gap: 3px; padding-top: 8px; border-top: 1px solid var(--line);
   color: var(--muted); font-size: 12px; line-height: 18px;
@@ -917,6 +999,20 @@ html:has(> body > .stage:not([hidden])) { overflow: hidden; }
 }
 .qc-b svg { width: 0.95em; height: 0.95em; flex: none; fill: currentColor; filter: drop-shadow(0 1px 2px #000); }
 @keyframes qc-pop { 0% { opacity: 0; transform: translateY(30%) scale(0.6); } 70% { opacity: 1; transform: scale(1.06); } 100% { transform: none; } }
+/* the countdown, a special phrase (quickchat.ts): its stopwatch in the picker and over the car, dimmed in a race (it
+ * does nothing there); its big number for the players near the one who said it, the chat lines' lime and shadow, in
+ * the picture's middle a quarter down (placed by the page), a pop at each */
+svg.qc-watch { width: 1em; height: 1em; flex: none; margin-right: 0.3em; vertical-align: -0.14em; fill: none; stroke: var(--lime); stroke-width: 1.6; stroke-linecap: round; }
+.qc-b svg.qc-watch { width: 0.95em; height: 0.95em; margin-right: 0; fill: none; stroke: currentColor; }
+.qc-off { color: var(--muted); }
+.qc-off svg.qc-watch { stroke: var(--muted); }
+.qc-count { position: absolute; left: 50%; top: 24%; transform: translate(-50%, -50%); transition: opacity 0.6s linear; }
+.qc-count.out { opacity: 0; }
+.qc-count span {
+  display: block; white-space: nowrap; transform-origin: 50% 50%; animation: qc-pop 0.22s ease-out both;
+  font: italic 700 calc(80 * var(--u)) / 1 var(--font); color: var(--lime);
+  text-shadow: 0 0 2px #000, 0 2px 6px #000, 0 0 calc(14 * var(--u)) rgba(0, 0, 0, 0.6);
+}
 /* quick chat's picker: on the left in the notices' place (they step aside while it is open), the race lobby's card
  * in its sizes (.lobby: its width, padding and text, the title, the places' rows, the key caps, the hint); on a touch
  * screen all sixteen at the top, big enough to tap */
@@ -1041,6 +1137,8 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.64); }
 .dlg p { margin-bottom: 16px; }
 .dlg ul { margin: 0 0 16px; padding-left: 24px; color: var(--muted); font-size: 14px; line-height: 20px; }
 .dlg .row.end { margin-top: 8px; }
+/* a question answered by buttons in its body (vault-ui.ts askAtPlay): no footer, the dialog's padding under the text */
+.dlg:has(.row.end[hidden]) #confirm-body > :last-child { margin-bottom: 0; }
 .dlg-field { display: flex; align-items: center; gap: 12px; }
 .dlg-field input[type="text"] { flex: 1; min-width: 0; }
 .dlg.help { width: min(560px, calc(100vw - 32px)); }

@@ -44,6 +44,9 @@ const SCEN = [
   ['kb_profile_prefill', 'kb_profile_prefill', ['NFSU2_NEW_PROFILE_NAME=Alex_the_Great'], null, null, 300],
   // in Chinese the box starts empty, not with the pack's NAME (font bytes the field never takes)
   ['kb_profile_zh', 'kb_profile_zh', ['NFSU2_LANGUAGE=chinese'], null, null, 300],
+  // Enter in that empty box makes no profile without a name
+  ['kb_profile_zh_empty', 'kb_profile_zh_empty', ['NFSU2_LANGUAGE=chinese'], null, null, 300],
+  ['kb_profile_pl_empty', 'kb_profile_zh_empty', ['NFSU2_LANGUAGE=polish'], null, null, 300],
   ['kb_no_pad_controls', 'kb_no_pad_controls', [], null, null, 300],
   // an x typed into the game's text entry (a name, a chat line) is no drift-mode key (drift.c x_is_typing)
   ['kb_typing_x', 'kb_typing_x', [], null, null, 400],
@@ -69,6 +72,8 @@ const SCEN = [
   // a steering wheel: the game's driving device, its layout and steering; a wheel taking over from a pad and back
   ['pad_wheel_race', 'pad_wheel_race', [], null, null, 300],
   ['pad_wheel_switch', 'pad_wheel_switch', [], null, null, 300],
+  // the right stick turns the car in the front end's car viewer (dinput_pad.c sub_004a5d90; the angles in the log)
+  ['pad_garage_stick', 'pad_garage_stick', ['NFSU2_PAD_LOG=1'], null, null, 300],
   ['pad_bind_save', 'pad_bind_save', [], 'pad', 'pad-rvf-bind_save', 400],
   ['pad_bind_load', 'pad_bind_load', [], 'pad', 'pad-rvf-bind_load', 300],
   ['pad_bind_pedals', 'pad_bind_pedals', ['NFSU2_PAD_LOG=1'], null, null, 400],

@@ -151,6 +151,24 @@ pub fn snap(sender: u32, pos: [f64; 3]) -> Vec<u8> {
     snap_n(sender, pos, 2, 1)
 }
 
+/// a SNAP of one state with a velocity, a heading (radians, 0 = +x, a turn about z) and its nose `slope` up (a
+/// tangent: 0.1 for 10 %)
+pub fn snap_pose(sender: u32, pos: [f64; 3], v: [f64; 3], heading: f64, slope: f64, status: u8) -> Vec<u8> {
+    let mut d = snap_moving(sender, pos, v, heading, status);
+    // the turn about z, then the nose up about the car's left (y): q = yaw * pitch
+    let (sz, cz) = ((heading / 2.0).sin(), (heading / 2.0).cos());
+    let (sy, cy) = ((-slope.atan() / 2.0).sin(), (-slope.atan() / 2.0).cos());
+    let q = [-sz * sy, cz * sy, sz * cy, cz * cy];
+    let p = &mut d[16..];
+    for (k, x) in q.iter().enumerate() {
+        p[34 + 2 * k..36 + 2 * k].copy_from_slice(&((x * 32767.0).round() as i16).to_le_bytes());
+    }
+    let len = d.len();
+    let crc = crc32fast::hash(&d[..len - 4]);
+    d[len - 4..].copy_from_slice(&crc.to_le_bytes());
+    d
+}
+
 /// a SNAP of one state with a velocity and a heading (radians, 0 = +x, a turn about z)
 pub fn snap_moving(sender: u32, pos: [f64; 3], v: [f64; 3], heading: f64, status: u8) -> Vec<u8> {
     let mut d = snap_n(sender, pos, status, 1);
@@ -171,6 +189,11 @@ pub fn snap_moving(sender: u32, pos: [f64; 3], v: [f64; 3], heading: f64, status
 /// the world map's question (MAPREQ): for max players at most, what changed since its answer base (0: none)
 pub fn mapreq_base(sender: u32, req: u16, max: u16, base: u16) -> Vec<u8> {
     dgram(10, sender, &[req.to_le_bytes(), max.to_le_bytes(), base.to_le_bytes()].concat())
+}
+
+/// ...with flags (1: the players parked a minute have 0x4000 in their keys)
+pub fn mapreq_flags(sender: u32, req: u16, max: u16, base: u16, flags: u16) -> Vec<u8> {
+    dgram(10, sender, &[req.to_le_bytes(), max.to_le_bytes(), base.to_le_bytes(), flags.to_le_bytes()].concat())
 }
 
 /// the minimap's question (NEARREQ): for max players at most within radius m, what changed since its answer base
@@ -200,6 +223,7 @@ pub fn mapd_of(f: &[u8]) -> Option<Mapd> {
         return None;
     }
     let (mut o, mut e) = (25, Vec::new());
+    let place = if u16::from_le_bytes([d[14], d[15]]) & 0x0800 != 0 { 11 } else { 9 }; // (with heights)
     for _ in 0..d[24] {
         let key = u16::from_le_bytes([d[o], d[o + 1]]);
         if key & 0x8000 != 0 {
@@ -208,7 +232,7 @@ pub fn mapd_of(f: &[u8]) -> Option<Mapd> {
         } else {
             let i = |k: usize| i16::from_le_bytes([d[o + k], d[o + k + 1]]);
             e.push((key, Some((i(2), i(4), d[o + 6], d[o + 7] as i8, d[o + 8] as i8))));
-            o += 9;
+            o += place;
         }
     }
     assert_eq!(o + 4, d.len(), "MAPD entries fill the datagram");

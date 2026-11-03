@@ -70,7 +70,7 @@ const RIGHT: Row[] = [
   { y: 90, xb: 'X', ps: 'square', does: N('Shift down') },
   { y: 104, xb: 'Y', ps: 'triangle', does: N('Camera') },
   { y: 118, xb: 'B', ps: 'circle', does: N('Look back') },
-  { y: 140, xb: 'RS', ps: 'R3', does: N('Quick chat'), to: [162, 94] },
+  { y: 134, xb: 'RS', ps: 'R3', does: N('Quick chat'), sub: N('garage, shops: turn the car'), to: [162, 94] },
 ];
 /** over the middle: View and Menu, their lines straight down */
 const MIDDLE: (Row & { x: number })[] = [
@@ -129,6 +129,8 @@ function padSvg(): string {
   }
   for (const r of RIGHT) {
     s += chip(248, r) + `<text class="pad-label" x="${248 + chipW(r) + 5}" y="${r.y + 4}">${does(r)}</text>`;
+    // a second line under the last row, ending at the drawing's edge: there is room below the grip, not beside it
+    if (r.sub) s += `<text class="pad-sub" x="335" y="${r.y + 16}" text-anchor="end">${esc(t(r.sub))}</text>`;
     if (r.to) s += line(245, r.y, r.to);
   }
   for (const [i, r] of MIDDLE.entries()) {
@@ -172,6 +174,7 @@ export function controlsSheet(root: HTMLElement, id: string, opts: { tab?: Tab; 
     const menus = esc(t('In menus: D-pad and {a}, {b} goes back.')).replace('{a}', cap('A', 'cross')).replace('{b}', cap('B', 'circle'));
     pad.innerHTML = padSvg() + `<div class="pad-foot">
     <p class="hint">${menus}</p>
+    <p class="hint">${esc(t('Parked in free roam: hold D-pad down to open trunk, then hood, then doors.'))}</p>
     <div class="seg" role="radiogroup" aria-label="${esc(t('Button names'))}">
       <label class="opt"><input type="radio" name="${id}-fam" value="xb">Xbox</label>
       <label class="opt"><input type="radio" name="${id}-fam" value="ps">PlayStation</label>

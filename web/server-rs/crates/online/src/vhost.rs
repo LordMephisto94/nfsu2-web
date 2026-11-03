@@ -49,8 +49,8 @@ const F_DATA: usize = 16;
 /// the most data one TCP frame carries (net_proto.h NET_MAX_PAYLOAD - NET_LAN_HDR)
 pub const TCP_CHUNK: usize = 1472 - LAN_HDR;
 
-/// The virtual host's limits.  max_conns: a player in the lobby holds two (the lobby and EA Messenger), so 6000 lobby
-/// sessions take 12000
+/// The virtual host's limits.  max_conns: a player in the lobby holds two (the lobby and EA Messenger), so 7000 lobby
+/// sessions take 14000
 #[derive(Clone, Copy, Debug)]
 pub struct VhostLimits {
     pub max_conns: usize,
@@ -59,7 +59,7 @@ pub struct VhostLimits {
 
 impl Default for VhostLimits {
     fn default() -> Self {
-        VhostLimits { max_conns: 24000, per_vip: 8 }
+        VhostLimits { max_conns: 28000, per_vip: 8 }
     }
 }
 
@@ -101,6 +101,8 @@ pub struct VConn {
     pub site: Option<Arc<str>>,
     /// the keyphrase its page plays with (FrameCtx::owner, as of its first frame)
     pub owner: Option<Arc<str>>,
+    /// its player races nobody (FrameCtx::no_races, as of its last frame: a race ban can come while it plays)
+    pub no_races: bool,
     pub rx_fin: bool,
     pub tx_fin: bool,
     pub bytes_in: u64,
@@ -292,6 +294,7 @@ impl Core {
                         group: ctx.group.clone(),
                         site: ctx.site.clone(),
                         owner: ctx.owner.clone(),
+                        no_races: ctx.no_races,
                         rx_fin: false,
                         tx_fin: false,
                         bytes_in: 0,
@@ -310,6 +313,7 @@ impl Core {
                 if conn.rx_fin {
                     return;
                 }
+                conn.no_races = ctx.no_races;
                 conn.bytes_in += payload.len() as u64;
                 if !payload.is_empty() {
                     self.on_data(id, payload);

@@ -434,9 +434,48 @@ static int force_rain(void){
     if (fr < 0){ const char *e = getenv("FORCERAIN"); fr = e ? atoi(e) : 0; }
     return fr;
 }
+/* --- One weather for everyone in free roam --------------------------------
+ * sub_0061e380(x, y) is the rain at a place: the "Rain" zone's rain there
+ * (its param 0) when v = |0.5 cos(t + x/50) + 0.5| <= the zone's threshold
+ * (param 1), else 0 (sub_006134e0: t the world timer 0x7fb718 in s, the
+ * angle in degrees), so the rain comes and goes in a 6-minute cycle, shifted
+ * by 1 s for every 50 m along x (measured at the prologue's spot: rain 0.75
+ * below v ~0.05, about 52 s of every 6 minutes, from 2:00 after a load on
+ * the game's clock).  Rain::Update takes it at the camera (the drops, the
+ * fog, the sound), and the car physics at each car (sub_005a4d80 and
+ * sub_005aad90 through 0x5ed5d0): a grip x (1 - 0.025 x rain), as the game's
+ * weather tip says.  The world timer starts at 1 s with each World
+ * (0x5ff490 -> 0x576cf0), so in free roam each player had their own weather,
+ * and their own grip at the same place.  Network races need nothing: every
+ * client's world timer follows the race host's (0x601a60).
+ * In free roam's world with free-roam multiplayer on, t is the device's UTC
+ * time mod 360 s instead, the same for everyone whose clock is right (a
+ * clock some seconds off only moves the rain's start and end as much).  The
+ * formula and the zones stay the game's, so it rains as often and as long
+ * as before; only where in the cycle a world starts changes (the game's own
+ * clock started each load at the same point).  Solo, races, the Dyno Shop
+ * and LAN keep the game's clock. */
+int roam_game_shared_weather(void);       /* roam_game.c: free roam's world with free-roam multiplayer on */
+#define A_WORLD_T   0x007fb718u           /* WorldTimer in seconds (float) */
+#define A_TICKS     0x0086518cu           /* WorldTimer in ticks: a new value each world step */
+static float shared_weather_t(void){
+    static uint32_t at = ~0u; static float t;
+    uint32_t tick = MR32(A_TICKS);
+    if (tick != at){                      /* the clock once a step: the car physics asks once per car */
+        struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts);
+        t = (float)((double)(ts.tv_sec % 360) + (double)ts.tv_nsec * 1e-9);
+        at = tick;
+    }
+    return t;
+}
 void sub_0061e380_orig(CPU *c);
 void sub_0061e380(CPU *c){
-    sub_0061e380_orig(c);
+    if (roam_game_shared_weather()){
+        float own = MRF32(A_WORLD_T);
+        MRF32(A_WORLD_T) = shared_weather_t();
+        sub_0061e380_orig(c);
+        MRF32(A_WORLD_T) = own;
+    } else sub_0061e380_orig(c);
     int fr = force_rain();
     if (fr == 1 || fr == 4) ST(0) = 1.0; else if (fr == 2 || fr == 3) ST(0) = 0.0;
 }
@@ -496,9 +535,35 @@ void sub_0060faa0(CPU *c){
  * game's.  The game's view space has y down (the projection's P11 is
  * negative), so this turns the picture anticlockwise for a + roll.  Photo
  * mode's tilt turns it the same way, and its field of view (camera +0xC4, a
- * binary angle) stands in for the camera's for the call (photo.c). */
+ * binary angle) stands in for the camera's for the call (photo.c).  So does
+ * its frame's shift for a still picture: the eye moved along the view's x
+ * and y (the camera's matrix, its translation row, for the call), then the
+ * projection sheared after (its third row: x and y go by that much times the
+ * depth) so that the picture moves within a pixel and what is at the focus
+ * distance F stays where it was (the eye's move a goes back by a * P00 / F),
+ * and the product made again (the view times the projection).  photo.c
+ * gives the lens's point as where far away lands (a part of the view's half
+ * width): the eye's move a is that times F / P00, the same scale for y, so
+ * the blur is round on the screen. */
 float input_view_roll(void);
-int photo_view(uint16_t *fov, float *roll);
+int photo_view(uint16_t *fov, float *roll, float *jit);
+static void photo_shear(uint32_t plat, const float *j){
+    float *V = (float *)(g_mem + plat), *Pr = V + 16, *M = V + 32;
+    float p00 = Pr[0], p11 = Pr[5], p23 = Pr[11];
+    static int said;
+    if (!said){                     /* once: the product is the view times the projection, as made here */
+        float e = 0.f;
+        for (int r = 0; r < 4; r++) for (int k = 0; k < 4; k++)
+            e = fmaxf(e, fabsf(M[r * 4 + k] - (V[r * 4] * Pr[k] + V[r * 4 + 1] * Pr[4 + k] + V[r * 4 + 2] * Pr[8 + k] + V[r * 4 + 3] * Pr[12 + k])));
+        said = 1;
+        fprintf(stderr, "[photo] the view's product made again: %s (off by %g); P00 %.3f P11 %.3f P23 %.3f\n",
+                e < 1e-3f ? "as the game's" : "NOT as the game's", (double)e, (double)p00, (double)p11, (double)p23);
+    }
+    Pr[8] += j[0] * p23 + (j[4] > 0.f ? j[2] * p00 / j[4] : 0.f);
+    Pr[9] += j[1] * p23 + (j[4] > 0.f ? j[3] * p11 / j[4] : 0.f);
+    for (int r = 0; r < 4; r++) for (int k = 0; k < 4; k++)
+        M[r * 4 + k] = V[r * 4] * Pr[k] + V[r * 4 + 1] * Pr[4 + k] + V[r * 4 + 2] * Pr[8 + k] + V[r * 4 + 3] * Pr[12 + k];
+}
 static void view_roll(uint32_t m, float a){
     float c = cosf(a), s = sinf(a);
     for (uint32_t r = m; r < m + 0x40u; r += 0x10u){
@@ -513,19 +578,33 @@ void sub_005c7ec0(CPU *c){
     uint32_t plat = c->ecx, view = MR32(c->esp + 4u);
 #ifdef __wasm__
     uint32_t cam = 0, fcam = 0; uint8_t keep[0x40]; uint16_t fov = 0, fkeep = 0;
+    float pj[5] = { 0 };
+    int shift = 0;
     if (view && mem_is_committed(view + 0x43u) && (MR32(view + 4u) == 1u || MR32(view + 4u) == 4u)){
         float a = input_view_roll(), pr = 0.f;
-        if (photo_view(&fov, &pr)){
+        if (photo_view(&fov, &pr, pj)){
             a += pr;
             fcam = MR32(view + 0x40u);
             if (fcam && mem_is_committed(fcam + 0xc5u)){ fkeep = MR16(fcam + 0xc4u); MR16(fcam + 0xc4u) = fov; }
             else fcam = 0;
+            shift = (pj[0] != 0.f || pj[1] != 0.f || pj[2] != 0.f || pj[3] != 0.f) && plat && mem_is_committed(plat + 0xbfu);
         }
-        cam = a != 0.f ? MR32(view + 0x40u) : 0u;
-        if (cam && mem_is_committed(cam + 0x3fu)){ memcpy(keep, g_mem + cam, sizeof keep); view_roll(cam, a); }
-        else cam = 0;
+        cam = a != 0.f || shift ? MR32(view + 0x40u) : 0u;
+        if (cam && mem_is_committed(cam + 0x3fu)){
+            memcpy(keep, g_mem + cam, sizeof keep);
+            if (a != 0.f) view_roll(cam, a);
+            if (shift){
+                /* the lens's point (far away's move, in half widths) as the eye's move in metres, round in the view:
+                 * times the focus distance over the projection's x scale (the view's own, as the last frame made it) */
+                float p00 = MRF32(plat + 0x40u), s = p00 > 0.05f && p00 < 50.f && pj[4] > 0.f ? pj[4] / p00 : 0.f;
+                pj[2] *= s; pj[3] *= s;
+                MRF32(cam + 0x30u) -= pj[2]; MRF32(cam + 0x34u) -= pj[3];
+            }
+        }
+        else { cam = 0; shift = 0; }
     }
     sub_005c7ec0_orig(c);
+    if (shift) photo_shear(plat, pj);
     if (cam) memcpy(g_mem + cam, keep, sizeof keep);
     if (fcam) MR16(fcam + 0xc4u) = fkeep;
 #else

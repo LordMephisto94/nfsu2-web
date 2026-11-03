@@ -51,7 +51,10 @@
 // hello names this browser's own id (NetOptions.id, and NetOptions.was), which
 // a ban names besides the player's address, and the token of the keyphrase it
 // plays with (NetOptions.claim), which says whose claimed names it may play
-// under, and which a ban names too.
+// under, and which a ban names too.  A race ban keeps the player on the switch
+// ({"t":"races"}: onRaces; the switch drops its races).  A name the operator
+// took away ({"t":"rename"}, then the close 4004: onRename) keeps the page off
+// the switch until the player picks another (rename), under which it goes back.
 //
 // TCP frames are never dropped here: while the LAN RX ring is full they wait
 // in order (the C side's streams have no retransmission; the WebSocket and the
@@ -101,6 +104,13 @@ export interface NetOptions {
   /** the operator removed this player from playing with others (a kick or a ban), with its message: the page stays
    *  off the switch for the rest of this game */
   onRemoved?: (r: NetRemoved) => void;
+  /** the operator's race ban (the switch's {"t":"races"}): this player plays on with others but races none of them
+   *  (the switch drops its races), why and until when; again each time LAN play opens (the LAN and Online screens);
+   *  null when it was lifted */
+  onRaces?: (r: NetRaces | null) => void;
+  /** the operator took this player's name away (the switch's {"t":"rename"}, then the close 4004): the page stays off
+   *  the switch until the player picks another (rename) */
+  onRename?: (r: NetRename) => void;
   /** milliseconds between pings to the switch (default 10000): their round trip is only shown (the F9 log's
    *  "lan rtt ms"); the switch times free roam's paths with pings of its own.  Each ping and its answer were a
    *  message each way through cloudflared for every page, 2 s apart */
@@ -112,8 +122,14 @@ export interface NetPeer { vip: string; name: string; self: boolean }
 /** a kick or a ban, as the switch said it: the operator's message (maybe ""), and a ban's end (ms since 1970; none:
  *  for good) */
 export interface NetRemoved { ban: boolean; msg: string; until?: number }
-/** the switch's close codes for a kick and a ban */
-const CLOSE_KICKED = 4001, CLOSE_BANNED = 4003;
+/** a race ban, as the switch said it: the operator's message (maybe ""), and its end (ms since 1970; none: for good) */
+export interface NetRaces { msg: string; until?: number }
+/** a name the operator took away, and the message with it (maybe "") */
+export interface NetRename { name: string; msg: string }
+/** the switch's close codes for a kick, a ban and a name taken away */
+const CLOSE_KICKED = 4001, CLOSE_BANNED = 4003, CLOSE_RENAME = 4004;
+/** why a player whose car flew in free roam for minutes goes off the switch (`flying`), over the game as a kick's */
+export const FLYING_MSG = "You're not an airplane, get down to the ground like the rest of us";
 /** a place in line: pos 1 is the next in, of everyone in line, eta about how many seconds until its turn (when the
  *  switch can tell: a few have gone in) */
 export interface NetQueue { pos: number; of: number; eta?: number }
@@ -152,11 +168,14 @@ export interface NetLink {
   setAway(on: boolean): void;
   /** the player stops waiting in line for a place: no switch for the rest of this game */
   goOffline(): void;
+  /** the player picked another name after the operator took its name away (onRename): back on the switch under it */
+  rename(name: string): void;
   /** free roam's solid cars, switched while the game runs (the page menu; runtime/roam_game.c solid_follow), as
    *  roam_collide has them: on, off (Ghost mode: Players) or none (Ghost mode: Everything) */
   setSolid(collide: 'on' | 'off' | 'none'): void;
-  /** quick chat: the player says phrase p (runtime/roam_game.c say_frame sends it); false: no free roam */
-  say(p: number): boolean;
+  /** quick chat: the player says phrase p (runtime/roam_game.c say_frame sends it; race: in a race between players,
+   *  runtime/racehorn.c qc_say); false: no free roam (race: no LAN play) */
+  say(p: number, race?: boolean): boolean;
   /** free roam's friends: a message to the server ({"t":"friend",...m}, or m's own "t": "room"); false: the link is
    *  not up now */
   friend(m: Record<string, unknown>): boolean;
@@ -381,6 +400,11 @@ class Link implements NetLink {
   private stayOff = false;
   /** the switch's kick or ban message, until its close comes */
   private removal: NetRemoved | null = null;
+  /** the race ban this player is under now (onRaces), and the name taken away the switch named before its close */
+  private races: NetRaces | null = null;
+  private renaming: NetRename | null = null;
+  /** off the switch for a name taken away (and nothing since that keeps it off): rename brings it back */
+  private offForName = false;
   /** the roam mailbox's solid word (setSolid): 0 not switched, 1 off, 2 on, 3 none */
   private solid = 0;
   /** quick chat's picks so far (say): the count in the roam mailbox's say word */
@@ -478,6 +502,8 @@ class Link implements NetLink {
     const udp = lan ? this.lanPorts() : 0;
     if ((lan !== this.lanSent || udp !== this.udpSent) && ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ t: 'lan', on: lan ? 1 : 0, ...(udp ? { udp } : {}) }));
+      // the LAN or Online screens opened under a race ban: the player hears it again there
+      if (lan && !this.lanSent && this.races) this.o.onRaces?.(this.races);
       this.lanSent = lan; this.udpSent = udp;
     }
   }
@@ -518,6 +544,28 @@ class Link implements NetLink {
     if (this.state !== 'away') this.release('away');
     this.log('the player stopped waiting for a place: no switch for the rest of this game');
   }
+  /** the game: the player's car was in the air in free roam for `secs` (NET_KIND_FLYING, roam_game.c fly_frame): off
+   *  the switch for the rest of this game, as an operator's kick takes a player, with FLYING_MSG over the game; the
+   *  server hears it first ({"t":"flying"}: its log; a server of before lets it be) */
+  private flying(secs: number) {
+    if (this.closed || this.stayOff) return;
+    const ws = this.ws;
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ t: 'flying', s: secs }));
+    this.stayOff = true; this.offForName = false;
+    if (this.state !== 'away') this.release('away');
+    this.log(`the player's car was in the air for ${secs} s: no switch for the rest of this game ("${FLYING_MSG}")`);
+    this.o.onRemoved?.({ ban: false, msg: FLYING_MSG });
+  }
+  /** the player picked another name after the operator took its name away (CLOSE_RENAME): back on the switch under it
+   *  as soon as a mailbox wants it (a page off it for any other reason stays off) */
+  rename(name: string) {
+    if (this.closed || !this.offForName) return;
+    this.o.name = name;
+    this.stayOff = false; this.offForName = false; this.removal = null; this.renaming = null;
+    if (this.state === 'away') this.state = 'idle';
+    this.log('back to the switch under another name');
+    this.checkWant();
+  }
   setAway(on: boolean) {
     if (this.closed || this.stayOff || on === (this.state === 'away')) return;
     if (on) {
@@ -534,11 +582,14 @@ class Link implements NetLink {
     if (this.roam) Atomics.store(this.roam.i32, P.W_SOLID, this.solid);
     this.log(`solid cars ${collide === 'on' ? 'on' : collide === 'none' ? 'off, traffic and tuners pass through too' : 'off'} (the page menu)`);
   }
-  /** quick chat: the player says phrase p (the game sends it while they drive in free roam); false: no free roam */
-  say(p: number): boolean {
-    if (!this.roam) return false;
+  /** quick chat: the player says phrase p (the game sends it while they drive in free roam, into the free-roam
+   *  mailbox; race: in a race between players, into the LAN mailbox, whose game sends it to the race's players); false:
+   *  no such mailbox */
+  say(p: number, race = false): boolean {
+    const ep = race ? this.lan : this.roam;
+    if (!ep) return false;
     this.picks = (this.picks + 1) & 0xffffff;
-    Atomics.store(this.roam.i32, P.W_SAY, (this.picks << 8 | (p & 0xff)) | 0);
+    Atomics.store(ep.i32, P.W_SAY, (this.picks << 8 | (p & 0xff)) | 0);
     return true;
   }
   friend(m: Record<string, unknown>): boolean {
@@ -627,11 +678,20 @@ class Link implements NetLink {
       if (e.code === CLOSE_KICKED || e.code === CLOSE_BANNED) {
         const r = this.removal ?? { ban: e.code === CLOSE_BANNED, msg: '' };
         this.removal = null;
-        this.stayOff = true;
+        this.stayOff = true; this.offForName = false;
         this.release('away');
         this.log(`the operator ${r.ban ? `banned this player${r.until ? ` until ${new Date(r.until).toISOString()}` : ' for good'}` : 'kicked this player'}` +
           `${r.msg ? ` ("${r.msg}")` : ''}: no switch for the rest of this game`);
         this.o.onRemoved?.(r);
+        return;
+      }
+      if (e.code === CLOSE_RENAME) {
+        const r = this.renaming ?? { name: this.o.name ?? '', msg: '' };
+        this.renaming = null;
+        this.stayOff = true; this.offForName = true;
+        this.release('away');
+        this.log(`the operator took the name "${r.name}" away${r.msg ? ` ("${r.msg}")` : ''}: no switch until the player picks another`);
+        this.o.onRename?.(r);
         return;
       }
       const was = this.state;
@@ -685,6 +745,19 @@ class Link implements NetLink {
         } else this.log(`back in line, ${m.pos} of ${m.of}`);
       }
       this.o.onQueue?.({ pos: m.pos, of: m.of, ...(typeof m.eta === 'number' ? { eta: m.eta } : {}) });
+    } else if (m.t === 'races') {
+      // a race ban (or its end): the switch drops this player's races from now on; free roam goes on
+      const r: NetRaces | null = m.lifted ? null : { msg: typeof m.msg === 'string' ? m.msg : '', ...(typeof m.until === 'number' ? { until: m.until } : {}) };
+      const same = JSON.stringify(r) === JSON.stringify(this.races);
+      this.races = r;
+      if (!same) {
+        this.log(r ? `the operator's race ban${r.until ? ` until ${new Date(r.until).toISOString()}` : ' for good'}${r.msg ? ` ("${r.msg}")` : ''}: no races with others`
+          : 'the race ban was lifted: races with others again');
+        this.o.onRaces?.(r);
+      }
+    } else if (m.t === 'rename') {
+      // its close follows
+      this.renaming = { name: typeof m.name === 'string' ? m.name : '', msg: typeof m.msg === 'string' ? m.msg : '' };
     } else if (m.t === 'kick' || m.t === 'ban') {
       // its close follows
       this.removal = { ban: m.t === 'ban', msg: typeof m.msg === 'string' ? m.msg : '', ...(typeof m.until === 'number' ? { until: m.until } : {}) };
@@ -806,6 +879,11 @@ class Link implements NetLink {
       } else if (dv.getUint32(s + P.S_KIND, true) === P.NET_KIND_FRIEND) {
         // front bumpers: the same
         if (len <= P.NET_MAX_PAYLOAD) this.o.onBump?.(new TextDecoder().decode(ep.u8.slice(s + P.S_DATA, s + P.S_DATA + len)));
+      } else if (dv.getUint32(s + P.S_KIND, true) === P.NET_KIND_FLYING) {
+        // a car in the air for minutes: off the switch, once this drain is done (it sends what came before)
+        let secs = 0;
+        try { secs = Number(JSON.parse(new TextDecoder().decode(ep.u8.slice(s + P.S_DATA, s + P.S_DATA + Math.min(len, 64)))).s) || 0; } catch { /* the line says 0 */ }
+        queueMicrotask(() => this.flying(secs));
       } else if (open && len <= P.NET_MAX_PAYLOAD) {
         const f = new Uint8Array(P.F_DATA + len), fv = new DataView(f.buffer), dst = dv.getUint32(s + P.S_DST_IP, true);
         f[P.F_KIND] = dv.getUint32(s + P.S_KIND, true);

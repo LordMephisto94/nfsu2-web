@@ -47,6 +47,7 @@ const LANGUAGE_NAMES: Record<Language, string> = {
   english: N('English'), french: N('French'), german: N('German'), italian: N('Italian'), spanish: N('Spanish'), dutch: N('Dutch'),
   swedish: N('Swedish'), danish: N('Danish'), korean: N('Korean'), chinese: N('Chinese'), japanese: N('Japanese'), russian: N('Russian'),
   thai: N('Thai'), portuguese: N('Portuguese (Brazil)'), polish: N('Polish'), turkish: N('Turkish'), hungarian: N('Hungarian'),
+  ukrainian: N('Ukrainian'),
 };
 const LANGUAGE_OPTS = LANGUAGES.map(l => [l, LANGUAGE_NAMES[l]] as [string, string]);
 
@@ -59,10 +60,10 @@ const GROUPS: Group[] = [
       ['cucaracha', N('La Cucaracha')], ['clown', N('Clown horn')], ['trombone', N('Sad trombone')]], preview: { play: playHorn, stop: stopHorn } } },
     { key: 'roam_room', label: N('Room'), help: N('With a name, free roam shows only players in the same room.'), c: { t: 'text', placeholder: N('everyone'), invite: true } },
     { key: 'roam_block', label: N('Blocked players'), help: N('Names, separated by commas: you never see each other in free roam. The server\'s operator sees who blocks whom.'), c: { t: 'text', placeholder: N('nobody') }, more: true },
-    { key: 'roam_collide', label: N('Ghost mode'), help: N('Players: drive through other players\' cars. Everything: also through traffic and the game\'s tuners in free roam, but not an outrun\'s opponent.'),
+    { key: 'roam_collide', label: N('Ghost mode'), help: N('Players: drive through other players\' cars. Everything: also through traffic and the game\'s tuners in free roam, but not a tuner you race in an outrun.'),
       c: { t: 'seg', opts: [['on', N('Off')], ['off', N('Players')], ['none', N('Everything')]] } },
     { key: 'roam_max_cars', label: N('Players\' cars shown'), help: N('How many of the nearest players\' cars free roam shows. More can lower the frame rate.'), c: { t: 'seg', opts: [['16', '16'], ['24', '24'], ['32', '32'], ['40', '40'], ['48', '48']] } },
-    { key: 'quick_chat', label: N('Quick chat'), help: N('Send phrases to players near you in free roam: 1 to 4, then 1 to 4 (controller: right stick twice; touch: the chat button).'), c: { t: 'switch' } },
+    { key: 'quick_chat', label: N('Quick chat'), help: N('Send phrases to players near you in free roam and to everyone in multiplayer races: 1 to 4, then 1 to 4 (controller: right stick twice; touch: the chat button).'), c: { t: 'switch' } },
     { key: 'quick_chat_phrases', label: N('Your phrases'), help: N('Four groups of four. Others read them in their own language.'), c: { t: 'phrases' } },
     { key: 'online', label: N('Online mode'), help: N('The game\'s Online menu skips the EA login: lobby, chat and races with everyone on this server.'), c: { t: 'switch' }, more: true },
   ] },
@@ -772,9 +773,12 @@ export class SettingsPanel {
       for (let i = 0; i < 4; i++) {
         const s = document.createElement('select'); s.id = `${id}-${g * 4 + i}`; s.dataset.slot = String(g * 4 + i);
         s.setAttribute('aria-label', t('Group {n}, phrase {i}', { n: g + 1, i: i + 1 }));
-        for (const c of CATS) {
+        // the special ones (the countdown) in a group of their own, first; then the categories'
+        for (const c of [{ id: null, name: N('Special') }, ...CATS]) {
           const og = document.createElement('optgroup'); og.label = t(c.name);
-          PHRASES.forEach((p, n) => { if (p.cat === c.id) og.append(new Option(t(p.text), String(n), false, n === layout[g * 4 + i])); });
+          PHRASES.forEach((p, n) => {
+            if (c.id === null ? !!p.special : !p.special && p.cat === c.id) og.append(new Option(t(p.text), String(n), false, n === layout[g * 4 + i]));
+          });
           s.append(og);
         }
         s.onchange = save;
