@@ -73,6 +73,16 @@ and it says something only when it is worth it:
   people translate it, and a thread's language is kept too, so later translations in it send no other messages
   along. At most 30 new translations a person an hour.
 
+- **The FAQ**, for a read-only channel: `/faq` (only for those who can manage the server) posts one message there,
+  the questions players ask most as buttons under their topics; a button's answer is seen only by the one who
+  pressed it. The questions and answers are `faq.md` (the file says how to write it); the bot reads it from its clone,
+  so a pushed change shows in the posted message within minutes, and `/faq` again in that channel brings it up to
+  date at once. A version Discord would refuse (a label over 80 characters, more than 40 parts) keeps the one before
+  it, and the log says why. An answer goes to each reader in their Discord language: one short Haiku call the first
+  time someone of that language presses it, given the page's own words for the buttons and settings it names
+  (`web/src/app/lang`), then kept in `state/faq-translations.json` until the answer changes. English readers get
+  `faq.md` as it is.
+
 - **Forum tags**: each look adds the forum's tags that say what the thread is about, at most two (the problem, and the
   device when it is a phone or tablet), picked from the forum's tags but the five below, the moderated ones and
   Denied. Five it keeps itself, by name, in a forum that has them: **Needs info** while its last reply asked the poster
@@ -83,7 +93,7 @@ and it says something only when it is worth it:
   3); nothing in a dry run (the log says what it would set).
 
 Otherwise it says nothing. It reads every channel it can see, but posts only in forum threads, those replies in the
-general channels, and the staff channel. It
+general channels, the staff channel and the FAQ it was asked to post. It
 stays out of a thread once staff wrote in it (the server owner, `BOT_STAFF`, anyone who can manage threads), and replies
 at most twice in a thread on its own. Someone answering it gets a look past that, up to `BOT_MAX_TALK` replies (4):
 after it asked for something, the poster's next post, which always gets a reply (a fix, or what their log shows and
@@ -119,13 +129,15 @@ bot's first log line says what the month and the day spent so far.
   a phone screenshot costs 1,456 tokens instead of 3,354, a 4K one 1,560 instead of 4,784.
 - `investigate.mjs`: one look. It sends Claude the rules (`system.md`), the maintainer's notes (`knowledge.md`),
   `docs/web/PLAYING.md` as of the live version, the live version, recent commits, recent threads and the problems the
-  developer has a report on (each report's first thread, where it stands; what it points posters to and joins
-  duplicates to), and the thread with the files it can read named at its top. The rules, the notes, the guide and the
-  code's history up to the live version (the same for every look until the next release, or a change to the rules or
-  the notes) are kept an hour in the prompt cache, so a look reads them for a tenth of the price instead of sending
-  them again; the newest commits, which change more often, go with the thread. Claude reads what it needs through the
-  tools, several calls a turn, at most 8 turns, then returns a verdict as JSON: none, ask or answer, and whether to
-  tell the developer. `vet()` drops weak answers and replies that paste code. A new post in a suggestion forum first
+  developer has a report on (each report's first thread, where it stands, where its logs crash or freeze; what it
+  points posters to and joins duplicates to), and the thread with the files it can read named at its top. `sigs.mjs`
+  reads the top three functions of each log's crash (`TRAP`) or freeze (watchdog) stack; the look is told the reports
+  whose logs stop in the same place (two functions in common), so threads join by the bug, not by the exit code.
+  The rules, the notes, the guide and the code's history up to the live version (the same for every look until the
+  next release, or a change to the rules or the notes) are kept an hour in the prompt cache, so a look reads them for
+  a tenth of the price instead of sending them again; the newest commits, which change more often, go with the
+  thread. Claude reads what it needs through the tools, several calls a turn, at most 8 turns, then returns a verdict
+  as JSON: none, ask or answer, and whether to tell the developer. `vet()` drops weak answers and replies that paste code. A new post in a suggestion forum first
   gets a quick pass with Haiku and no tools (`firstPass()`): when it finds nothing for the bot to say, its summary,
   category and tags stand and there is no full look; anything else gets the full look, which writes the reply.
 - `tools.mjs`: what Claude can do. It can search and read the code, read the thread's attachments, look at the git
@@ -148,6 +160,7 @@ bot's first log line says what the month and the day spent so far.
 - `general.mjs`: the general channels: the replies that point to the forums or give a page code's fix, the spike
   alerts and the daily note.
 - `translate.mjs`: the Translate command. The bot registers it at start; the `bot` scope of the invite covers it.
+- `faq.mjs`: the FAQ message, its answers and their translations; `faq.md` holds the questions and answers.
 - `tags.mjs`: the forum tags. A look's verdict names the tags it picked from "Tags you may add" in the thread's text.
 - `eval.mjs`: the bot against past threads (below).
 
@@ -178,8 +191,10 @@ the tools used, the tokens and the cost.
    aware, Fix live, Complete and Solved (any letter case). Tags players should not set themselves (Needs info, Dev
    aware, Fix live, Complete, Denied): "Only allow moderators to apply this tag" in the forum's tag settings. The bot
    never picks a moderated tag, its own five aside.
-4. **Claude.** Create an API key at https://console.anthropic.com, and set a monthly spend limit there.
-5. **`.env`**:
+4. **FAQ channel.** In the read-only channel's permissions, add the bot with View Channel and Send Messages, then
+   type `/faq` there.
+5. **Claude.** Create an API key at https://console.anthropic.com, and set a monthly spend limit there.
+6. **`.env`**:
 
    ```sh
    DISCORD_TOKEN=...

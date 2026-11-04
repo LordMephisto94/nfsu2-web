@@ -69,7 +69,7 @@ void autotest_tap(unsigned dik, long frames);
 /* ---- guest globals (v1.2 NA) ---------------------------------------------- */
 #define G_FLOW          0x008654a4u   /* TheGameFlowManager state (6 = in game) */
 #define G_WORLD         0x00890080u   /* World*: +0/+4 car list (bTList), +0x10 count */
-#define G_PLAYER1       0x008900acu   /* PlayersByNumber[0] (Player*), +4 = car */
+#define G_PLAYER1       SPLIT_PLAYERS_INDEX   /* PlayersByNumber[0] (Player*), +4 = car */
 #define G_RACE          0x00890118u   /* race coordinator: +0 state, +0x24 racers */
 #define G_CAREER_RACE   0x00863470u   /* Career 0x85AD40 +0x8730: race being run (0 = roam) */
 #define G_HOTPOS        0x00890140u
@@ -79,6 +79,7 @@ void autotest_tap(unsigned dik, long frames);
 #define G_CARTYPES      0x008a1cccu   /* CarTypeInfo[], 0x890 bytes, +0 name */
 #define HOOK_MAINLOOP   0x00581475u
 
+uint32_t split_guest_addr(uint32_t a);   /* splitscreen.c: a script's 0x8900AC.. where this build keeps it */
 /* ---- expressions ---------------------------------------------------------- */
 static const char *xp;
 static uint32_t x_expr(void);
@@ -88,7 +89,7 @@ static uint32_t x_unary(void){
     x_ws();
     if (*xp == '*'){ xp++; return rd32(x_unary()); }
     if (*xp == '('){ xp++; uint32_t v = x_expr(); x_ws(); if (*xp == ')') xp++; return v; }
-    char *end; uint32_t v = (uint32_t)strtoul(xp, &end, 0); xp = end; return v;
+    char *end; uint32_t v = split_guest_addr((uint32_t)strtoul(xp, &end, 0)); xp = end; return v;
 }
 static uint32_t x_term(void){
     uint32_t v = x_unary();
@@ -648,9 +649,10 @@ void sub_0063a6f0(CPU *c){
     else POP32(c->eip);
 }
 void sub_00610750_orig(CPU *c);
+void split_second_pool(CPU *c);
 int roam_game_pool_grow(uint32_t size);
 void sub_00610750(CPU *c){
-    if (roam_game_pool_grow(MR32(c->esp + 4u))) sub_00610750_orig(c);
+    if (roam_game_pool_grow(MR32(c->esp + 4u))) split_second_pool(c);
     else { POP32(c->eip); c->esp += 4u; }
 }
 void sub_005eba30_orig(CPU *c);   /* Car::SetDriverType(this, type) */
@@ -813,6 +815,7 @@ void racehorn_frame(CPU *c);                  /* racehorn.c: horns in races betw
 void racenet_frame(CPU *c);                   /* racenet.c: how the other players' cars came in, at a race's end */
 void racenet_prestep(CPU *c);                 /*   and the cars' own places back before the world's step */
 void mprace_frame(CPU *c);                    /* mprace.c: a multiplayer race's trip from free roam and back */
+void mpcredit_frame(CPU *c);                  /* mpcredit.c: a multiplayer race's win that waits for the crib */
 void optslider_frame(CPU *c);                 /* optslider.c: our option sliders' copied parts (the pause menu's Horn Volume) */
 void drift_frame(CPU *c);                     /* drift.c: drift mode in free roam (F2) */
 void showoff_frame(CPU *c);                   /* showoff.c: the car's trunk, hood and doors open */
@@ -834,7 +837,7 @@ __attribute__((weak)) int roam_asipeer_cmd(CPU *c, const char *args, long *wait_
     fprintf(stderr, "[roam] asi: not in this build (ASIPEER=1 ./link.sh orig makes out/nfsu2_asipeer)\n"); return 1; }
 int roam_hook(CPU *c, uint32_t ip){
     switch (ip){
-    case HOOK_SITE(0x00581475): reads_frame(c); intro_frame(c); language_texts_frame(c); sms_frame(c); hiddenraces_frame(); carspot_frame(); mprace_frame(c); if (!roam_asipeer_frame(c)) roam_game_frame(c); racehorn_frame(c); racenet_frame(c); optslider_frame(c); drift_frame(c); showoff_frame(c); photo_frame(c); savegame_frame(); roam_frame(c); return 1;
+    case HOOK_SITE(0x00581475): reads_frame(c); intro_frame(c); language_texts_frame(c); sms_frame(c); hiddenraces_frame(); carspot_frame(); mprace_frame(c); mpcredit_frame(c); if (!roam_asipeer_frame(c)) roam_game_frame(c); racehorn_frame(c); racenet_frame(c); optslider_frame(c); drift_frame(c); showoff_frame(c); photo_frame(c); savegame_frame(); roam_frame(c); return 1;
     /* Player::Update's HUD step (0x600590), behind its call of the HUD
      * update (0x4EC5A0), where the game places its own LAN race labels */
     case HOOK_SITE(0x006005e0): roam_game_hud(c); return 1;

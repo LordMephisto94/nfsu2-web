@@ -60,6 +60,9 @@
  *                              adds a won record of stage 5's final event
  *   watchw X                   debug: log the guest functions that write X
  *   bot on|off                 the career bot below (also NFSU2_CAREER_BOT=1)
+ *   mpcredit NAME[,NAME] [MARGIN]  the wins of those races at the next crib, as
+ *                              multiplayer race's (mpcredit.c; MARGIN as the
+ *                              game measures it, 100 by default, -1 a friend's)
  * X/ARG/FN are expressions: numbers, "*X" (guest dword at X), "(X)", "+", "-",
  * and "*" between two operands (multiply), e.g. "*(*0x890118+0xbd0)".
  */
@@ -79,7 +82,7 @@ void autotest_tap(unsigned dik, long frames);
 
 /* ---- guest globals (v1.2 NA, verified in our exe) ------------------------ */
 #define G_FLOW          0x008654a4u   /* TheGameFlowManager state (6 = in game) */
-#define G_PLAYER1       0x008900acu   /* PlayersByNumber[0] (Player*) */
+#define G_PLAYER1       SPLIT_PLAYERS_INDEX   /* PlayersByNumber[0] (Player*) */
 #define G_HOTPOS        0x00890140u   /* hot-position vec3 used by the jump */
 #define G_HOTPOS_ANGLE  0x008900d0u   /* u16 */
 #define G_HOTPOS_JUMP   0x008900cdu   /* u8: jump to the hot position */
@@ -140,6 +143,7 @@ void autotest_tap(unsigned dik, long frames);
 #define G_NOTHERS        0x00838420u
 
 /* ---- expressions ---------------------------------------------------------- */
+uint32_t split_guest_addr(uint32_t a);   /* splitscreen.c: a script's 0x8900AC.. where this build keeps it */
 static const char *xp;
 static uint32_t x_expr(void);
 static void x_ws(void){ while (*xp == ' ' || *xp == '\t') xp++; }
@@ -148,7 +152,7 @@ static uint32_t x_unary(void){
     if (*xp == '*'){ xp++; uint32_t a = x_unary();
         return mem_is_committed(a) && mem_is_committed(a + 3) ? MR32(a) : 0u; }
     if (*xp == '('){ xp++; uint32_t v = x_expr(); x_ws(); if (*xp == ')') xp++; return v; }
-    char *end; uint32_t v = (uint32_t)strtoul(xp, &end, 0); xp = end; return v;
+    char *end; uint32_t v = split_guest_addr((uint32_t)strtoul(xp, &end, 0)); xp = end; return v;
 }
 static uint32_t x_term(void){        /* '*' after an operand multiplies */
     uint32_t v = x_unary();
@@ -1049,10 +1053,16 @@ static void run_job(CPU *c, const char *line){
 }
 
 /* Main-loop hook.  sub_004022c0 is an empty function with ~300 callers; only
- * the call from GameLoop (return address 0x581475) does work. */
+ * GameLoop's do work: the call returning to 0x581475 (before the camera's
+ * and the sound's update), and the first after the frame's Present
+ * (0x5D2850), which gives back the camera the right stick's look turned for
+ * the frame drawn (look.c). */
+#define LOOK_END_RET     0x005814e0u
+void look_frame_end(void);
 void sub_004022c0_orig(CPU *c);
 void sub_004022c0(CPU *c){
-    if (MR32(c->esp) == MAINLOOP_RET){
+    if (MR32(c->esp) == LOOK_END_RET) look_frame_end();
+    else if (MR32(c->esp) == MAINLOOP_RET){
         if (!g_hooked) bot_init();
         g_hooked = 1;
         while (g_qh != g_qt){ Job *j = &g_q[g_qh]; g_qh = (g_qh + 1) % QMAX; run_job(c, j->line); }
@@ -1072,7 +1082,7 @@ static void queue(const char *line){
 int career_is_cmd(const char *cmd){
     static const char *const k[] = { "call", "memdump", "waitx", "teleport", "autopilot", "racewin",
                                      "careerlist", "careergo", "shopgo", "peekx", "fnglist", "bot", "waitfe", "tapfe", "waitroam", "showgo", "cargo", "watchw",
-                                     "outrun", "outrunwin", "visual", "uniques", 0 };
+                                     "outrun", "outrunwin", "visual", "uniques", "mpcredit", 0 };
     for (int i = 0; k[i]; i++) if (!strcasecmp(cmd, k[i])) return 1;
     return 0;
 }
@@ -1216,6 +1226,7 @@ int career_cmd(CPU *c, const char *line, long *wait_start){
     if (!strcasecmp(cmd, "fnglist")){
         fprintf(stderr, "[career] f=%ld fe packages:", f); fe_each(fe_print, a1[0] ? (void *)1 : 0); fputc('\n', stderr); return 1; }
     if (!strcasecmp(cmd, "careergo")){ career_go(a1); return 1; }
+    if (!strcasecmp(cmd, "mpcredit")){ int mpcredit_test(const char *, float); mpcredit_test(a1, a2[0] ? (float)atof(a2) : 100.f); return 1; }
     if (!strcasecmp(cmd, "shopgo")){
         uint32_t sh = shop_by_name(a1);
         char what[64]; snprintf(what, sizeof what, "shopgo %s", a1);

@@ -218,6 +218,16 @@ static void t_roundtrip(void){
           CHECK(rc_decode(c, n, &d) == RC_E_FIELD, "DUEL with a bad field refused (%d)", k);
       }
       m.u.duel.op = 0; CHECK(rc_encode(&m, b, sizeof b) < 0, "DUEL without an op not encoded"); }
+    /* a drift battle's SCORE: 14 bytes, the points after the id; cut short refused */
+    memset(&m, 0, sizeof m); m.h.type = RC_MSG_DUEL; m.h.sender = 7;
+    m.u.duel.op = RC_DUEL_SCORE; m.u.duel.arg = 1; m.u.duel.to = 0xCAFEF00Du; m.u.duel.duel = 0x12345678u; m.u.duel.score = 4000000123u;
+    { int n = rc_encode(&m, b, sizeof b);
+      CHECK(n == RC_HDR + 14 + RC_CRC && rc_decode(b, n, &d) == RC_OK && d.u.duel.op == RC_DUEL_SCORE && d.u.duel.arg == 1 &&
+            d.u.duel.duel == 0x12345678u && d.u.duel.score == 4000000123u, "DUEL SCORE round trip (%d bytes, %u)", n, d.u.duel.score);
+      m.u.duel.op = RC_DUEL_OFFER; m.u.duel.arg = RC_DA_DRIFT | RC_DA_SOLID;
+      n = rc_encode(&m, b, sizeof b);
+      CHECK(n == RC_HDR + 10 + RC_CRC && rc_decode(b, n, &d) == RC_OK && d.u.duel.arg == (RC_DA_DRIFT | RC_DA_SOLID) && !d.u.duel.score,
+            "DUEL OFFER: no points on the wire (%d bytes)", n); }
     /* LOBBY: 24 bytes and 4 per player; a bad op, state, reason, id, race, size or player list refused */
     memset(&m, 0, sizeof m); m.h.type = RC_MSG_LOBBY; m.h.sender = 7;
     { rc_lobby *l = &m.u.lobby;
@@ -253,11 +263,14 @@ static void t_roundtrip(void){
       CHECK(n == RC_HDR + 3 + 2 * RC_LOBBIES_ENTRY + RC_CRC && rc_decode(b, n, &d) == RC_OK && d.u.lobbies.req == 99 && d.u.lobbies.n == 2 &&
             !memcmp(d.u.lobbies.data, le, sizeof le), "LOBBIES round trip (%d bytes)", n);
       m.u.lobbies.n = RC_LOBBIES_MAX + 1; CHECK(rc_encode(&m, b, sizeof b) < 0, "LOBBIES of too many not encoded"); }
-    /* SAY: 4 bytes (phrase, seq, two zero); any phrase number goes through (a newer game may have more) */
-    memset(&m, 0, sizeof m); m.h.type = RC_MSG_SAY; m.h.sender = 7; m.u.say.phrase = 13; m.u.say.seq = 200;
+    /* SAY: 4 bytes (phrase, seq, stay, a zero); any phrase number goes through (a newer game may have more) */
+    memset(&m, 0, sizeof m); m.h.type = RC_MSG_SAY; m.h.sender = 7; m.u.say.phrase = 13; m.u.say.seq = 200; m.u.say.stay = 31;
     { int n = rc_encode(&m, b, sizeof b);
-      CHECK(n == RC_HDR + 4 + RC_CRC && b[RC_HDR] == 13 && b[RC_HDR + 1] == 200 && !b[RC_HDR + 2] && !b[RC_HDR + 3] &&
-            rc_decode(b, n, &d) == RC_OK && d.u.say.phrase == 13 && d.u.say.seq == 200, "SAY round trip (%d bytes)", n);
+      CHECK(n == RC_HDR + 4 + RC_CRC && b[RC_HDR] == 13 && b[RC_HDR + 1] == 200 && b[RC_HDR + 2] == 31 && !b[RC_HDR + 3] &&
+            rc_decode(b, n, &d) == RC_OK && d.u.say.phrase == 13 && d.u.say.seq == 200 && d.u.say.stay == 31, "SAY round trip (%d bytes)", n);
+      m.u.say.stay = 0; n = rc_encode(&m, b, sizeof b);              /* a game before the stay sends 0 there */
+      CHECK(rc_decode(b, n, &d) == RC_OK && d.u.say.stay == 0, "SAY of a game before the stay: 0");
+      m.u.say.stay = 31;
       m.u.say.phrase = 250; n = rc_encode(&m, b, sizeof b);
       CHECK(rc_decode(b, n, &d) == RC_OK && d.u.say.phrase == 250, "SAY with a phrase this game does not have still decodes");
       CHECK(rc_decode(b, n - 1, &d) != RC_OK, "SAY cut short refused"); }
@@ -934,11 +947,11 @@ static void truth(double t, float *p, float *v, float *q, float *w){
 }
 typedef struct { double mean, p99, max, extrap_frac; uint64_t snaps; double max_jerk, latency; } Metrics;
 static int cmpd(const void *a, const void *b){ double x = *(const double *)a, y = *(const double *)b; return x < y ? -1 : x > y; }
-static Metrics run_interp(int loss_pct, int jitter_us, int dup_pct, int reorder, double drift_ppm, int64_t latency_us){
+static Metrics run_interp_at(int loss_pct, int jitter_us, int dup_pct, int reorder, double drift_ppm, int64_t latency_us, int64_t delay){
     rc_interp ip; rc_interp_reset(&ip);
     static double err[40000]; int ne = 0;
     /* sender samples at 20 Hz on its own clock; receiver renders at 120 Hz */
-    const int64_t delay = 100000, cap = 250000;
+    const int64_t cap = 250000;
     int64_t sender_off = 123456789;                          /* the clocks are unrelated */
     struct { int64_t at; rc_state s; } q[64]; int qn = 0;
     int64_t next_sample = 0; uint32_t sent = 0;
@@ -998,6 +1011,9 @@ static Metrics run_interp(int loss_pct, int jitter_us, int dup_pct, int reorder,
     M.snaps = ip.n_snap; M.max_jerk = max_jerk; M.latency = lat_n ? lat_sum / lat_n : 0;
     return M;
 }
+static Metrics run_interp(int loss_pct, int jitter_us, int dup_pct, int reorder, double drift_ppm, int64_t latency_us){
+    return run_interp_at(loss_pct, jitter_us, dup_pct, reorder, drift_ppm, latency_us, 100000);
+}
 static void t_interp(void){
     struct { const char *name; int loss, jit, dup, reord; double ppm; int64_t lat; double lim_p99, lim_max; } cs[] = {
         { "clean LAN (1 ms)",            0,     0, 0, 0,    0,   1000, 0.05, 0.10 },
@@ -1014,6 +1030,20 @@ static void t_interp(void){
                "max step change %.4f m\n", cs[i].name, 1000 * M.latency, M.mean, M.p99, M.max, 100 * M.extrap_frac, (unsigned long long)M.snaps, M.max_jerk);
         CHECK(M.p99 < cs[i].lim_p99 && M.max < cs[i].lim_max, "interp %s: p99 %.3f (< %.2f), max %.3f (< %.2f)", cs[i].name, M.p99, cs[i].lim_p99, M.max, cs[i].lim_max);
         if (cs[i].loss == 0 && cs[i].jit == 0) CHECK(M.extrap_frac < 0.01 && M.snaps == 0, "clean: < 1%% extrapolation, no snaps");
+    }
+    /* a solid car: drawn where its driver is now, 150 ms (+- 20) of delay ahead of its newest state, on the circle: in
+     * a straight line it runs wide (about v w t^2 / 2), along the curve its velocity turns on it stays on it */
+    {
+        Metrics A[3]; int was = rc_extrap_arc;
+        for (int m = 0; m < 3; m++){
+            rc_extrap_arc = m;
+            A[m] = run_interp_at(0, 20000, 0, 0, 0, 150000, -150000);
+            printf("  interp solid, 150 ms, %-18s error mean %.4f m, p99 %.4f m; extrapolating %.2f%%\n",
+                   m == 0 ? "straight line:" : m == 1 ? "curve of its path:" : "curve of its yaw:", A[m].mean, A[m].p99, 100 * A[m].extrap_frac);
+        }
+        rc_extrap_arc = was;
+        CHECK(A[0].extrap_frac > 0.9 && A[1].mean < 0.25 * A[0].mean && A[2].mean < 0.25 * A[0].mean,
+              "solid car on a curve: %.3f m off in a straight line, %.3f / %.3f m along the curve", A[0].mean, A[1].mean, A[2].mean);
     }
     /* teleport epoch: the car snaps to the new place, no glide through the city */
     rc_interp ip; rc_interp_reset(&ip);
@@ -1233,12 +1263,12 @@ static void t_duel(void){
     CHECK(est(0) == 2 && p1 >= 0 && p2 >= 0 && g_n[0].peer[p1].duels && !g_n[0].peer[p2].duels,
           "the HELLO's flag says who takes outrun challenges (%d %d)", p1 >= 0 && g_n[0].peer[p1].duels, p2 >= 0 && g_n[0].peer[p2].duels);
     uint32_t bad2 = g_n[2].rx_bad;
-    CHECK(rc_send_duel(&g_n[0], 0x501, RC_DUEL_OFFER, 0, 0xD1) == 1 && rc_send_duel(&g_n[0], 0x502, RC_DUEL_OFFER, 0, 0xD2) == 0 &&
-          rc_send_duel(&g_n[0], 0x777, RC_DUEL_OFFER, 0, 0xD3) == 0, "DUEL goes to a peer that takes it, not to an older one or a stranger");
+    CHECK(rc_send_duel(&g_n[0], 0x501, RC_DUEL_OFFER, 0, 0xD1, 0) == 1 && rc_send_duel(&g_n[0], 0x502, RC_DUEL_OFFER, 0, 0xD2, 0) == 0 &&
+          rc_send_duel(&g_n[0], 0x777, RC_DUEL_OFFER, 0, 0xD3, 0) == 0, "DUEL goes to a peer that takes it, not to an older one or a stranger");
     net_run(g_now + 20000, 3);
     uint32_t from = 0, duel = 0; uint8_t op = 0, arg = 0;
-    CHECK(rc_take_duel(&g_n[1], &from, &op, &arg, &duel) == 1 && from == 0x500 && op == RC_DUEL_OFFER && duel == 0xD1 &&
-          !rc_take_duel(&g_n[1], &from, &op, &arg, &duel), "the challenge arrives once (from %x, op %d, id %x)", from, op, duel);
+    CHECK(rc_take_duel(&g_n[1], &from, &op, &arg, &duel, 0) == 1 && from == 0x500 && op == RC_DUEL_OFFER && duel == 0xD1 &&
+          !rc_take_duel(&g_n[1], &from, &op, &arg, &duel, 0), "the challenge arrives once (from %x, op %d, id %x)", from, op, duel);
     CHECK(g_n[2].rx_bad == bad2 && !g_n[2].n_duel_in, "the older game hears nothing it cannot read");
     /* one for somebody else, from an established peer: not ours */
     rc_msg m; memset(&m, 0, sizeof m); m.h.type = RC_MSG_DUEL; m.h.sender = 0x500;
@@ -1247,12 +1277,40 @@ static void t_duel(void){
     rc_receive(&g_n[1], node_ip(0), node_port(0), b, n, g_now);
     CHECK(!g_n[1].n_duel_in, "a DUEL for another player is dropped");
     /* the inbox holds RC_DUEL_INBOX, oldest first */
-    for (int k = 0; k < RC_DUEL_INBOX + 4; k++) rc_send_duel(&g_n[0], 0x501, RC_DUEL_RESULT, 1, 0x100u + (uint32_t)k);
+    for (int k = 0; k < RC_DUEL_INBOX + 4; k++) rc_send_duel(&g_n[0], 0x501, RC_DUEL_RESULT, 1, 0x100u + (uint32_t)k, 0);
     net_run(g_now + 20000, 3);
     int kept = g_n[1].n_duel_in, taken = 0; uint32_t seen = 0;
-    while (rc_take_duel(&g_n[1], &from, &op, &arg, &duel)) if (duel >= 0x100 && duel < 0x100 + RC_DUEL_INBOX + 4){ taken++; seen |= 1u << (duel - 0x100); }
+    while (rc_take_duel(&g_n[1], &from, &op, &arg, &duel, 0)) if (duel >= 0x100 && duel < 0x100 + RC_DUEL_INBOX + 4){ taken++; seen |= 1u << (duel - 0x100); }
     CHECK(kept == RC_DUEL_INBOX && g_n[1].duel_dropped == 4 && taken == RC_DUEL_INBOX && __builtin_popcount(seen) == RC_DUEL_INBOX && !g_n[1].n_duel_in,
           "inbox: %d kept, %u dropped, %d taken", kept, g_n[1].duel_dropped, taken);
+}
+
+/* ---- 4d''. drift battles: a drift challenge and SCORE only to a peer whose HELLO takes them, the points through -- */
+static void t_duel_drift(void){
+    mesh(3, 8);
+    for (int i = 0; i < 3; i++) g_n[i].conf.duels = 1;
+    g_n[0].conf.drifts = 1; g_n[1].conf.drifts = 1;           /* node 2: outruns only (a game of before) */
+    for (int i = 1; i < 3; i++){ rc_add_peer(&g_n[0], node_ip(i), node_port(i), 1, g_now); rc_add_peer(&g_n[i], node_ip(0), node_port(0), 1, g_now); }
+    drive(3, g_now + 3000000);
+    int p1 = peer_of(0, 0x501), p2 = peer_of(0, 0x502);
+    CHECK(est(0) == 2 && p1 >= 0 && p2 >= 0 && g_n[0].peer[p1].drifts && !g_n[0].peer[p2].drifts && g_n[0].peer[p2].duels,
+          "the HELLO's flag says who takes drift battles");
+    uint32_t bad2 = g_n[2].rx_bad;
+    CHECK(rc_send_duel(&g_n[0], 0x502, RC_DUEL_OFFER, RC_DA_DRIFT, 0xE1, 0) == 0 && rc_send_duel(&g_n[0], 0x502, RC_DUEL_SCORE, 0, 0xE1, 5) == 0 &&
+          rc_send_duel(&g_n[0], 0x502, RC_DUEL_OFFER, RC_DA_SOLID, 0xE2, 0) == 1, "an older game gets an outrun's challenge, no drift battle's");
+    CHECK(rc_send_duel(&g_n[0], 0x501, RC_DUEL_OFFER, RC_DA_DRIFT, 0xE3, 0) == 1 && rc_send_duel(&g_n[0], 0x501, RC_DUEL_SCORE, 1, 0xE3, 123456) == 1,
+          "a drift battle's challenge and points go to a game that takes them");
+    net_run(g_now + 20000, 3);
+    /* (the fake network may hand them over in either order: the game takes points only once the battle runs, and
+     * sends them again every second) */
+    uint32_t from = 0, duel = 0, pts = 0; uint8_t op = 0, arg = 0;
+    int got = g_n[1].n_duel_in, offer = 0, score = 0;
+    while (rc_take_duel(&g_n[1], &from, &op, &arg, &duel, &pts)){
+        if (op == RC_DUEL_OFFER && arg == RC_DA_DRIFT && duel == 0xE3 && !pts) offer++;
+        if (op == RC_DUEL_SCORE && arg == 1 && duel == 0xE3 && pts == 123456) score++;
+    }
+    CHECK(got == 2 && offer == 1 && score == 1, "the drift challenge and its points arrive (%d in: %d challenge, %d points)", got, offer, score);
+    CHECK(g_n[2].rx_bad == bad2 && g_n[2].n_duel_in == 1, "the older game got the outrun only, nothing it cannot read");
 }
 
 /* ---- 4d'. an outrun's other player (rc_set_duel): the hub hears it, and the session keeps it while the hub's
@@ -1703,11 +1761,12 @@ static void t_say(void){
     CHECK(est(0) == 2 && p1 >= 0 && p2 >= 0 && g_n[0].peer[p1].say && !g_n[0].peer[p2].say,
           "the HELLO's flag says who takes quick chat (%d %d)", p1 >= 0 && g_n[0].peer[p1].say, p2 >= 0 && g_n[0].peer[p2].say);
     uint32_t bad2 = g_n[2].rx_bad;
-    CHECK(rc_send_say(&g_n[0], 7, 1) == 1, "SAY goes to the one peer that takes it");
+    CHECK(rc_send_say(&g_n[0], 7, 1, 42) == 1, "SAY goes to the one peer that takes it");
     net_run(g_now + 20000, 3);
-    uint32_t from = 0; uint8_t ph = 0, sq = 0;
-    CHECK(rc_take_say(&g_n[1], &from, &ph, &sq) == 1 && from == 0x500 && ph == 7 && sq == 1 && !rc_take_say(&g_n[1], &from, &ph, &sq),
-          "the phrase arrives once (from %x, phrase %d, seq %d)", from, ph, sq);
+    uint32_t from = 0; uint8_t ph = 0, sq = 0, sy = 0;
+    CHECK(rc_take_say(&g_n[1], &from, &ph, &sq, &sy) == 1 && from == 0x500 && ph == 7 && sq == 1 && sy == 42 &&
+          !rc_take_say(&g_n[1], &from, &ph, &sq, &sy),
+          "the phrase arrives once (from %x, phrase %d, seq %d, stay %d)", from, ph, sq, sy);
     CHECK(g_n[2].rx_bad == bad2 && !g_n[2].n_say_in, "the older game hears nothing it cannot read");
     /* one that reaches a game taking none (sent by hand): kept from the game side */
     rc_msg m; memset(&m, 0, sizeof m); m.h.type = RC_MSG_SAY; m.h.sender = 0x500; m.u.say.phrase = 2; m.u.say.seq = 9;
@@ -1715,13 +1774,13 @@ static void t_say(void){
     rc_receive(&g_n[2], node_ip(0), node_port(0), b, n, g_now);
     CHECK(!g_n[2].n_say_in, "a game that takes no quick chat keeps none");
     g_n[0].conf.say = 0;
-    CHECK(rc_send_say(&g_n[0], 7, 2) == 0, "a game that takes no quick chat sends none");
+    CHECK(rc_send_say(&g_n[0], 7, 2, 0) == 0, "a game that takes no quick chat sends none");
     g_n[0].conf.say = 1;
     /* the inbox holds RC_SAY_INBOX, oldest first */
-    for (int k = 0; k < RC_SAY_INBOX + 4; k++) rc_send_say(&g_n[0], (uint8_t)(k & 15), (uint8_t)(10 + k));
+    for (int k = 0; k < RC_SAY_INBOX + 4; k++) rc_send_say(&g_n[0], (uint8_t)(k & 15), (uint8_t)(10 + k), 0);
     net_run(g_now + 20000, 3);
     int kept = g_n[1].n_say_in, taken = 0; uint32_t seen = 0;
-    while (rc_take_say(&g_n[1], &from, &ph, &sq)) if (sq >= 10 && sq < 10 + RC_SAY_INBOX + 4){ taken++; seen |= 1u << (sq - 10); }
+    while (rc_take_say(&g_n[1], &from, &ph, &sq, &sy)) if (sq >= 10 && sq < 10 + RC_SAY_INBOX + 4){ taken++; seen |= 1u << (sq - 10); }
     CHECK(kept == RC_SAY_INBOX && g_n[1].say_dropped == 4 && taken == RC_SAY_INBOX && __builtin_popcount(seen) == RC_SAY_INBOX,
           "say inbox: %d kept, %u dropped, %d taken", kept, g_n[1].say_dropped, taken);
 }
@@ -1737,6 +1796,7 @@ int main(int argc, char **argv){
     t_hub();
     t_far();
     t_duel();
+    t_duel_drift();
     t_duel_hub();
     t_lobby();
     t_say();

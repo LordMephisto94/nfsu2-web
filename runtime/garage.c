@@ -330,7 +330,8 @@ static void swap_out(void){
     for (int p = 0; p < 2; p++) if (g_sw_at[p]){ MR32(g_sw_at[p]) = g_sw_was[p]; g_sw_at[p] = 0; }
 }
 void sub_00525ed0_orig(CPU *c);
-void sub_00525ed0(CPU *c){ swap_in(); sub_00525ed0_orig(c); swap_out(); }
+void split_create_humans(CPU *c);
+void sub_00525ed0(CPU *c){ swap_in(); split_create_humans(c); swap_out(); }
 void sub_00526970_orig(CPU *c);
 void sub_00526970(CPU *c){ swap_in(); sub_00526970_orig(c); swap_out(); }
 void sub_0053feb0_orig(CPU *c);
@@ -470,13 +471,25 @@ void sub_0052a4c0(CPU *c){
     if (differ(&g_now, &g_kept.st)){ c->eax = (c->eax & ~0xffu) | 1u; fprintf(stderr, "[garage] slots 6-10 changed: something to save\n"); }
 }
 
-/* fileio.c: the game has written a profile (host path): its GARAGE file beside it */
+/* the name of the profile player 1 loaded last ("" none yet), and how many loads of player 1's profile there were
+ * (the game's own load, or its going back to the payload it kept, 0x5347C0): mpcredit.c reads its file beside the
+ * profile again at each */
+static char g_profile[33];
+static unsigned g_p1_loads;
+const char *garage_profile_name(void){ return g_profile; }
+unsigned garage_profile_loads(void){ return g_p1_loads; }
+
+/* fileio.c: the game has written a profile (host path): its GARAGE file beside it (and mpcredit.c's wins that
+ * waited for a save of it) */
+void mpcredit_profile_written(const char *path);
+void mpcredit_profile_deleted(const char *path);
 void garage_profile_written(const char *path){
     static uint8_t f[PROFILE_SIZE];
     FILE *in = fopen(path, "rb");
     if (!in) return;
     size_t n = fread(f, 1, sizeof f, in); fclose(in);
     if (n != PROFILE_SIZE || memcmp(f, "20CM", 4)) return;
+    mpcredit_profile_written(path);              /* (a whole profile on disk: a failed write leaves its wins waiting) */
     const uint8_t *pl = f + PAYLOAD_AT;
     char name[33]; unsigned i = 0;
     for (; i < 32u && pl[P_NAME + i]; i++) name[i] = (char)pl[P_NAME + i];
@@ -508,6 +521,7 @@ void garage_profile_deleted(const char *path){
         snprintf(g, sizeof g, "%.*s/%s", sl ? (int)(sl - path) : 1, sl ? path : ".", files[i]);
         if (remove(g) == 0) fprintf(stderr, "[garage] %s deleted with its profile\n", g);
     }
+    mpcredit_profile_deleted(path);
 }
 
 /* slots 6-10 of the profile named name whose car part has fingerprint fp, 1:
@@ -547,12 +561,14 @@ void sub_00516850(CPU *c){
     sub_00516850_orig(c);
     g_loads++;
     int p = player_of(db);
+    if (p == 0) g_p1_loads++;
     if (p < 0 || !ensure(c)) return;
     if (!p) g_back.on = 0;
     xinit(c, db);
     char name[33] = "";
     uint64_t fp = fnv(in, CARS_PART);
     if (size >= P_NAME + 32u) name_of(in, name);
+    if (!p && name[0]) snprintf(g_profile, sizeof g_profile, "%s", name);
     if (g_kept.on && g_kept.p == p && in == MR32(FEDB + FEDB_KEPT) && fp == g_kept.fp && (!name[0] || !strcmp(name, g_kept.name))){
         load_state(c, db, &g_kept.st);
         fprintf(stderr, "[garage] back to the kept payload: slots 6-10 as then, %u cars of yours, %u of %u slots open\n",

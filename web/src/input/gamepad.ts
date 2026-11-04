@@ -45,6 +45,7 @@ import {
   shifterGear, usbIds, WHEEL_MAP_EVENT, wheelOf, withSetUp, type OtherAxes, type ShifterMode, type WheelInfo, type WheelMap,
 } from './wheel';
 import { eightBitDoFace, HidPadReader } from './hidpad';
+import { LocalPadWriter } from './local-pads';
 
 export interface PadSnapshot { connected: boolean; buttons: number; axes: number[]; family: number; name: string; index: number; wheel?: boolean }
 
@@ -203,8 +204,13 @@ export interface PadPage {
   /** a button went down while dialog() (a PAD_* number; the left stick's directions come as the D-pad's) */
   press(button: number): void;
   /** the right stick (x, y: -1..1, +y down) each time the controller is read while no dialog is open (quick chat's
-   *  picker); true: the page uses it now, the game gets it at rest */
+   *  picker); true: the page uses it now, the game gets it at rest (else the game looks round the car with it:
+   *  runtime/look.c) */
   stick?(x: number, y: number): boolean;
+  /** the right stick pressed in alone (not the menu's shortcut) while no dialog is open and capture() does not have
+   *  the controller (quick chat's picker opens or closes); true: the page took it, the game does not get it (else
+   *  the game's: a car's hydraulics) */
+  click?(): boolean;
   /** the whole controller each time it is read while no dialog is open (photo mode: runtime/photo.c), with the
    *  buttons pressed since the last read; true: the page has it now, the game gets it at rest */
   capture?(s: PadSnapshot, pressed: number): boolean;
@@ -233,6 +239,7 @@ function stickDirs(x: number, y: number, prev: number): number {
 }
 
 export class PadPoller {
+  private localPads: LocalPadWriter | null;
   private order: number[] = [];            // controller indices in connection order
   private last: PadSnapshot | null = null;
   private f32 = new Float32Array(1);
@@ -291,6 +298,7 @@ export class PadPoller {
               private onPress: () => void, private log: (s: string) => void, private onUse?: () => void,
               private page?: PadPage) {
     this.h = h; this.u8 = u8;
+    this.localPads = new LocalPadWriter(u8.buffer, base);
     addEventListener('gamepadconnected', this.onConnect);
     addEventListener('gamepaddisconnected', this.onDisconnect);
     addEventListener(WHEEL_MAP_EVENT, this.onWheelMap);
@@ -303,6 +311,7 @@ export class PadPoller {
     removeEventListener(WHEEL_MAP_EVENT, this.onWheelMap);
     this.rumble(null);
     this.h = null; this.u8 = null;
+    this.localPads = null;
     if (driver) { driver = null; dispatchEvent(new Event(PAD_DRIVER_EVENT)); }
   }
 
@@ -343,6 +352,7 @@ export class PadPoller {
     const both = this.touch ? withTouch(s, this.touch) : s;
     if (this.touch && !g) this.buzz();
     const out = this.page ? this.forPage(both, pressed) : both;
+    this.localPads?.poll(pads, mapStandard, !!globalThis.document?.hidden || !!this.page?.dialog());
     if (this.same(out)) return;
     this.publish(out, !this.last || this.last.connected !== out.connected || this.last.index !== out.index || this.last.name !== out.name);
     this.last = out;
@@ -432,21 +442,26 @@ export class PadPoller {
    *  controller at rest.  A button held then (or the shortcut's) stays away from the game until it is let go, so the
    *  A that closed the menu does not press A in the game too.  A stick pressed in alone (the horn, horn.c; a car's
    *  hydraulics) reaches the game once CHORD_MS passed without the other, or for TAP_MS when let go before, so the
-   *  shortcut does not sound the horn or bounce the car. */
+   *  shortcut does not sound the horn or bounce the car; the right one goes to the page's click() first (quick
+   *  chat), and when the page takes it the game never gets it. */
   private forPage(s: PadSnapshot, pressed: number): PadSnapshot {
     const page = this.page!, sticks = 1 << PAD_LS | 1 << PAD_RS, home = 1 << PAD_HOME, now = performance.now();
     const menu = (pressed & home) !== 0 || ((pressed & sticks) !== 0 && (s.buttons & sticks) === sticks);
     if (menu) { page.menu(); this.held |= s.buttons & (sticks | home); }
+    const captured = !page.dialog() && !menu && !!page.capture?.(s, pressed);
+    const clicked = (b: number) => b === 1 << PAD_RS && !captured && !page.dialog() && !!page.click?.();
     if (pressed & sticks && (s.buttons & sticks) !== sticks) { this.alone = s.buttons & sticks; this.aloneAt = now; }
     let wait = 0;
     if (menu) this.alone = 0;
-    else if (this.alone && !(s.buttons & this.alone)) { this.tap = this.alone; this.tapUntil = now + TAP_MS; this.alone = 0; }
-    else if (this.alone && now - this.aloneAt < CHORD_MS) wait = this.alone;
-    else this.alone = 0;
+    else if (this.alone && !(s.buttons & this.alone)) {
+      if (!clicked(this.alone)) { this.tap = this.alone; this.tapUntil = now + TAP_MS; }
+      this.alone = 0;
+    } else if (this.alone && now - this.aloneAt < CHORD_MS) wait = this.alone;
+    else if (this.alone) { if (clicked(this.alone)) this.held |= this.alone; this.alone = 0; }
     const tap = now < this.tapUntil ? this.tap : 0;
     const dirs = stickDirs(s.axes[PAD_AXIS_LX], s.axes[PAD_AXIS_LY], this.stick), turned = dirs & ~this.stick;
     this.stick = dirs;
-    if (!page.dialog() && !menu && page.capture?.(s, pressed)) {
+    if (captured) {
       this.held = s.buttons;
       return { ...s, buttons: 0, axes: [0, 0, 0, 0, 0, 0] };
     }

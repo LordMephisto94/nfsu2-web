@@ -481,6 +481,8 @@ void sub_0061e380(CPU *c){
 }
 void hfr_rain_update(CPU *c);          /* framerate.c: sub_0061f120_orig at any frame rate */
 void sub_0061f120(CPU *c){
+    void split_rain_begin(CPU *); void split_rain_end(void);
+    split_rain_begin(c);
     uint32_t rain = c->ecx;
     int fr = force_rain();
     if (fr && rain && mem_is_committed(rain + 0x50a3u))
@@ -488,6 +490,7 @@ void sub_0061f120(CPU *c){
     hfr_rain_update(c);
     if (fr >= 3 && rain && mem_is_committed(rain + 0x50a3u)){
         MRF32(rain + 0x5098u) = 0.0f; MRF32(rain + 0x509cu) = 0.0f; }
+    split_rain_end();
 }
 
 /* --- Force the sky transition (FORCETOD) ----------------------------------
@@ -547,6 +550,7 @@ void sub_0060faa0(CPU *c){
  * the blur is round on the screen. */
 float input_view_roll(void);
 int photo_view(uint16_t *fov, float *roll, float *jit);
+void look_view(uint32_t id, uint32_t cam);  /* look.c: the right stick's look round the car turns the camera */
 static void photo_shear(uint32_t plat, const float *j){
     float *V = (float *)(g_mem + plat), *Pr = V + 16, *M = V + 32;
     float p00 = Pr[0], p11 = Pr[5], p23 = Pr[11];
@@ -581,6 +585,7 @@ void sub_005c7ec0(CPU *c){
     float pj[5] = { 0 };
     int shift = 0;
     if (view && mem_is_committed(view + 0x43u) && (MR32(view + 4u) == 1u || MR32(view + 4u) == 4u)){
+        look_view(MR32(view + 4u), MR32(view + 0x40u));     /* till after Present, for everything drawn */
         float a = input_view_roll(), pr = 0.f;
         if (photo_view(&fov, &pr, pj)){
             a += pr;
@@ -1038,7 +1043,7 @@ void sub_004ff3b0(CPU *c){
  * (roam_host.h RH_FE_NODES; the list below); the packages are drawn one
  * after another, and sub_0050b430 lets go of the nodes after each. */
 #define FE_LIST      1024u                /* the renderer's own list: +0x110 the count, +0x114 entries (object, depth key) */
-#define FE_LIST_BIG  4096u                /* ...and ours past it */
+#define FE_LIST_BIG  8192u                /* ...and ours past it */
 #define FE_NODES     FE_LIST_BIG
 void sub_0050b410_orig(CPU *c);
 void sub_0050b410(CPU *c){

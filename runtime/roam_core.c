@@ -371,6 +371,7 @@ static int in(float f, float lo, float hi){ return f_finite(f) && f >= lo && f <
 static int racerep_ok(const rc_racerep *r){
     if (!r->lobby || !r->race || r->players < 1 || r->players > RC_LOBBY_MAX || r->place > r->players) return 0;
     if (r->cls < -1 || r->cls > 3 || r->flags & ~(RC_RR_HOST | RC_RR_QUIT | RC_RR_EDITED)) return 0;
+    if (r->credit > 2) return 0;
     if (!in(r->rating, 0.f, 5000.f) || !in(r->field, 0.f, 5000.f) || !in(r->factor, 0.01f, 100.f) || !in(r->kw, 0.f, 10000.f)
         || !in(r->kg, 0.f, 50000.f) || !in(r->kmh, 0.f, 2000.f) || !in(r->time, 0.f, 100000.f)) return 0;
     uint32_t n = 0; while (n < RC_RACEREP_NAME && r->name[n]) n++;
@@ -446,6 +447,7 @@ int rc_encode(const rc_msg *m, uint8_t *out, int cap){
     case RC_MSG_DUEL:
         if (m->u.duel.op < 1 || m->u.duel.op >= RC_DUEL__N || !m->u.duel.to || !m->u.duel.duel) return -1;
         rc_put8(&w, m->u.duel.op); rc_put8(&w, m->u.duel.arg); rc_put32(&w, m->u.duel.to); rc_put32(&w, m->u.duel.duel);
+        if (m->u.duel.op == RC_DUEL_SCORE) rc_put32(&w, m->u.duel.score);
         break;
     case RC_MSG_MAPREQ:
         rc_put16(&w, m->u.mapreq.req); rc_put16(&w, m->u.mapreq.max); rc_put16(&w, m->u.mapreq.base);
@@ -477,14 +479,14 @@ int rc_encode(const rc_msg *m, uint8_t *out, int cap){
         if (!racerep_ok(r)) return -1;
         rc_put32(&w, r->lobby); rc_put32(&w, r->race); rc_put8(&w, r->mode); rc_put8(&w, r->laps); rc_put16(&w, r->track);
         rc_put8(&w, r->place); rc_put8(&w, r->players); rc_put8(&w, r->flags); rc_put8(&w, r->type); rc_put8(&w, (uint8_t)r->cls);
-        rc_put8(&w, 0); rc_put8(&w, 0); rc_put8(&w, 0);
+        rc_put8(&w, r->credit); rc_put8(&w, 0); rc_put8(&w, 0);
         rc_putf(&w, r->rating); rc_putf(&w, r->field); rc_putf(&w, r->factor); rc_putf(&w, r->kw); rc_putf(&w, r->kg);
         rc_putf(&w, r->kmh); rc_putf(&w, r->time);
         uint8_t nm[RC_RACEREP_NAME] = {0};
         for (int i = 0; i < RC_RACEREP_NAME && r->name[i]; i++) nm[i] = (uint8_t)r->name[i];
         rc_putb(&w, nm, RC_RACEREP_NAME);
         break; }
-    case RC_MSG_SAY: rc_put8(&w, m->u.say.phrase); rc_put8(&w, m->u.say.seq); rc_put8(&w, 0); rc_put8(&w, 0); break;
+    case RC_MSG_SAY: rc_put8(&w, m->u.say.phrase); rc_put8(&w, m->u.say.seq); rc_put8(&w, m->u.say.stay); rc_put8(&w, 0); break;
     case RC_MSG_RACERES: {
         const rc_raceres *r = &m->u.raceres;
         if (!raceres_ok(r)) return -1;
@@ -598,6 +600,7 @@ int rc_decode(const uint8_t *buf, int len, rc_msg *m){
     case RC_MSG_DUEL:
         m->u.duel.op = (uint8_t)rc_get8(&r); m->u.duel.arg = (uint8_t)rc_get8(&r);
         m->u.duel.to = rc_get32(&r); m->u.duel.duel = rc_get32(&r);
+        m->u.duel.score = m->u.duel.op == RC_DUEL_SCORE ? rc_get32(&r) : 0;
         if (r.err) return RC_E_SHORT;
         if (m->u.duel.op < 1 || m->u.duel.op >= RC_DUEL__N || !m->u.duel.to || !m->u.duel.duel) return RC_E_FIELD;
         break;
@@ -651,7 +654,7 @@ int rc_decode(const uint8_t *buf, int len, rc_msg *m){
         q->lobby = rc_get32(&r); q->race = rc_get32(&r); q->mode = (uint8_t)rc_get8(&r); q->laps = (uint8_t)rc_get8(&r);
         q->track = (uint16_t)rc_get16(&r); q->place = (uint8_t)rc_get8(&r); q->players = (uint8_t)rc_get8(&r);
         q->flags = (uint8_t)rc_get8(&r); q->type = (uint8_t)rc_get8(&r); q->cls = (int8_t)rc_get8(&r);
-        (void)rc_get8(&r); (void)rc_get8(&r); (void)rc_get8(&r);
+        q->credit = (uint8_t)rc_get8(&r); (void)rc_get8(&r); (void)rc_get8(&r);
         q->rating = rc_getf(&r); q->field = rc_getf(&r); q->factor = rc_getf(&r); q->kw = rc_getf(&r); q->kg = rc_getf(&r);
         q->kmh = rc_getf(&r); q->time = rc_getf(&r);
         rc_getb(&r, q->name, RC_RACEREP_NAME); q->name[RC_RACEREP_NAME] = 0;
@@ -660,7 +663,7 @@ int rc_decode(const uint8_t *buf, int len, rc_msg *m){
         break; }
     case RC_MSG_SAY:
         /* the phrase as it came: a newer game may have more of them (the game side ignores one it does not know) */
-        m->u.say.phrase = (uint8_t)rc_get8(&r); m->u.say.seq = (uint8_t)rc_get8(&r); (void)rc_get8(&r); (void)rc_get8(&r);
+        m->u.say.phrase = (uint8_t)rc_get8(&r); m->u.say.seq = (uint8_t)rc_get8(&r); m->u.say.stay = (uint8_t)rc_get8(&r); (void)rc_get8(&r);
         break;
     case RC_MSG_RACERES: {
         rc_raceres *q = &m->u.raceres;
@@ -831,6 +834,29 @@ static void from_state(const rc_state *s, rc_pose *o){
     for (int i = 0; i < 8; i++) o->slip[i] = s->slip[i];
     o->eng = s->eng; o->eng_acc = s->eng_acc / 255.f; o->eng_dcl = s->eng_dcl / 255.f; o->eng_base = s->eng_base / 255.f;
 }
+/* Along the curve its path turns on (1): a friend's solid car is drawn where its driver is now, a round trip's half
+ * past its newest state, and in a straight line it ran wide of every bend.  Replayed through this code, a real drive
+ * (pose.csv, 20 states a second, 100 / 200 ms on): the error across the road 0.077 -> 0.009 m / 0.186 -> 0.028 m on
+ * average, the whole error 0.144 -> 0.098 / 0.288 -> 0.170 m; handbrake slides 0.235 -> 0.097 / 0.562 -> 0.241 m
+ * (with the yaw rate, 2: 0.140 / 0.327); the steps from frame to frame no rougher (2026-11-03).  The speed's change
+ * carried on too came out worse (0.107 / 0.201 m): the drive's changes of speed come and go faster than that. */
+int rc_extrap_arc = 1;
+/* How fast a car's course turns about the vertical (rad/s, left positive) as it goes on past its newest state: how much
+ * its velocity turned from the state before (what its path did), when the two are close in time and it moves; else
+ * its own yaw rate, which in a slide is more than its path turns */
+#define ARC_MAX_RAD_S  3.f
+static float turn_rate(const rc_interp *ip){
+    const rc_state *b = &ip->s[ip->n - 1];
+    float k = b->w[2];
+    if (rc_extrap_arc != 2 && ip->n >= 2){
+        const rc_state *a = &ip->s[ip->n - 2];
+        int64_t dt = ip->t[ip->n - 1] - ip->t[ip->n - 2];
+        float sa = a->v[0] * a->v[0] + a->v[1] * a->v[1], sb = b->v[0] * b->v[0] + b->v[1] * b->v[1];
+        if (dt >= 10000 && dt <= 150000 && sa > 9.f && sb > 9.f)
+            k = rc_atan2f(a->v[0] * b->v[1] - a->v[1] * b->v[0], a->v[0] * b->v[0] + a->v[1] * b->v[1]) / ((float)(int32_t)dt * 1e-6f);
+    }
+    return f_clamp(k, -ARC_MAX_RAD_S, ARC_MAX_RAD_S);
+}
 int rc_interp_peek(const rc_interp *ip, int64_t rt, int64_t cap_us, rc_pose *o){
     memset(o, 0, sizeof *o); o->q[3] = 1;
     if (ip->n == 0) return 0;
@@ -846,6 +872,18 @@ int rc_interp_peek(const rc_interp *ip, int64_t rt, int64_t cap_us, rc_pose *o){
         float ds = (float)(int32_t)dt * 1e-6f;                        /* dt <= cap_us */
         for (int i = 0; i < 3; i++) o->p[i] = s->p[i] + s->v[i] * ds;
         q_integrate(s->q, s->w, ds, o->q);
+        if (rc_extrap_arc){
+            /* along the curve: the velocity turned by k over the time, a = k ds at most 1 rad, the place its
+             * integral (sin a / k and (1 - cos a) / k, from their series) */
+            float a = f_clamp(turn_rate(ip) * ds, -1.f, 1.f), a2 = a * a;
+            float sa = a * (1.f - a2 / 6.f * (1.f - a2 / 20.f)), ca = 1.f - a2 * (0.5f - a2 / 24.f * (1.f - a2 / 30.f));
+            float c1 = ds * (1.f - a2 / 6.f * (1.f - a2 / 20.f)), c2 = ds * a * (0.5f - a2 / 24.f * (1.f - a2 / 30.f));
+            float vx = s->v[0], vy = s->v[1];
+            o->p[0] = s->p[0] + c1 * vx - c2 * vy;
+            o->p[1] = s->p[1] + c2 * vx + c1 * vy;
+            o->v[0] = ca * vx - sa * vy;
+            o->v[1] = sa * vx + ca * vy;
+        }
         return 1;
     }
     int k = 0;
@@ -985,21 +1023,23 @@ static int hub_mode(const rc_session *s, int64_t now){
     if (!s->hub_since) return 1;
     return now - (s->hub_heard_us ? s->hub_heard_us : s->hub_since) < T_HUB_SILENT;
 }
-int rc_send_duel(rc_session *s, uint32_t to, uint8_t op, uint8_t arg, uint32_t duel){
+int rc_send_duel(rc_session *s, uint32_t to, uint8_t op, uint8_t arg, uint32_t duel, uint32_t score){
+    int drift = op == RC_DUEL_SCORE || ((op == RC_DUEL_OFFER || op == RC_DUEL_ACCEPT || op == RC_DUEL_START) && (arg & RC_DA_DRIFT));
     for (int i = 0; i < RC_TABLE; i++){
         rc_peer *p = &s->peer[i];
-        if (p->state != RC_PS_EST || p->id != to || !p->duels) continue;
+        if (p->state != RC_PS_EST || p->id != to || !p->duels || (drift && !p->drifts)) continue;
         rc_msg m; hdr(s, &m, RC_MSG_DUEL);
-        m.u.duel.op = op; m.u.duel.arg = arg; m.u.duel.to = to; m.u.duel.duel = duel;
+        m.u.duel.op = op; m.u.duel.arg = arg; m.u.duel.to = to; m.u.duel.duel = duel; m.u.duel.score = op == RC_DUEL_SCORE ? score : 0;
         uint32_t before = s->tx;
         tx(s, p, &m);
         return s->tx != before;
     }
     return 0;
 }
-int rc_take_duel(rc_session *s, uint32_t *from, uint8_t *op, uint8_t *arg, uint32_t *duel){
+int rc_take_duel(rc_session *s, uint32_t *from, uint8_t *op, uint8_t *arg, uint32_t *duel, uint32_t *score){
     if (!s->n_duel_in) return 0;
     *from = s->duel_in[0].from; *op = s->duel_in[0].op; *arg = s->duel_in[0].arg; *duel = s->duel_in[0].duel;
+    if (score) *score = s->duel_in[0].score;
     for (int k = 1; k < s->n_duel_in; k++) s->duel_in[k - 1] = s->duel_in[k];
     s->n_duel_in--;
     return 1;
@@ -1045,23 +1085,23 @@ int rc_take_lobby(rc_session *s, uint32_t *from, rc_lobby *l){
     s->n_lobby_in--;
     return 1;
 }
-int rc_send_say(rc_session *s, uint8_t phrase, uint8_t seq){
+int rc_send_say(rc_session *s, uint8_t phrase, uint8_t seq, uint8_t stay){
     if (s->closed || !s->conf.say) return 0;
     int n = 0;
     for (int i = 0; i < RC_TABLE; i++){
         rc_peer *p = &s->peer[i];
         if (p->state != RC_PS_EST || !p->say) continue;
         rc_msg m; hdr(s, &m, RC_MSG_SAY);
-        m.u.say.phrase = phrase; m.u.say.seq = seq;
+        m.u.say.phrase = phrase; m.u.say.seq = seq; m.u.say.stay = stay;
         uint32_t before = s->tx;
         tx(s, p, &m);
         n += s->tx != before;
     }
     return n;
 }
-int rc_take_say(rc_session *s, uint32_t *from, uint8_t *phrase, uint8_t *seq){
+int rc_take_say(rc_session *s, uint32_t *from, uint8_t *phrase, uint8_t *seq, uint8_t *stay){
     if (!s->n_say_in) return 0;
-    *from = s->say_in[0].from; *phrase = s->say_in[0].phrase; *seq = s->say_in[0].seq;
+    *from = s->say_in[0].from; *phrase = s->say_in[0].phrase; *seq = s->say_in[0].seq; *stay = s->say_in[0].stay;
     for (int k = 1; k < s->n_say_in; k++) s->say_in[k - 1] = s->say_in[k];
     s->n_say_in--;
     return 1;
@@ -1104,8 +1144,8 @@ static void map_part(rc_session *s, const rc_msg *m, int64_t now){
     s->map_asm_z = (m->h.flags & RC_HF_MAPZ) != 0;
     memcpy(s->map_asm + (size_t)m->u.mapd.part * RC_MAPD_BYTES, m->u.mapd.data, m->u.mapd.len);
     s->map_part_n[m->u.mapd.part] = m->u.mapd.n; s->map_part_len[m->u.mapd.part] = m->u.mapd.len;
-    s->map_mask |= (uint16_t)(1u << m->u.mapd.part);
-    if (s->map_mask != (1u << s->map_nparts) - 1u) return;
+    s->map_mask |= (uint64_t)1 << m->u.mapd.part;
+    if (s->map_mask != ((uint64_t)1 << s->map_nparts) - 1u) return;
     s->map_mask = 0; s->map_asked_us = 0;                    /* answered: a repeat of a part changes nothing */
     if (s->map_asm_base && s->map_asm_base != s->map_held) return;
     int n = 0, i = 0, held = s->map_asm_base ? s->map_n : 0;
@@ -1304,6 +1344,7 @@ static void fill_hello(rc_session *s, rc_msg *m, const rc_peer *to, int crews){
         m->u.hello.duel = s->duel_with;
     }
     if (s->conf.duels) m->h.flags |= RC_HF_DUELS;
+    if (s->conf.duels && s->conf.drifts) m->h.flags |= RC_HF_DRIFT;
     if (s->conf.lobbies) m->h.flags |= RC_HF_LOBBY;
     if (s->conf.say) m->h.flags |= RC_HF_SAY;
     if (!to) m->h.flags |= RC_HF_ALL;
@@ -1489,6 +1530,7 @@ void rc_receive(rc_session *s, uint32_t ip, uint16_t port, const uint8_t *buf, i
         memcpy(p->name, m.u.hello.name, sizeof p->name);
         p->platform = m.u.hello.platform; p->status = m.u.hello.status; p->cfg_rev_seen = m.u.hello.cfg_rev;
         p->core_ver = m.u.hello.core_ver; p->duels = (m.h.flags & RC_HF_DUELS) != 0;
+        p->drifts = p->duels && (m.h.flags & RC_HF_DRIFT) != 0;
         p->lobbies = (m.h.flags & RC_HF_LOBBY) != 0;
         p->statex = (m.h.flags & RC_HF_STATEX) != 0;
         p->say = (m.h.flags & RC_HF_SAY) != 0;
@@ -1596,6 +1638,7 @@ void rc_receive(rc_session *s, uint32_t ip, uint16_t port, const uint8_t *buf, i
         if (s->n_duel_in == RC_DUEL_INBOX){ s->duel_dropped++; return; }
         s->duel_in[s->n_duel_in].from = m.h.sender; s->duel_in[s->n_duel_in].op = m.u.duel.op;
         s->duel_in[s->n_duel_in].arg = m.u.duel.arg; s->duel_in[s->n_duel_in].duel = m.u.duel.duel;
+        s->duel_in[s->n_duel_in].score = m.u.duel.score;
         s->n_duel_in++;
         break;
     case RC_MSG_LOBBY:
@@ -1608,7 +1651,7 @@ void rc_receive(rc_session *s, uint32_t ip, uint16_t port, const uint8_t *buf, i
         if (p->state != RC_PS_EST || !s->conf.say) return;
         if (s->n_say_in == RC_SAY_INBOX){ s->say_dropped++; return; }
         s->say_in[s->n_say_in].from = m.h.sender; s->say_in[s->n_say_in].phrase = m.u.say.phrase;
-        s->say_in[s->n_say_in].seq = m.u.say.seq;
+        s->say_in[s->n_say_in].seq = m.u.say.seq; s->say_in[s->n_say_in].stay = m.u.say.stay;
         s->n_say_in++;
         break;
     case RC_MSG_BYE: {

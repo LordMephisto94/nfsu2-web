@@ -2,14 +2,21 @@
 // (web/tools/browser.mjs):
 //   node --test web/test/quickchat.test.mjs
 // - free roam with free roam on: 1 opens the first group and 1 again says its first phrase (free roam's way), Esc
-//   closes the picker and the game does not get it, a flick of the right stick opens it
-// - the career's free roam with free roam off (the game's "drive" is 2 there too): no picker by a key, the stick or
-//   the touch button, and 1-4, Esc and the right stick stay the game's
+//   closes the picker and the game does not get it; a flick of the right stick alone is the game's (its look round
+//   the car), the stick's click shows the four groups, a flick opens one and another says its phrase, a second click
+//   closes it
+// - the career's free roam with free roam off (the game's "drive" is 2 there too): no picker by a key, the stick, its
+//   click or the touch button, and 1-4, Esc and the right stick stay the game's
+// - the right stick on the game's steering or a pedal (the game's "rstick"): its click is the game's, the keys still
+//   open the picker
 // - a race between players (the game's "netrace") with free roam off: the picker, and the phrase goes to the race
 // - quick chat off: no picker anywhere
 // - the countdown (the special phrase, in the default sixteen's last place): its stopwatch in the picker, 5 to 1 and
-//   GO! big for the one who said it and a friend within 50 m, over the car for one farther; while one is on and 10 s
-//   after, another's is not shown and the player's own waits; in a race dimmed, and it says nothing there
+//   GO! big for the one who said it and a friend within 50 m, over the car for one farther; while one is on and 30 s
+//   after, another's is not shown and the player's own waits (a far one holds back only far ones); in a race dimmed,
+//   and it says nothing there
+// - the countdown where the game's "nocount" says it is not the player's to start (a car meet, not stayed): dimmed,
+//   picked it says only that it is not allowed here and nothing goes to the game; the game's own refusal the same
 // The module is bundled from web/src with esbuild into a blank page.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -60,8 +67,12 @@ const key = (p, code) => p.evaluate(c => document.getElementById('game').dispatc
 const open = p => p.evaluate(() => /** @type {any} */ (window).qc.state().open);
 const said = p => p.evaluate(() => /** @type {any} */ (window).said);
 const keys = p => p.evaluate(() => /** @type {any} */ (window).game);
-/** the right stick flicked up and back: whether the picker took it */
-const flick = p => p.evaluate(() => { const q = /** @type {any} */ (window).qc; const took = q.stick(0, -1); q.stick(0, 0); return took; });
+/** the right stick flicked (up, or to x, y) and back: whether the picker took it */
+const flick = (p, x = 0, y = -1) => p.evaluate(([x, y]) => {
+  const q = /** @type {any} */ (window).qc; const took = q.stick(x, y); q.stick(0, 0); return took;
+}, [x, y]);
+/** the right stick pressed in: whether the picker took it */
+const click = p => p.evaluate(() => /** @type {any} */ (window).qc.click());
 const touch = p => p.evaluate(() => /** @type {any} */ (window).qc.toggle());
 
 test('free roam with free roam on: keys, Esc, the stick', async () => {
@@ -75,8 +86,23 @@ test('free roam with free roam on: keys, Esc, the stick', async () => {
   await key(p, 'Digit2');
   assert.equal(await key(p, 'Escape'), false, 'Esc closes the picker, not the game');
   assert.equal(await open(p), -1);
-  assert.equal(await flick(p), true, 'the stick opens it');
-  assert.equal(await open(p), 0);
+  assert.equal(await flick(p), false, 'a flick alone opens nothing: the game looks round with the stick');
+  assert.equal(await open(p), -1);
+  assert.equal(await click(p), true, 'the stick\'s click opens it');
+  assert.equal(await open(p), 5, 'the four groups');
+  assert.deepEqual(await p.evaluate(() => [...document.querySelectorAll('.qc-row')].map(r => r.textContent)),
+    ['↑Hi', '→Reply', '↓Drive', '←Race'], 'each with its flick');
+  assert.equal(await p.evaluate(() => {
+    const q = /** @type {any} */ (window).qc; q.stick(0, 0); return q.stick(0.5, 0);
+  }), true, 'back at rest, then part way out: the picker\'s still (the game gets it at rest)');
+  assert.equal(await flick(p, 1, 0), true, 'a flick right opens the second group');
+  assert.equal(await open(p), 1);
+  assert.equal(await flick(p, 0, 1), true, 'a flick down says its third phrase');
+  assert.deepEqual(await said(p), [[0, false], [6, false]]);
+  assert.equal(await open(p), -1);
+  assert.equal(await click(p), true);
+  assert.equal(await click(p), true, 'a second click closes it');
+  assert.equal(await open(p), -1);
   await p.close();
 });
 
@@ -90,10 +116,32 @@ test('the career\'s free roam with free roam off: no picker, the keys and the st
   assert.equal(await key(p, 'Escape'), true, 'Esc goes to the game (its pause menu)');
   assert.deepEqual(await keys(p), ['Digit1', 'Digit2', 'Numpad3', 'Digit4', 'Escape']);
   assert.equal(await flick(p), false, 'the stick stays the game\'s');
+  assert.equal(await click(p), false, 'and its click (a car\'s hydraulics)');
   await touch(p);
   assert.equal(await open(p), -1, 'nor the touch button');
   assert.equal(await p.evaluate(() => /** @type {HTMLElement} */ (document.querySelector('.qc-picker')).hidden), true);
   assert.deepEqual(await said(p), []);
+  await p.close();
+});
+
+test('a right stick the game\'s controls read (the game\'s "rstick"): its click is the game\'s, 1-4 still open it', async () => {
+  const p = await page();
+  await game(p, true, true, 2);
+  await p.evaluate(() => { /** @type {any} */ (window).st.rstick = 1; });
+  await p.clock.runFor(200);                                     // (the status is read again)
+  assert.equal(await click(p), false, 'the click goes to the game (its hydraulics), no picker');
+  assert.equal(await open(p), -1);
+  assert.equal(await flick(p, 1, 0), false, 'the stick stays the game\'s (its steering)');
+  await key(p, 'Digit1');
+  assert.equal(await open(p), 0, 'the keys still open it');
+  assert.equal(await click(p), false, 'and a click there is still the game\'s');
+  assert.equal(await open(p), 0, 'the picker stays open');
+  await key(p, 'Digit1');
+  assert.deepEqual(await said(p), [[0, false]]);
+  await p.evaluate(() => { /** @type {any} */ (window).st.rstick = 0; });
+  await p.clock.runFor(200);
+  assert.equal(await click(p), true, 'the stick the look\'s again: the click opens the picker');
+  assert.equal(await open(p), 5);
   await p.close();
 });
 
@@ -150,7 +198,9 @@ test('the countdown: big near, over the car far, one at a time, not in a race', 
   assert.equal(await count(p), null, 'gone after GO!');
   assert.equal(await p.evaluate(() => document.querySelectorAll('.qc-count').length), 0);
   await from(p, { id: 2, name: 'Ann', p: 152, d: 10 });
-  assert.equal(await count(p), null, 'nor within 10 s after');
+  await p.clock.runFor(20000);
+  await from(p, { id: 2, name: 'Ann', p: 152, d: 10 });
+  assert.equal(await count(p), null, 'nor within 30 s after');
   await key(p, 'Digit4'); await key(p, 'Digit4');
   assert.deepEqual(await said(p), [[152, false]], 'the player\'s own waits too');
   assert.equal(await text(p, '.qc-wait'), 'Wait a moment');
@@ -159,13 +209,49 @@ test('the countdown: big near, over the car far, one at a time, not in a race', 
   assert.deepEqual(await count(p), { id: 3, big: false, text: '5' }, 'past 50 m: over the car');
   assert.deepEqual(await p.evaluate(() => /** @type {any} */ (window).qc.state().lines), [3]);
   assert.equal(await p.evaluate(() => document.querySelectorAll('.qc-line svg.qc-watch').length), 1, 'its line with the stopwatch');
-  await p.clock.runFor(17000);
+  await from(p, { id: 5, name: 'Dee', p: 152, d: 90 });
+  assert.equal((await count(p))?.id, 3, 'another far one while it is on: not shown');
   await from(p, { id: 4, name: 'Cy', p: 152, d: 50 });
-  assert.equal((await count(p))?.big, true, 'within 50 m: big');
+  assert.deepEqual(await count(p), { id: 4, big: true, text: '5' }, 'within 50 m: big, a far one holds back no near one');
+  assert.deepEqual(await p.evaluate(() => /** @type {any} */ (window).qc.state().lines), [], 'the far one\'s line gone');
+  await p.clock.runFor(35000);
+  await from(p, { id: 6, name: 'Eve', p: 152, d: 20 });
+  assert.equal(await count(p), null, 'nor another near one 35 s after the near one\'s start');
+  await p.clock.runFor(1000);
+  await from(p, { id: 6, name: 'Eve', p: 152, d: 20 });
+  assert.equal((await count(p))?.id, 6, '36 s after: shown');
   await game(p, true, false, 1, 1);
   await key(p, 'Digit4');
   assert.equal(await p.evaluate(() => document.querySelectorAll('.qc-row .qc-off svg.qc-watch').length), 1, 'in a race: dimmed');
   await key(p, 'Digit4');
   assert.deepEqual(await said(p), [], 'and it says nothing there');
+  await p.close();
+});
+
+test('the countdown at a car meet where the player has not stayed: dimmed, not allowed, nothing said', async () => {
+  const p = await page();
+  await game(p, true, true, 2);
+  await p.evaluate(() => { /** @type {any} */ (window).st.nocount = 1; });
+  await p.clock.runFor(200);                                     // (the status is read again)
+  await key(p, 'Digit4');
+  assert.equal(await p.evaluate(() => document.querySelectorAll('.qc-row .qc-off svg.qc-watch').length), 1, 'dimmed');
+  await key(p, 'Digit4');
+  assert.deepEqual(await said(p), [], 'nothing goes to the game');
+  assert.equal(await text(p, '.qc-no'), 'You are not allowed to start a countdown here');
+  await p.clock.runFor(4100);
+  assert.equal(await open(p), -1, 'the message closes as the picker does');
+  await key(p, 'Digit1'); await key(p, 'Digit1');
+  assert.deepEqual(await said(p), [[0, false]], 'other phrases go as ever');
+  // the game's own refusal (a pick as the status changed): the same message, no countdown
+  await from(p, { id: 1, name: 'Me', p: 152, me: 1, no: 1 });
+  assert.equal(await count(p), null, 'no countdown');
+  assert.equal(await text(p, '.qc-no'), 'You are not allowed to start a countdown here');
+  // stayed (or the meet gone): its own again
+  await p.evaluate(() => { /** @type {any} */ (window).st.nocount = 0; });
+  await p.clock.runFor(4200);
+  await key(p, 'Digit4');
+  assert.equal(await p.evaluate(() => document.querySelectorAll('.qc-row .qc-off').length), 0, 'not dimmed');
+  await key(p, 'Digit4');
+  assert.deepEqual(await said(p), [[0, false], [152, false]], 'said');
   await p.close();
 });

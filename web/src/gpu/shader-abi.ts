@@ -3,7 +3,7 @@
 // the override constants.  The renderer and the shader check both build their
 // pipelines from here, so the check validates exactly what the game will run.
 
-/** A draw's VS constant block: {stride, tsel, base, pad} + 256 vec4f (the rows it may read). */
+/** A draw's VS constant block: {stride, tsel, base, target w | h << 16} + 256 vec4f (the rows it may read). */
 export const VSPAR_SIZE = 4112;
 /** The K binding: a 64 KB window of the frame's VS constant arena (gpu_proto.h GW_KWIN_ROWS rows); a draw's
  *  block starts at row firstInstance of it, at most KWIN_SIZE - VSPAR_SIZE bytes in. */
@@ -53,7 +53,7 @@ export function createShaderAbi(device: GPUDevice): ShaderAbi {
       { binding: 0, visibility: V, buffer: { type: 'read-only-storage', hasDynamicOffset: false } },
       { binding: 1, visibility: V, buffer: { type: 'uniform', hasDynamicOffset: true, minBindingSize: KWIN_SIZE } },
       { binding: 2, visibility: F, buffer: { type: 'uniform', hasDynamicOffset: true, minBindingSize: PSPAR_SIZE } },
-      { binding: 3, visibility: F, buffer: { type: 'uniform', hasDynamicOffset: false, minBindingSize: HLPAR_SIZE } },
+      { binding: 3, visibility: F, buffer: { type: 'uniform', hasDynamicOffset: true, minBindingSize: HLPAR_SIZE } },
     ],
   });
   const textures = (cube: boolean): GPUBindGroupLayoutEntry[] => {

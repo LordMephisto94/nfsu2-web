@@ -34,8 +34,9 @@ type Control =
    *  drop-down list */
   | { t: 'phrases' };
 
-/** link: the words of help that link to a page (a mod's, say), opened in a new tab */
-interface Item { key: string; label: string; help: string; link?: { text: string; href: string }; c: Control; more?: boolean }
+/** link: the words of help that link to a page (a mod's, say), opened in a new tab; several for help that names several */
+interface Link { text: string; href: string }
+interface Item { key: string; label: string; help: string; link?: Link | Link[]; c: Control; more?: boolean }
 /** own: the group has no heading of its own, its tab's name says it (Online; Friends & crews' Crews); at: the id of the
  *  element it goes in (Crews in Friends & crews, the Controls tab's Controller part), else the Online tab's (own) or the
  *  Game tab's; head: its heading, else its title; more: the title of its "more" part.  The texts are English (N),
@@ -63,7 +64,7 @@ const GROUPS: Group[] = [
     { key: 'roam_collide', label: N('Ghost mode'), help: N('Players: drive through other players\' cars. Everything: also through traffic and the game\'s tuners in free roam, but not a tuner you race in an outrun.'),
       c: { t: 'seg', opts: [['on', N('Off')], ['off', N('Players')], ['none', N('Everything')]] } },
     { key: 'roam_max_cars', label: N('Players\' cars shown'), help: N('How many of the nearest players\' cars free roam shows. More can lower the frame rate.'), c: { t: 'seg', opts: [['16', '16'], ['24', '24'], ['32', '32'], ['40', '40'], ['48', '48']] } },
-    { key: 'quick_chat', label: N('Quick chat'), help: N('Send phrases to players near you in free roam and to everyone in multiplayer races: 1 to 4, then 1 to 4 (controller: right stick twice; touch: the chat button).'), c: { t: 'switch' } },
+    { key: 'quick_chat', label: N('Quick chat'), help: N('Send phrases to players near you in free roam and to everyone in multiplayer races: 1 to 4, then 1 to 4 (controller: press the right stick in, then flick it twice; touch: the chat button).'), c: { t: 'switch' } },
     { key: 'quick_chat_phrases', label: N('Your phrases'), help: N('Four groups of four. Others read them in their own language.'), c: { t: 'phrases' } },
     { key: 'online', label: N('Online mode'), help: N('The game\'s Online menu skips the EA login: lobby, chat and races with everyone on this server.'), c: { t: 'switch' }, more: true },
   ] },
@@ -74,6 +75,7 @@ const GROUPS: Group[] = [
     { key: 'language', label: N('Language'), help: N('Menus, subtitles, dubbed voices and this page.'), c: { t: 'select', opts: LANGUAGE_OPTS } },
     { key: 'movies', label: N('Movies'), help: N('Intro and story movies.'), c: { t: 'switch' } },
     { key: 'subtitles', label: N('Subtitles'), help: N('For the movies. English uses VileStuff\'s English Subtitles Fixed.'), link: { text: N('English Subtitles Fixed'), href: 'https://nfsmods.xyz/mod/5286' }, c: { t: 'switch' } },
+    { key: 'songs', label: N('Songs'), help: N('Uncensored: the EA Trax songs unedited, some in longer versions. Original: as the game shipped them. F7 plays the next song.'), c: { t: 'seg', opts: [['uncensored', N('Uncensored')], ['original', N('Original')]] } },
     { key: 'autosave', label: N('Autosave'), help: N('Sets each profile\'s Save option to Autosave once. A later change in the game\'s Options stays.'), c: { t: 'switch' } },
     { key: 'show_hidden_races', label: N('Show hidden races'), help: N('MaxHwoy\'s Show Hidden Races Mod: the 33 hidden races show on the map and radar, with up to 8 of each kind at once (the original shows 1 to 4).'), link: { text: N('Show Hidden Races Mod'), href: 'https://nfsmods.xyz/mod/1583' }, c: { t: 'switch' }, more: true },
     { key: 'intro', label: N('Startup movies'), help: N('Logos, PSA and intro. Skippable: Enter, Esc, Space, a click, A, B or Start skips each. Original: only the intro can be skipped.'), c: { t: 'seg', opts: [['skippable', N('Skippable')], ['original', N('Original')], ['off', N('Off')]] }, more: true },
@@ -86,10 +88,12 @@ const GROUPS: Group[] = [
     { key: 'fullscreen', label: N('Full screen on Play'), help: N('Off: play in the window; the menu (F9) has full screen. Hold Esc to leave it.'), c: { t: 'switch' } },
     { key: 'render', label: N('Resolution scale'), help: N('Lower is faster but softer: 50% renders a quarter of the pixels. Phones start at 75%.'), c: { t: 'seg', opts: [['scale:0.5', '50%'], ['scale:0.75', '75%'], ['backing', '100%'], ['scale:1.5', '150%'], ['scale:2', '200%']] } },
     { key: 'fps', label: N('Frame rate'), help: N('Auto matches the display. 30 is steadier on slow phones and saves battery. Online and LAN races run at up to 120; cutscenes at 30.'), c: { t: 'seg', opts: [['auto', N('Auto')], ['30', '30'], ['60', '60'], ['120', '120'], ['240', '240']] } },
-    { key: 'ui_textures', label: N('Menus and HUD'), help: N('Upscaled: LunicAura106\'s Upscaled HUD, sharp at high resolutions. About 5 MB to download, and more memory on phones.'), link: { text: N('Upscaled HUD'), href: 'https://nfsmods.xyz/mod/4319' }, c: { t: 'seg', opts: [['original', N('Original')], ['uhud', N('Upscaled')]] }, more: true },
+    { key: 'ui_textures', label: N('Menus, HUD and maps'), help: N('Upscaled: LunicAura106\'s Upscaled HUD and JeansBig\'s Detailed Map, sharp at high resolutions. About 25 MB to download, and more memory on phones.'), link: [{ text: N('Upscaled HUD'), href: 'https://nfsmods.xyz/mod/4319' }, { text: N('Detailed Map'), href: 'https://nfsmods.xyz/mod/4485' }], c: { t: 'seg', opts: [['original', N('Original')], ['uhud', N('Upscaled')]] }, more: true },
+    { key: 'pixelated_textures', label: N('Pixelated textures'), help: N('Textures without smoothing, blocky like early PC games. Overrides the game\'s Texture Filtering.'), c: { t: 'switch' }, more: true },
     { key: 'hud', label: N('Race HUD'), help: N('Wide anchors it to the screen edges; 4:3 is the original centred layout.'), c: { t: 'seg', opts: [['wide', N('Wide')], ['43', '4:3']] }, more: true },
     { key: 'movie_framing', label: N('Movie framing'), help: N('Fit keeps the 4:3 movies whole; fill crops them; stretch widens them.'), c: { t: 'seg', opts: [['fit', N('Fit')], ['fill', N('Fill')], ['stretch', N('Stretch')]] }, more: true },
     { key: 'cutscene_borders', label: N('Cutscene bars'), help: N('Letterbox bars across the whole width, or none.'), c: { t: 'seg', opts: [['full', N('Full')], ['off', N('Off')]] }, more: true },
+    { key: 'fov_scale', label: N('3D proportions'), help: N('Corrected: true proportions and round wheels, a little more at the sides.'), c: { t: 'seg', opts: [['original', N('Original')], ['correct', N('Corrected')]] }, more: true },
     { key: 'other_headlights', label: N('Other cars\' headlights'), help: N('Other cars light up the road like yours. Players: other players\' cars. All: AI racers and traffic too. Off: as in the original.'), c: { t: 'seg', opts: [['players', N('Players')], ['all', N('All cars')], ['off', N('Off')]] }, more: true },
     { key: 'fps_counter', label: N('Frame-rate counter'), help: N('F8 switches it while you play.'), c: { t: 'seg', opts: [['off', N('Off')], ['on', N('On')], ['detailed', N('Detailed')]] }, more: true },
     { key: 'resolution', label: N('Fixed render size'), help: N('Always render at this size, such as 2560x1440. Empty: the game\'s own setting.'), c: { t: 'text', placeholder: N('WxH') }, more: true },
@@ -594,13 +598,19 @@ export class SettingsPanel {
     label.textContent = t(it.label);
     if (label instanceof HTMLLabelElement) label.htmlFor = id;
     const help = document.createElement('p'); help.className = 'set-help'; help.id = `${id}-help`;
-    const helpText = t(it.help), linkText = it.link ? t(it.link.text) : '';
-    const at = it.link ? helpText.indexOf(linkText) : -1;
-    if (at < 0) help.textContent = helpText;
-    else {
-      const a = document.createElement('a'); a.href = it.link!.href; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = linkText;
-      help.append(helpText.slice(0, at), a, helpText.slice(at + linkText.length));
+    // each link on its words where they first stand in the help (in this language's text), in their order there
+    const helpText = t(it.help);
+    const links = (it.link ? Array.isArray(it.link) ? it.link : [it.link] : [])
+      .map(l => ({ href: l.href, text: t(l.text), at: helpText.indexOf(t(l.text)) })).filter(l => l.text && l.at >= 0)
+      .sort((x, y) => x.at - y.at);
+    let pos = 0;
+    for (const l of links) {
+      if (l.at < pos) continue;
+      const a = document.createElement('a'); a.href = l.href; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = l.text;
+      help.append(helpText.slice(pos, l.at), a);
+      pos = l.at + l.text.length;
     }
+    help.append(helpText.slice(pos));
     const ctl = document.createElement('div'); ctl.className = 'set-control';
     let described: HTMLElement;                      // what aria-describedby goes on
     if (c.t === 'switch') {

@@ -15,8 +15,9 @@
 //!   list; an empty one says the hub is there.  To a player in a crew the list ends in
 //!   crew marks: its own crews, then which of them each listed player is in.
 //! - player -> hub -> player: when its world map opens, and a quarter second after each answer while it is open, a
-//!   MAPREQ naming the answer it holds; the hub answers with MAPD datagrams (at most 16): the other players of its
-//!   room in free roam, past its links, map_max (2048) of them at most (the nearest), or as many as the MAPREQ asks
+//!   MAPREQ naming the answer it holds; the hub answers with MAPD datagrams (at most 16, 48 to a page that takes
+//!   them): the other players of its room in free roam, past its links, map_max (4096) of them at most (the nearest,
+//!   and as many as the answer's datagrams hold: 1664 in 16 with heights), or as many as the MAPREQ asks
 //!   for, by the hub's slot of each, as what changed since that answer: each player come, or moved off where the
 //!   page has it, placed (x, y in whole metres, heading a byte, velocity in m/s: the page moves its marker on at
 //!   it), each one gone gone.  A player standing costs nothing, a car going straight little.
@@ -223,7 +224,7 @@ impl Default for RoamOptions {
             level_slack_m: 5.0,
             level_grade: 0.2,
             level_k: 25.0,
-            map_max: 2048,
+            map_max: 4096,
             map_gap_ms: 250.0,
             map_fresh_ms: 5_000.0,
             near_gap_ms: 150.0,
@@ -268,6 +269,7 @@ enum Cmd {
     Blocks(u32, Vec<String>),
     PageName(u32, String),
     OtherNames(oneshot::Sender<HashMap<u32, Vec<String>>>),
+    Pairs(oneshot::Sender<Vec<(u32, u32)>>),
     Friends(u32, Arc<str>, Vec<Arc<str>>),
     RoomName(u32, String),
     Flew(u32, f64),
@@ -479,6 +481,9 @@ fn run(
             Cmd::OtherNames(tx) => guard(|| {
                 let _ = tx.send(hub.other_names());
             }),
+            Cmd::Pairs(tx) => guard(|| {
+                let _ = tx.send(hub.link_pairs());
+            }),
             Cmd::Friends(vip, me, owners) => guard(|| hub.friends(vip, me, owners)),
             Cmd::RoomName(vip, name) => guard(|| hub.room_name(vip, name)),
             Cmd::Flew(vip, secs) => guard(|| hub.flew(vip, secs)),
@@ -541,6 +546,11 @@ impl Host for RoamHub {
     fn other_names(&self) -> oneshot::Receiver<HashMap<u32, Vec<String>>> {
         let (tx, rx) = oneshot::channel();
         let _ = self.tx.send(Cmd::OtherNames(tx));
+        rx
+    }
+    fn link_pairs(&self) -> oneshot::Receiver<Vec<(u32, u32)>> {
+        let (tx, rx) = oneshot::channel();
+        let _ = self.tx.send(Cmd::Pairs(tx));
         rx
     }
     fn stop(&self) {

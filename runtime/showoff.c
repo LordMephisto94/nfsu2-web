@@ -43,10 +43,11 @@
  * throws away every bank (0x438140 with 0), and ours are loaded again.
  *
  * The controller's D-pad down is the game's Legend (Career Status) as well:
- * while the car stands in free roam with no screen over the HUD, a press
- * goes to the game only when it is let go within the second (as a short
- * press then: showoff_pad, from dinput_pad.c); held a second it is a step
- * here instead.  Driving, or anywhere else, the button is the game's as
+ * in free roam with no screen over the HUD, a press goes to the game only
+ * when it is let go within the second (as a short press then: showoff_pad,
+ * from dinput_pad.c); held a second it is a step here instead when the car
+ * stood at the press, and drift mode on or off when it was driving (drift.c
+ * drift_pad, the keyboard's X).  Anywhere else the button is the game's as
  * before.  Nothing here runs or loads before the first press.
  *
  * Tests: tests/scripts/showoff_*.txt; "[showoff]" log lines. */
@@ -72,7 +73,7 @@ long autotest_frame(void);
 #define G_RACEKIND     0x0089e7b0u   /* 0 free roam, 7 an outrun */
 #define G_CAREER_RACE  0x00863470u   /* the career race being run (0 = free roam) */
 #define G_FREEZE       0x00890084u   /* the world stands (photo mode) */
-#define G_PLAYER1      0x008900acu   /* Player*: +4 its car, +0x9A4 its HUD */
+#define G_PLAYER1      SPLIT_PLAYERS_INDEX   /* Player*: +4 its car, +0x9A4 its HUD */
 #define G_FENG         0x008384c4u   /* +8 the package manager: +0xE4 the top package, +0xC its name */
 #define G_TXT_ON       0x0083a9c0u   /* byte: the game's text entry takes the typing ... */
 #define G_TXT_REC      0x0083a9c4u   /* ... for this record (0: none) */
@@ -137,6 +138,7 @@ typedef struct {
     uint8_t  has;                     /* RC_OPEN_* those we opened (their nodes opening or open) */
     uint8_t  live;                    /* a node of it is not closed: it goes on the list while drawn */
 } Car;
+void drift_pad(void);              /* drift.c: drift mode's switch, as X */
 typedef struct { uint32_t type, file, name; uint8_t st; int tries; long since; } Bank;   /* st: 0 none, 1 loading, 2 in */
 static struct {
     uint32_t mem;                     /* our block: SO_CARS x 4 nodes, then SO_TYPES file names of 64 bytes */
@@ -145,8 +147,8 @@ static struct {
     int nlive;                        /* cars with a node not closed */
     int step;                         /* the player's: 0 closed, 1 the trunk, 2 and the hood, 3 and the doors */
     int ostate; uint32_t kseq; int kinit;
-    int gate;                         /* the D-pad's hold is ours now (the car stands in free roam, the HUD on top) */
-    int held, fired, fires; double t0, tap_until;
+    int gate, moving;                 /* the D-pad's hold is ours now (free roam, the HUD on top); the car drives */
+    int held, fired, fires, drifts, hmove; double t0, tap_until;   /* hmove: the hold began driving (drift mode's) */
     int note;                         /* the last press that did nothing, logged once */
     int failed;                       /* the player's car type's animations can't be had */
 } S;
@@ -201,16 +203,16 @@ static int o_presses(void){
     return n;
 }
 
-/* the controller's buttons as the game reads them (dinput_pad.c fill_state): D-pad down kept back while the car stands,
- * a step when held a second, the game's own press when let go before */
+/* the controller's buttons as the game reads them (dinput_pad.c fill_state): D-pad down kept back in free roam, held a
+ * second a step (the car stood at the press) or drift mode (it drove), the game's own press when let go before */
 uint32_t showoff_pad(uint32_t b){
     const uint32_t D = 1u << PAD_DDOWN;
     double t = now_s();
     int down = (b & D) != 0;
-    if (down && !S.held && S.gate){ S.held = 1; S.fired = 0; S.t0 = t; }
+    if (down && !S.held && S.gate){ S.held = 1; S.fired = 0; S.t0 = t; S.hmove = S.moving; }
     if (S.held){
         if (!down){ S.held = 0; if (!S.fired) S.tap_until = t + TAP_S; }
-        else if (!S.fired && t - S.t0 >= HOLD_S){ S.fired = 1; S.fires++; }
+        else if (!S.fired && t - S.t0 >= HOLD_S){ S.fired = 1; if (S.hmove) S.drifts++; else S.fires++; }
         b &= ~D;
     }
     if (t < S.tap_until) b |= D;
@@ -310,7 +312,18 @@ static void car_reset(Car *k){
     k->car = k->ri = k->type = 0; k->want = k->has = 0; k->live = 0;
 }
 /* the car's parts to what it wants: open those it should and has not, close those it has and should not (closing a
- * part never opened would open it: 0x433A80 makes a node opening) */
+ * part never opened would open it: 0x433A80 makes a node opening).
+ * A node is kept for the next car in its slot (car_reset), and it holds the car type it was made for (+0x20).  A part
+ * turned the other way while it opens or closes (0x433D50 from 2 to 3, or 3 to 2) is timed by its animation: 0x433D10
+ * looks up that type's bank (0x433A30) and hands it to 0x433AD0, which reads the bank's animation list with no check.
+ * With that type's animations thrown away since (a garage, shop or race lobby: 0x438140), the bank is 0, the list
+ * reads 0 and the game calls through 0 for ever: free roam froze, or stopped with error 134, in a crowd (2026-11-02
+ * 22:47 to 11-03, stack sub_00433ad0 < sub_00433d10 < car_apply).  The log of one: slot 30's trunk opened on a 350Z,
+ * the game threw the banks away, a Skyline came into the slot and opened the hood (a new node) and the trunk (the
+ * 350Z's node, which the drawing never finds on the Skyline's list, so it stayed opening), and its trunk closing was
+ * the 350Z's bank looked up.  So a node of another type is made anew when its part opens, and one whose type has no
+ * bank closes at once.  Test: tests/scripts/showoff_stale.txt (NFSU2_TEST_SHOWOFF_STALE=1, script runs only: the
+ * player's car's trunk node first made for a type with no animations, as a slot's earlier car leaves it). */
 static void car_apply(CPU *c, Car *k, int sound, const char *who){
     if (k->want == k->has || !ok(k->ri, 0x2d48)) return;
     uint32_t ti = rd32(k->ri + RI_TYPE);
@@ -322,15 +335,25 @@ static void car_apply(CPU *c, Car *k, int sound, const char *who){
     }
     if (!mem_ok(c)) return;
     int idx = (int)(k - S.car);
+    static int stale = -1;                                             /* test aid, script runs only */
+    if (stale < 0){ const char *s = getenv("NFSU2_INPUT_SCRIPT"), *e = getenv("NFSU2_TEST_SHOWOFF_STALE"); stale = s && *s && e && *e == '1'; }
+    if (stale == 1 && idx == 0 && !k->node[1]){
+        uint32_t n = k->node[1] = S.mem + NODE_SZ, a[5] = { k->type ^ 0x5a5a5a5au, 0x3f800000u, 1u, 0u, 0u };
+        gcall(c, FN_NODE_INIT, n, 5, a);
+        MR32(n + 0x10u) = 1u; stale = 2;
+        fprintf(stderr, "[showoff] f=%ld test: my car's trunk node is one of another car type, closed\n", autotest_frame());
+    }
     for (int p = 0; p < 4; p++){
         uint8_t bit = (uint8_t)(1u << p);
         int w = (k->want & bit) != 0, h = (k->has & bit) != 0;
         if (w == h) continue;
         uint32_t mark = 0, kind = w ? so_kind(c, k->ri, p, &mark) : 0, n = k->node[p];
-        if (w && !n){
+        if (w && (!n || MR32(n + 0x20u) != k->type)){
             n = k->node[p] = S.mem + ((uint32_t)idx * 4u + (uint32_t)p) * NODE_SZ;
             uint32_t a[5] = { k->type, 0x3f800000u, (uint32_t)p, kind, mark };
             gcall(c, FN_NODE_INIT, n, 5, a);                          /* opening, from now */
+        } else if (!w && !bank_of(MR32(n + 0x20u))){
+            MR32(n + 0x10u) = 1u;                                     /* closed at once: no animation to close by */
         } else {
             if (w){ MR32(n + 8u) = 0x3f800000u; MR32(n + 0x14u) = kind; MR8(n + 0x24u) = (uint8_t)mark; }
             uint32_t a[2] = { n, w ? 2u : 3u };
@@ -368,7 +391,8 @@ void showoff_frame(CPU *c){
     float v = ok(car, 0x9e0) ? fabsf(MRF32(car + CAR_SPEED)) : 0.f;
     if (!(v == v)) v = 0.f;
     int stands = top && v < OPEN_MPS;
-    S.gate = stands;
+    S.gate = top; S.moving = !stands;
+    for (; S.drifts > 0; S.drifts--) drift_pad();
     int n = o_presses() * !typing(), fires = S.fires; S.fires = 0;
     for (int i = 0; i < n + fires; i++){
         const char *how = i < n ? "O" : "D-pad down held";
@@ -422,6 +446,31 @@ static void put_on(Car *k, uint32_t b, uint32_t *keep){
 }
 static void take_off(uint32_t b, const uint32_t *keep){ MR32(b + 0xcu) = keep[0]; MR32(b + 0x10u) = keep[1]; }
 
+/* The trunk's audio (the layout, ride slot 0x22, and its 12 pieces, 0x23..0x2E, on the layout's places, render info
+ * +0x2184): 0x620AE0 draws it only for a car whose racer record's driver is a human (car +0x14, +4 == 1: never a
+ * friend's car, kind 2 or 4), and out in the world (not the front end, no cover shoot) each piece as an empty box of
+ * its size (AUDIO_COMP_EMPTY_*, +0x2B74: what shows through a hatch's glass) instead of its own model (+0x2274).  The
+ * cover shoot, which opens the trunk out in the world, has its flag (G_SHOWCASE, 0x499DB0) set: the pieces' own
+ * models then, and the car at its first LOD (0x62118F).  So while a car's trunk is open (opening, open or closing)
+ * near the camera, its drawing runs with that flag and a human's driver kind, both as they were again after.
+ * Nothing else in 0x620AE0 or what it calls reads either (the flag's three reads are 0x62118F, 0x630883 and
+ * 0x630C29; the kind's one 0x6306D4). */
+#define G_SHOWCASE     0x00836352u   /* byte: a cover shoot is on (0x4CE770 sets it, 0x499FA0 clears it) */
+#define G_VIEW1        0x00832e50u   /* eView 1: +0x40 its camera (+0x40 its position) */
+#define CAR_REC        0x14u         /* car: its racer record (+4 the driver: 1 a human, 2 an AI racer, 3 traffic) */
+#define CAR_POS        0x60u
+#define TRUNK_NEAR_M   40.f          /* farther off the pieces are a few pixels: the game's boxes */
+static uint32_t trunk_rec(const Car *k){
+    static int game_way = -1;                                          /* test aid, script runs only: the game's drawing */
+    if (game_way < 0){ const char *s = getenv("NFSU2_INPUT_SCRIPT"), *e = getenv("NFSU2_TEST_TRUNK_GAMEWAY"); game_way = s && *s && e && *e == '1'; }
+    if (game_way) return 0;
+    uint32_t n = k->node[1], car = k->car, rec = ok(car, 0x9e0) ? rd32(car + CAR_REC) : 0, cam = rd32(G_VIEW1 + 0x40u);
+    if (!n || MR32(n + 0x10u) == 1u || !ok(rec, 8) || rd32(k->ri) != car || !ok(cam, 0x4c)) return 0;
+    float dx = MRF32(car + CAR_POS) - MRF32(cam + 0x40u), dy = MRF32(car + CAR_POS + 4u) - MRF32(cam + 0x44u),
+          dz = MRF32(car + CAR_POS + 8u) - MRF32(cam + 0x48u), d2 = dx * dx + dy * dy + dz * dz;
+    return d2 == d2 && d2 < TRUNK_NEAR_M * TRUNK_NEAR_M ? rec : 0;
+}
+
 /* photo.c: a car photo mode does not draw (its Cars list); none where photo mode is not built in */
 __attribute__((weak)) int photo_hides(uint32_t ri){ (void)ri; return 0; }
 void sub_00620ae0_orig(CPU *c);
@@ -430,7 +479,10 @@ void sub_00620ae0(CPU *c){                       /* the car's drawing */
     uint32_t b = 0, keep[2]; Car *k = drawn(c->ecx, &b);
     if (!k){ sub_00620ae0_orig(c); return; }
     put_on(k, b, keep);
+    uint32_t rec = trunk_rec(k), kind = 0; uint8_t shoot = 0;
+    if (rec){ shoot = MR8(G_SHOWCASE); kind = MR32(rec + 4u); MR8(G_SHOWCASE) = 1; MR32(rec + 4u) = 1u; }
     sub_00620ae0_orig(c);
+    if (rec){ MR8(G_SHOWCASE) = shoot; MR32(rec + 4u) = kind; }
     take_off(b, keep);
 }
 void sub_00615a10_orig(CPU *c);

@@ -399,6 +399,44 @@ static int chan_reads_axis(uint32_t ch, uint32_t ofs){
     if (MR8(ch + 0x368u) && MR8(ch + 0x367u)) return MR32(ch + 0x350u) == ofs;
     return (MR8(ch + 0x365u) && MR32(ch + 0x348u) == ofs) || (MR8(ch + 0x366u) && MR32(ch + 0x34cu) == ofs);
 }
+#define ACT_LOOK_BACK   0x09u            /* the game's action id (its keyboard map 0x7fcac0: "Look Back") */
+static int g_look_back_bound;            /* the pad last read has a button on it */
+int look_back_held(const PadState *s);   /* look.c */
+
+/* ---- the look's stick -------------------------------------------------------------
+ * The look round the car (look.c) takes the right stick, unless the game reads it: the steering's or a pedal's axis
+ * on it (Options > Controls > Joypad Configuration; players who steer with the right stick, or accelerate and brake
+ * with it, 2026-11-03: the stick steered and turned the view at once).  Then it takes the left stick, if the game
+ * reads neither of that one's axes nor its directions (POV 1, an action on one in the in-game tables: 0x5c1840 sets
+ * the bits of all four for each button and direction pressed, +0x98 being the front end's); else there is no look.
+ * The page hears "rstick" (status_web.c's block): 1 while the game reads the right stick, when its click and flicks
+ * are the game's again, not quick chat's (web/src/app/quickchat.ts). */
+static int g_look_stick = PAD_AXIS_RX;   /* PAD_AXIS_RX, PAD_AXIS_LX, or -1: no look */
+__attribute__((weak)) int host_status_slot(const char *name){ (void)name; return -1; }
+__attribute__((weak)) void host_status_set_n(const int *slot, const double *value, int n){ (void)slot; (void)value; (void)n; }
+static int pov1_bound(uint32_t ch){
+    static const uint32_t tab[3] = {0x018u, 0x118u, 0x198u};
+    for (int t = 0; t < 3; t++)
+        for (uint32_t k = 20; k < 24; k++) if (MR32(ch + tab[t] + 4u * k)) return 1;   /* POV 1: down, up, left, right */
+    return 0;
+}
+static void look_stick_from(uint32_t ch){
+    int r = chan_reads_axis(ch, k_axis_ofs[3]) || chan_reads_axis(ch, k_axis_ofs[4]);
+    int l = chan_reads_axis(ch, k_axis_ofs[0]) || chan_reads_axis(ch, k_axis_ofs[1]) || pov1_bound(ch);
+    int st = !r ? PAD_AXIS_RX : !l ? PAD_AXIS_LX : -1;
+    static int slot = -2, said = -1;
+    if (slot == -2) slot = host_status_slot("rstick");
+    if (r != said && slot >= 0){ double v = r; host_status_set_n(&slot, &v, 1); }
+    if (st == g_look_stick && r == said) return;
+    if (said >= 0 || st != PAD_AXIS_RX)
+        fprintf(stderr, "[pad] looking round: %s\n", st == PAD_AXIS_RX ? "the right stick"
+                : st == PAD_AXIS_LX ? "the left stick (the game's controls read the right one)"
+                : "none (the game's controls read both sticks)");
+    g_look_stick = st;
+    said = r;
+}
+/* look.c: the stick the look turns with (PAD_AXIS_RX or PAD_AXIS_LX, its Y the next axis), -1 none */
+int pad_look_stick(void){ return g_look_stick; }
 static void fill_state(uint8_t *buf, uint32_t size, Dev *d, const PadState *s){
     uint8_t st[0x110];
     memset(st, 0, sizeof st);
@@ -410,7 +448,7 @@ static void fill_state(uint8_t *buf, uint32_t size, Dev *d, const PadState *s){
         memcpy(st + k_axis_ofs[a], &v, 4);
     }
     uint32_t showoff_pad(uint32_t b);                  /* showoff.c: D-pad down held while the car stands */
-    uint32_t b = showoff_pad(s->buttons);
+    uint32_t b = MR32(0x850078u) == 4 ? s->buttons : showoff_pad(s->buttons);
     uint32_t pov[4] = { pov_of(!!(b & 1u << PAD_DUP), !!(b & 1u << PAD_DDOWN),
                                !!(b & 1u << PAD_DLEFT), !!(b & 1u << PAD_DRIGHT)),
                         stick_pov(d, s->axis[PAD_AXIS_LX], s->axis[PAD_AXIS_LY]),
@@ -439,8 +477,41 @@ static void fill_state(uint8_t *buf, uint32_t size, Dev *d, const PadState *s){
         int on = src == SRC_LT_FULL ? d->trig[0] : src == SRC_RT_FULL ? d->trig[1] : !!(b & (1u << src));
         if (on) st[0x30 + i] = 0x80;
     }
+    /* the look's stick, as the game's controls leave it free (not while the Joypad page waits for an axis) */
+    if (ch && !axis_bind && !s->wheel) look_stick_from(ch);
+    /* the look's stick straight back while driving holds the button the player has on Look Back (look.c): the
+     * channel's in-game table (+0x18, by button) gives it */
+    int lb = -1;
+    for (int i = 0; ch && i < NBTNS && lb < 0; i++) if (MR32(ch + 0x018u + 4u * (uint32_t)i) == ACT_LOOK_BACK) lb = i;
+    g_look_back_bound = lb >= 0;
+    if (lb >= 0 && look_back_held(s)) st[0x30 + lb] = 0x80;
     memcpy(buf, st, size < sizeof st ? size : sizeof st);
 }
+/* look.c: whether the pad has a button on Look Back (else the stick turns the view round to the rear) */
+int pad_look_back_bound(void){ return g_look_back_bound; }
+
+#ifdef __wasm__
+/* Convert a local browser seat using the SAME ranges and button mapping as
+ * the virtual DI pad. Copy Dev so one seat's trigger/POV history never
+ * changes another's. Bindings still run through the guest record converter. */
+int dipad_local_state(unsigned seat, uint8_t out[0x110]){
+    static int pov[6], triggers[6][2];
+    if (seat >= 6) return 0;
+    PadState state;
+    int split_read_local(unsigned, PadState *);
+    if (!split_read_local(seat, &state)) { pov[seat] = 0; memset(triggers[seat], 0, sizeof triggers[seat]); return 0; }
+    Dev *source = 0;
+    for (int i = 0; i < 4; ++i) if (g_dev[i].obj && !g_dev[i].gone && !g_dev[i].wheel){ source = &g_dev[i]; break; }
+    if (!source) return 0;
+    Dev local = *source;
+    local.pov1 = pov[seat];
+    memcpy(local.trig, triggers[seat], sizeof local.trig);
+    fill_state(out, 0x110, &local, &state);
+    pov[seat] = local.pov1;
+    memcpy(triggers[seat], local.trig, sizeof local.trig);
+    return 1;
+}
+#endif
 
 /* ---- front-end keystrokes ----------------------------------------------------------
  * Some front-end input exists only as characters from the window procedure
@@ -785,7 +856,7 @@ static struct { float v[3], t; } g_jh[JOLT_HIST];   /* velocity at world time t 
 static int g_jhn;
 static float g_jolt_age, g_jolt_logt;   /* world seconds since this car appeared; since the last speed line */
 static void ff_jolt(void){
-    uint32_t pl = mem_is_committed(0x8900acu + 3u) ? MR32(0x8900acu) : 0u;
+    uint32_t pl = mem_is_committed(SPLIT_PLAYERS_INDEX + 3u) ? MR32(SPLIT_PLAYERS_INDEX) : 0u;
     uint32_t car = pl && mem_is_committed(pl + 7u) ? MR32(pl + 4u) : 0u;
     float dt = MRF32(0x865154u);
     if (MR32(0x8654a4u) != 6u || !car || !mem_is_committed(car + 0x7bu)){ g_jolt_car = 0; g_jolt = 0; return; }
@@ -1018,6 +1089,8 @@ void dipad_effect_free(uint32_t obj){
 uint32_t dipad_call(CPU *c, uint32_t self, const char *nm, int nargs, const uint32_t *a){
     Dev *d = dev_of(self, 1);
     PadState s; gamepad_read(&s);
+    int split_menu_pad(PadState *);
+    split_menu_pad(&s);
     /* a controller of the other kind drives the pad (a wheel, and this is the
      * pad, or back): this device makes way for one of that kind */
     int other = s.connected && !!s.wheel != d->wheel;
@@ -1209,6 +1282,7 @@ void sub_00407750(CPU *c){
 #define WHEEL_STEERS 0.02f               /* |LX| from which the wheel is turned */
 void sub_005c1000_orig(CPU *c);
 void sub_005c1000(CPU *c){
+    if (MR32(c->esp + 4) >= 2){ c->eax = 0; c->zf = 1; POP32(c->eip); return; }
     uint32_t ret = MR32(c->esp);
     sub_005c1000_orig(c);
     if (ret != 0x0041dfeau || !(c->eax & 0xffu)) return;

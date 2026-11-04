@@ -81,6 +81,7 @@ export const KEYS: readonly KeyDef[] = [
   { key: 'hud', env: 'NFSU2_HUD', kind: 'enum', vals: 'wide|43|4:3', scope: 'web' },
   { key: 'movie_framing', env: 'NFSU2_MOVIE', kind: 'enum', vals: 'fit|fill|stretch', scope: 'web' },
   { key: 'cutscene_borders', env: 'NFSU2_CUTSCENE_BORDERS', kind: 'enum', vals: 'full|off', scope: 'web' },
+  { key: 'fov_scale', env: 'NFSU2_FOV_SCALE', kind: 'enum', vals: 'original|correct', scope: 'web' },
   { key: 'other_headlights', env: 'NFSU2_HEADLIGHTS', kind: 'enum', vals: 'players|all|off', scope: 'web' },
   // graphics options and frame-rate counter
   { key: 'graphics', env: 'NFSU2_GRAPHICS', kind: 'enum', vals: 'original|enhanced|custom', scope: 'mac' },
@@ -130,7 +131,8 @@ export const KEYS: readonly KeyDef[] = [
   { key: 'roam_rate', env: 'NFSU2_ROAM_RATE', kind: 'int', vals: '10..30', ic: true, scope: 'web' },
   { key: 'roam_delay', env: 'NFSU2_ROAM_DELAY', kind: 'int', vals: '0..1000', ic: true, scope: 'web' },
   { key: 'roam_extrap', env: 'NFSU2_ROAM_EXTRAP', kind: 'int', vals: '0..1000', ic: true, scope: 'web' },
-  { key: 'roam_carpool_kb', env: 'NFSU2_ROAM_CARPOOL_KB', kind: 'int', vals: '0..128000', ic: true, scope: 'web' },
+  // only the Mac app reads it: in the browser the game sizes the pool (runtime/roam_game.c)
+  { key: 'roam_carpool_kb', env: 'NFSU2_ROAM_CARPOOL_KB', kind: 'int', vals: '0..128000', ic: true, scope: 'mac' },
   // LAN play
   { key: 'network', env: 'NFSU2_NET', kind: 'enum', vals: 'lan|on|off', scope: 'web' },
   { key: 'lan_interface', env: 'NFSU2_NET_IFACE', kind: 'ifname', scope: 'mac' },
@@ -155,10 +157,15 @@ export const KEYS: readonly KeyDef[] = [
   { key: 'language', env: 'NFSU2_LANGUAGE', kind: 'enum', vals: LANGUAGES.join('|'), scope: 'web' },
   // the movies' subtitles (runtime/language.c).  Not in bundle.m's table either
   { key: 'subtitles', env: 'NFSU2_SUBTITLES', kind: 'bool', scope: 'web' },
+  // the EA Trax songs: the game folder's (a soundtrack mod's uncensored versions) or EA's own, which the I/O worker
+  // reads in their place (pfdata/original: io-worker.ts dataFile; the page fetches ahead only the ones picked:
+  // datacache.ts).  Not in bundle.m's table either
+  { key: 'songs', env: 'NFSU2_SONGS', kind: 'enum', vals: 'uncensored|original', scope: 'web' },
   // the player's horn, which the others hear too (runtime/horn.c).  Not in bundle.m's table either: NFSU2_HORN there
   { key: 'horn', env: 'NFSU2_HORN', kind: 'enum', vals: HORNS.join('|'), scope: 'web' },
-  // the menus' and HUD's textures: a texture pack in place of the game's (runtime/web/texrep_web.c; the page fetches
-  // ahead only the one picked: datacache.ts).  Not in bundle.m's table: the Mac's packs are "textures"
+  // the menus', HUD's and maps' textures: texture packs in place of the game's (runtime/web/texrep_web.c; the page
+  // fetches ahead only those picked: datacache.ts).  uhud also turns on the maps' pack (resolveEnv: NFSU2_MAP_TEXTURES).
+  // Not in bundle.m's table: the Mac's packs are "textures"
   { key: 'ui_textures', env: 'NFSU2_UI_TEXTURES', kind: 'enum', vals: 'original|uhud', scope: 'web', device: true },
   // the players this one blocks in free roam, by name (the page's hello to the server: net/index.ts).  Not in bundle.m's
   // table: the Mac's free roam has no hub
@@ -166,6 +173,12 @@ export const KEYS: readonly KeyDef[] = [
   // the career's hidden races on the map like the others (runtime/hiddenraces.c).  Not in bundle.m's table: there a
   // lower-case key, so it reaches the runtime as NFSU2_SHOW_HIDDEN_RACES all the same
   { key: 'show_hidden_races', env: 'NFSU2_SHOW_HIDDEN_RACES', kind: 'bool', scope: 'web' },
+  // the game's own textures without smoothing (only the page's renderer reads it: subsystems.ts, gpu/encoder.ts
+  // pointTex).  Not in bundle.m's table
+  { key: 'pixelated_textures', env: 'NFSU2_PIXELATED_TEXTURES', kind: 'bool', scope: 'web' },
+  // free roam's world map: the other players marked at most (runtime/roam_game.c map_update; phones 2048: device.ts).
+  // Not in bundle.m's table: the Mac's free roam has no hub
+  { key: 'roam_map_max', env: 'NFSU2_ROAM_MAP_MAX', kind: 'int', vals: '0..4096', ic: true, scope: 'web', device: true },
 ];
 
 /** strcasecmp's and toupper's folding: ASCII letters only (String.toLowerCase would also fold the Kelvin sign to 'k') */
@@ -219,6 +232,12 @@ export const TEMPLATE = `# NFSU2 settings, read at every launch.
 # with who says each line, where the server has its language pack.
 # [NFSU2_SUBTITLES]
 #subtitles = on
+
+# The EA Trax songs: uncensored = unedited, some in longer versions than
+# the game's (a soundtrack mod's); original = the versions the game shipped
+# with, where the server has them.  F7 plays the next song while you play.
+# [NFSU2_SONGS]
+#songs = uncensored
 
 # Sound output.  [NOSOUND, inverted]
 #sound = on
@@ -294,19 +313,29 @@ export const TEMPLATE = `# NFSU2 settings, read at every launch.
 # Cutscene letterbox bars: full = across the whole width; off = none.
 # [NFSU2_CUTSCENE_BORDERS]
 #cutscene_borders = full
+# 3D proportions: original = as the game drew them, about 10 % too wide
+# (round wheels look oval); correct = true proportions, with a little more
+# to the sides.  [NFSU2_FOV_SCALE]
+#fov_scale = original
 # Other cars' headlights on the road, as your own light it: players = your
 # friends' cars in free roam and the other players' in Online and LAN races;
 # all = every car, AI racers and traffic too; off = only yours, as in the
 # original game.  [NFSU2_HEADLIGHTS]
 #other_headlights = players
 
-# The menus' and the HUD's textures: original = the game's; uhud =
+# The menus', the HUD's and the maps' textures: original = the game's; uhud =
 # LunicAura106's Upscaled HUD (nfsmods.xyz/mod/4319): the menus, the race
 # HUD, the fonts and the car and brand logos redrawn at four times their
-# size, where this server has the mod's texture pack (a language pack's own
+# size, and JeansBig's Detailed Map (nfsmods.xyz/mod/4485): the minimap's
+# and the world map's maps redrawn at 2048x2048 with the missing shortcuts,
+# where this server has the mods' texture packs (a language pack's own
 # fonts stay; most phones' GPUs decode the larger textures into four times
-# the memory).  [NFSU2_UI_TEXTURES]
+# the memory; NFSU2_MAP_TEXTURES = original keeps the game's maps).
+# [NFSU2_UI_TEXTURES]
 #ui_textures = original
+# Textures without smoothing (point sampling), blocky like early PC games;
+# on overrides the game's Texture Filtering.  [NFSU2_PIXELATED_TEXTURES]
+#pixelated_textures = off
 
 # ---- Frame rate ----------------------------------------------------------
 
@@ -424,6 +453,9 @@ export const TEMPLATE = `# NFSU2 settings, read at every launch.
 # [NFSU2_ROAM_MAX_PLAYERS, NFSU2_ROAM_MAX_CARS]
 #roam_max_players = 49
 #roam_max_cars = 32
+# Other players marked on the world map at once (0 to 4096, the nearest; 2048
+# on phones).  [NFSU2_ROAM_MAP_MAX]
+#roam_map_max = 4096
 # on = the other players' cars are solid: drawn where they are now, and one
 # that appears on your car lets you through until you are apart.
 # off = Ghost mode for players: you drive through their cars, and they
@@ -434,8 +466,8 @@ export const TEMPLATE = `# NFSU2 settings, read at every launch.
 #roam_collide = on
 # Quick chat: say one of your sixteen set phrases to the players near you in
 # free roam, or to everyone in a multiplayer race, while driving and on its
-# results (1 to 4, then 1 to 4; a controller's right stick twice; the chat
-# button on a touch screen), and see theirs.  off = neither, and the others
+# results (1 to 4, then 1 to 4; a controller's right stick pressed in, then
+# flicked twice; the chat button on a touch screen), and see theirs.  off = neither, and the others
 # send you none in free roam.  [NFSU2_ROAM_SAY]
 #quick_chat = on
 # Your sixteen: the phrases' numbers (web/src/app/phrases.ts), four for each
@@ -450,10 +482,6 @@ export const TEMPLATE = `# NFSU2 settings, read at every launch.
 #roam_rate = 20
 #roam_delay = 100
 #roam_extrap = 250
-# The free-roam car memory pool in KB, raised for other players' cars (the
-# game's own is 11000; a value at or below it is ignored, as it would leave
-# no room for them).  [NFSU2_ROAM_CARPOOL_KB]
-#roam_carpool_kb = 48000
 `;
 
 /** The template's default for a key ("#key = value"), '' if the template leaves it empty or does not list it. */
@@ -855,7 +883,47 @@ export function resolveEnv(text: string | null, environment: Record<string, stri
   }
   for (const [k, v] of Object.entries(APP_DEFAULTS)) if (!(k in env)) { env[k] = v; source[k] = 'default'; }
   for (const [k, v] of Object.entries(host)) if (!(k in env)) { env[k] = v; source[k] = 'host'; }
+  // the maps' pack (TEXPACKS/detailed.pak) comes with the menus' and HUD's: ui_textures = uhud shows both.
+  // NFSU2_MAP_TEXTURES = original in settings.ini keeps the game's maps (a test knob)
+  const ui = (env.NFSU2_UI_TEXTURES ?? '').toLowerCase();
+  if (!('NFSU2_MAP_TEXTURES' in env) && ui && ui !== 'original') { env.NFSU2_MAP_TEXTURES = 'detailed'; source.NFSU2_MAP_TEXTURES = source.NFSU2_UI_TEXTURES; }
   return { env, source, notes, file, byEnv, other };
+}
+
+// ------------------------------------------------- the server's tally --
+
+/** kinds a report gives the value of (a switch as on/off, a choice, a number, a size) */
+const TOLD_VALUE: ReadonlySet<Kind> = new Set<Kind>(['bool', 'boolInv', 'enum', 'num', 'int', 'wxh']);
+/** kinds of the player's own words (a name, a room, crews, phrases, blocked players): a report says only "set" */
+const TOLD_SET: ReadonlySet<Kind> = new Set<Kind>(['name', 'room', 'text', 'crews', 'rgbs', 'phrases', 'sayGroups', 'names']);
+/** what the server takes as a value (web/server-rs src/app/settings_days.rs value_ok) */
+const TALLY_VALUE = /^[A-Za-z0-9:._+-]{1,24}$/;
+
+/**
+ * The settings a launch takes from settings.ini that differ from this device's defaults (`device`: deviceDefaults,
+ * else the template's), as "key=value" in the table's order: what the page tells the server at a day's first Play
+ * (page-id.ts seen), whose daily tally shows the operator what players change (web/server-rs src/app/settings_days.rs).
+ * A switch as on/off, a choice or number as it applies, the player's own words only as "set"; a setting the file
+ * gives by its variable's name (NFSU2_FPS = 30) as the setting.  Left out: the Mac's keys, the other kinds (LAN
+ * addresses and names, test lists), variables outside the table, and the page address's (a development server's).
+ */
+export function changedSettings(r: Resolved, device: Record<string, string> = {}): string[] {
+  const out: string[] = [];
+  for (const d of KEYS) {
+    if (d.scope !== 'web' || r.source[d.env] !== 'settings.ini') continue;
+    if (!TOLD_VALUE.has(d.kind) && !TOLD_SET.has(d.kind)) continue;
+    const v = r.env[d.env];
+    const def = checkSetting(d.key, device[d.key] ?? DEFAULTS.get(d.key) ?? '');
+    if (def?.ok && def.value === v) continue;
+    let told: string;
+    if (TOLD_SET.has(d.kind)) told = 'set';
+    else if (d.kind === 'bool' || d.kind === 'boolInv') told = (v === '1') === (d.kind === 'bool') ? 'on' : 'off';
+    else if (d.kind === 'wxh') told = v.replace(/\s+/g, '').toLowerCase();
+    else if (d.kind === 'num' || d.kind === 'int') told = Number.isFinite(Number(v.trim())) ? String(Number(v.trim())) : v.trim();
+    else told = lower(v);                            // an enum: "SCALE:0.75" is scale:0.75
+    if (TALLY_VALUE.test(told)) out.push(`${d.key}=${told}`);
+  }
+  return out;
 }
 
 // -------------------------------------------------------------- editing --

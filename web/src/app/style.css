@@ -429,7 +429,7 @@ summary:hover { color: var(--text); }
 .shot:hover { border-color: var(--lime); box-shadow: 0 0 12px var(--lime-glow); }
 .shot .kind { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
 .shot .kind { color: var(--edge); font: italic 700 14px/20px var(--font); }     /* a file the page cannot draw */
-/* cloud saves (vault-ui.ts): Enable cloud saving beside the heading, or when it last synced; the keyphrase in a value
+/* cloud saves (vault-ui.ts): Turn on beside the heading, or when it last synced; the keyphrase in a value
  * box, its first 3 characters shown and the rest as dots (a mask over the field, which keeps the real text, its caret
  * and selection) until the eye shows it; the actions as text under it */
 .vault .hint:empty { display: none; }
@@ -781,6 +781,8 @@ html:has(> body > .stage:not([hidden])) { overflow: hidden; }
   font-size: 14px; line-height: 20px; pointer-events: none;
 }
 /* the game's pause menu: what opens the page's menu, under the game's panel (pausehint.ts places it), as a toast */
+/* the site's address under the title screen's copyright (titlemark.ts): drawn there, placed and faded by the game's status */
+.title-mark { position: absolute; z-index: 1; pointer-events: none; user-select: none; }
 .pause-hint {
   position: absolute; z-index: 3; transform: translateX(-50%); width: max-content;
   padding: 8px 16px; border: 1px solid var(--line); border-radius: 8px; background: rgba(0, 0, 0, 0.8);
@@ -888,6 +890,13 @@ html:has(> body > .stage:not([hidden])) { overflow: hidden; }
 .drift-gain { display: flex; flex-direction: column; align-items: flex-end; gap: calc(5 * var(--u)); }
 .drift-gain b { color: #d8a020; }
 .drift-total, .drift-total b { color: #30cd30; }
+/* a drift battle's scoreboard (drift.ts) under it, the panel's rows: Time and its m:ss, then each player's place in
+ * italics, name and points, the player's own name green */
+.drift-board .drift-time b { color: #e8e8e8; }
+.drift-board .drift-who { gap: calc(8 * var(--u)); }
+.drift-board .drift-who i { font-weight: 700; color: #e8e8e8; width: calc(14 * var(--u)); }
+.drift-board .drift-who span { flex: 1; overflow: hidden; text-overflow: ellipsis; letter-spacing: 0.04em; color: #e8e8e8; }
+.drift-board .drift-who.me span { color: #30cd30; }
 /* the DRIFT counter (drift.ts): the drift event's, centred under free roam's arrow, the label over the points in big
  * italics: lime while a drift counts and when it banks, red (the drift event's) when a wall loses it; a banked or lost
  * one fades out */
@@ -1039,6 +1048,7 @@ svg.qc-watch { width: 1em; height: 1em; flex: none; margin-right: 0.3em; vertica
   padding: 10px; border-left: 0; border-radius: 10px; font-size: 14px; pointer-events: auto;
 }
 @media (max-width: 520px) { .qc-picker[data-mode="touch"] { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.qc-picker[data-mode="touch"] > .qc-title, .qc-picker[data-mode="touch"] > .qc-wait { grid-column: 1 / -1; }   /* (a line, not a column) */
 .qc-group { display: grid; gap: 6px; align-content: start; min-width: 0; }
 .qc-say {
   min-height: 40px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--field); color: var(--text);
@@ -1083,7 +1093,8 @@ svg.qc-watch { width: 1em; height: 1em; flex: none; margin-right: 0.3em; vertica
 .lobby-title { font-size: 1.1em; font-weight: 700; font-style: italic; text-transform: uppercase; letter-spacing: 0.02em; color: var(--lime); }
 .lobby-sub, .lobby-hint { color: var(--muted); font-size: 0.85em; }
 .lobby-why { margin-top: 0.4em; color: var(--muted); }
-/* its host made no input lately: the seconds until the lobby closes (lobby.ts away) */
+/* its host made no input lately: the seconds until the lobby closes (lobby.ts away); a lobby whose race's stage
+ * usually has much faster cars than ours (outpaced) */
 .lobby-warn { margin-top: 0.3em; font-size: 0.85em; font-weight: 700; color: var(--warn); }
 .lobby-places { list-style: none; margin: 0.5em 0 0; padding: 0; }
 .lobby-places li { display: flex; gap: 0.6em; align-items: baseline; padding: 0.12em 0; border-top: 1px solid rgba(255, 255, 255, 0.08); }
@@ -1092,6 +1103,8 @@ svg.qc-watch { width: 1em; height: 1em; flex: none; margin-right: 0.3em; vertica
 .lobby-n { width: 1em; text-align: right; color: var(--muted); }
 .lobby-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lobby-tag { font-size: 0.75em; text-transform: uppercase; color: var(--lime); }
+/* a race that counts in a player's career (lobby.ts places, career) */
+.lobby-star { color: var(--lime); }
 /* quick chat: what a player of the lobby said lately, beside their name (lobby.ts say) */
 .lobby-said { max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.9em; font-weight: 700; font-style: italic; color: var(--lime); }
 .lobby-act { display: flex; gap: 0.5em; align-items: center; margin-top: 0.6em; }

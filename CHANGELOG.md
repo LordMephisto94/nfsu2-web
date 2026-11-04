@@ -10,13 +10,33 @@ change, in plain text, as `- **Area:** what changed`, written for players. Left 
 bot, logs, tests, docs and cheat checks. A change that may or may not belong here is asked about before the release,
 not guessed.
 
-## 2026-11-03 (44c9024)
+## 2026-11-03 (a5892ba)
 
-- **Quick chat:** Countdown, a new phrase with a stopwatch (in the sixteen you start with, in One more?'s place, and under Special in Choose phrases): 5, 4, 3, 2, 1 and GO!, big in the middle of the picture for you and the players within 50 m, for a start in free roam.
-- **World map:** a spot where 16 or more players have been parked for a minute is a car meet (was 24).
-- **Free roam:** no outrun is offered in a crowd (4 or more other players within 25 m, as at a car meet); a challenge already made stands.
-- **Free roam:** with Ghost mode on Everything, other players' cars stay ghosts in an outrun too, as with Players. The tuner you race in an outrun stays solid.
-- **Free roam:** a hit with another player's car that throws yours farther than a hit can (the game loading, the car gone, the view broken) is undone: the two cars pass through each other instead.
+- **Split screen:** 2 to 4 players on one screen, each with their own controller: Split Screen in the main menu, after Quick Race. A port of mihaits' NFSU2-SplitScreen mod by BirdSentinel (Zack).
+- **Free roam:** lobby races count in your career, as Solo races do: win a race of your stage you haven't won yet, or finish one a friend or crew-mate wins. A star in the lobby shows whom a race counts for.
+- **Free roam:** a lobby warns you when its stage's cars are usually much faster than yours, and quitting a race costs more at stages 4 and 5.
+- **Free roam:** races start for everyone at once, about 10 seconds after the host's Enter (was 20 to 30), and no longer get stuck at the start for the host.
+- **Free roam:** a game file that won't open no longer stops friends' cars loading or hangs the way to the garage.
+- **Free roam:** at a race's marker, Join is picked where a lobby waits, and no second lobby opens beside one that isn't full.
+- **Free roam:** among many players, a car closing its trunk, hood or doors no longer freezes the game or stops it with error 134.
+- **Free roam:** friends' cars no longer run wide in bends.
+- **Free roam:** no outrun offers in a crowd (4 or more players within 25 m), and Ghost mode on Everything covers outruns too.
+- **Free roam:** a hit that throws a car impossibly far is undone.
+- **Free roam:** an open trunk shows its speakers and amps.
+- **Free roam:** drift battles: with drift mode on, challenge a player as for an outrun. The most drift points in 90 seconds wins $100 from the other.
+- **Drift mode:** on a controller, hold D-pad down a second while driving. The car no longer slides more after drift mode is off.
+- **Races:** other players' cars in Online, LAN and free-roam races keep to their line and point the right way, your game no longer speeds up and slows down to follow the host, and a car whose connection stalls drives on instead of stopping and jumping.
+- **Online:** Personal Stats show your new rating right after a ranked race.
+- **World map:** shows up to 4096 players (2048 on phones), and a car meet takes 20 parked players (was 24).
+- **Maps:** Upscaled (Settings, Game, Display) also shows JeansBig's Detailed Map: the minimap and world map sharp at high resolutions, with the missing shortcuts.
+- **Quick chat:** a Countdown phrase: 5, 4, 3, 2, 1, GO! on screen for everyone within 50 m.
+- **Music:** Settings, Game, Songs: Original plays the EA Trax songs as the game shipped them, in place of the uncensored ones, and F7 skips to the next song.
+- **Controllers:** the right stick looks around the car while driving (straight down looks back), and a click of it opens quick chat. If you steer or brake with the right stick in the game's controls, the left stick looks around instead.
+- **Steering wheels:** Fanatec bases get their own layouts, and separate USB pedals of any make work with a wheel.
+- **Graphics:** Enhanced Contrast no longer draws flickering lines along the screen's edges, and is as sharp as the original.
+- **Photo mode:** the camera reaches twice as far.
+- **Phones:** Android phones whose graphics driver can't show the game now say so, instead of asking to press Play again.
+- **Start page:** Safari before 26 is told to update, and the page says when an antivirus or network blocks the game.
 
 ## 2026-11-02 (d4fa27f)
 
