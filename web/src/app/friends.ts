@@ -15,7 +15,9 @@
 // - FriendsApi: /friends, asked with the keyphrase's token (claim.ts NameClaims does the same for /names).
 import type { GameSession } from './game';
 import { touchFirst } from './device';
+import { gameHas, KEY_FRIEND } from './gamekeys';
 import { t } from './i18n';
+import { keyName, siteKey } from './sitekeys';
 import { pageDialog } from './padnav';
 import { onlineName } from './claim';
 import { roomHash } from './players';
@@ -363,9 +365,10 @@ export class FriendPrompt {
   }
 
   private key(e: KeyboardEvent) {
-    if (e.code !== 'KeyF' || e.metaKey || e.ctrlKey || e.altKey || !this.actionable()) return;
+    if (e.code !== siteKey('friend') || e.metaKey || e.ctrlKey || e.altKey || !this.actionable()) return;
     const el = e.target as HTMLElement | null;
-    if (el?.closest?.('input, textarea, select') || pageDialog()) return;
+    // (a control of the game's the player put on F: the game's alone, gamekeys.ts; a click on the line still adds)
+    if (el?.closest?.('input, textarea, select') || pageDialog() || gameHas(this.session, KEY_FRIEND)) return;
     e.preventDefault(); e.stopImmediatePropagation();
     if (!e.repeat) this.act();
   }
@@ -388,7 +391,8 @@ export class FriendPrompt {
     const w = this.who, b = this.root;
     if (!w || w.st === 'wait') { b.hidden = true; return; }
     const kbd = (k: string) => { const e = document.createElement('kbd'); e.textContent = k; return e; };
-    const offer = this.actionable(), key = offer && !touchFirst() ? [kbd('F')] : [];
+    const fk = siteKey('friend');                   // (the player's key for it: sitekeys.ts, F by default)
+    const offer = this.actionable(), key = offer && fk && !touchFirst() && !gameHas(this.session, KEY_FRIEND) ? [kbd(keyName(fk))] : [];
     const text = (s: string) => Object.assign(document.createElement('span'), { textContent: s });
     const line = (s: string) => b.replaceChildren(personIcon(offer ? PERSON_PLUS : PERSON), ...key, text(s));
     switch (w.st) {
@@ -507,6 +511,8 @@ export class FriendsPanel {
     const say = (text: string, warn: boolean) => { this.addNote = { text, warn }; };
     if (done === 'asked') say(t('Friend request sent to {name}', { name: shown }), false);
     else if (done === 'friends') say(t('You and {name} are friends', { name: shown }), false);
+    // (the server says "claim" for this player's own name too: its claim gone since the list was drawn)
+    else if (done === 'claim' && !r?.me) say(t('Claim your name (Online, Your name) to add friends.'), true);
     else if (done === 'claim') say(t('{name} has no claimed name, so can\'t add friends yet', { name }), true);
     else if (done === 'self') say(t('That\'s your own name'), true);
     else if (done === 'name') say(t('Not a player\'s name'), true);

@@ -73,6 +73,10 @@
  *     game it runs on its own physics until a state from after the hit
  *     comes (as the game showed hits), and with no state for STALL_S on its
  *     own too, with its owner's last controls, then glides back.
+ * Since 2026-11-04 a game of this version sends its own car to every racer
+ * itself, every frame, and draws the others' from those (racecars.c, called
+ * from sub_005f8af0 below); the way above stays for the car of a racer whose
+ * game is older (none of those come), and the fade for every car.
  * NFSU2_RACE_SMOOTH=0 turns all of it off (the game's own, for A/B tests);
  * NFSU2_RACE_DIRECT=0 only the states straight from their games,
  * NFSU2_RACE_FADE=0 only the fading, NFSU2_RACE_RATE=0 the game's rates,
@@ -174,6 +178,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <time.h>
 
 #define G_FLOW       0x008654a4u   /* 6: in the world */
@@ -201,6 +206,12 @@
 #define FS_N         (16 + NAME_N)
 #define NAME_N       16
 #define NCARS        8
+/* a car's jump right after a wait of over STALL_US for its states (within STALL_AFTER_US of the state that ended it)
+ * is what a stall does, up to what a car drives meanwhile (STALL_MPS a second of the wait): the race's report
+ * (racenet_jump) counts only the rest of it (a player who holds its states back, then teleports: still a jump) */
+#define STALL_US       1000000u
+#define STALL_AFTER_US 500000u
+#define STALL_MPS      100.f
 #define NLINKS       16
 #define SLOW_US      50000u        /* a frame longer than this is a stall */
 /* the car states (above) */
@@ -269,6 +280,11 @@ int vlan_rt_send(uint16_t port, uint32_t ip_h, const void *p, int n);
 int vlan_race_peers(uint32_t *ip_h, int max, uint32_t within_ms);
 int vlan_race_sent_to(uint32_t ip_h, uint32_t within_ms);
 __attribute__((weak)) int vlan_race_links(RaceLink *o, int max, int reset){ (void)o; (void)max; (void)reset; return 0; }
+/* racecars.c: the other cars as free roam sends and shows them, where their games send them */
+int  racecars_pre(uint32_t car);
+int  racecars_step(CPU *c, uint32_t ctl, uint32_t car);
+void racecars_frame(CPU *c);
+void racecars_log(double secs);
 
 static int ok(uint32_t a, uint32_t n){ return a && mem_is_committed(a) && mem_is_committed(a + n); }
 static uint32_t rd32(uint32_t a){ return ok(a, 3) ? MR32(a) : 0u; }
@@ -304,6 +320,9 @@ typedef struct {
     uint32_t car; char name[NAME_N];
     uint32_t n, direct, g100, g250, g500; uint64_t first, last, gap_max;
     Jumps shown, game;                                /* as drawn, and as the game had it */
+    uint64_t gap_last, gap_at;                        /* the wait before its last state, and when that came */
+    float jump;                                       /* its largest jump as the game had it, not after a stall
+                                                       * (racenet_jump: the race's report to the server) */
     uint32_t faded, kept;                             /* corrections faded, and shown (over FADE_MAX) */
     uint32_t unhit;                                   /* far "hits" passed (sub_005f8d40) */
     float age_min, age_max; double age_sum;           /* its states' age by our race clock (s) */
@@ -533,6 +552,7 @@ void sub_005f8900(CPU *c){
         if (e->n){
             uint64_t g = t - e->last;
             if (g > e->gap_max) e->gap_max = g;
+            e->gap_last = g; e->gap_at = t;
             e->g100 += g > 100000u; e->g250 += g > 250000u; e->g500 += g > 500000u;
         } else e->first = t;
         if (ok(st, ST_TIME + 4u)){                        /* the state's age by this game's race clock */
@@ -596,6 +616,21 @@ static void list_send(void){
         m[6] = (uint8_t)k;
         vlan_rt_send(HORN_PORT, peers[i], m, 8 + 4 * k);
     }
+}
+/* the other racers' addresses (racecars.c sends them our car): the creator's
+ * joiners (the race peers its race link sends to), a joiner's creator (the
+ * one its race link sends to) and the others on the creator's list */
+int racenet_race_peers(uint32_t *ip, int max){
+    uint32_t all[16];
+    int na = vlan_race_peers(all, 16, PEER_MS), n = 0;
+    for (int i = 0; i < na && n < max; i++) if (vlan_race_sent_to(all[i], PEER_MS)) ip[n++] = all[i];
+    if (!is_host() && g_pl.n && ms_now() - g_pl.at <= PL_STALE_MS)
+        for (uint32_t k = 0; k < g_pl.n && n < max; k++){
+            int dup = 0;
+            for (int j = 0; j < n; j++) dup |= ip[j] == g_pl.ip[k];
+            if (!dup) ip[n++] = g_pl.ip[k];
+        }
+    return n;
 }
 /* an N2PL from the horn's port (racehorn.c): only from the race's creator,
  * an address the game's race link sends to, and the first one in this race
@@ -826,8 +861,10 @@ void sub_005f8af0_orig(CPU *c);
 void sub_005f8af0(CPU *c){
     uint32_t ctl = c->ecx, car = ok(ctl, 0x1a0u) ? rd32(ctl + CTL_CAR) : 0;
     Pred *p = car && (predict_on() || stall_s() > 0.f) && in_race() ? pred_of(car, 0) : 0;
-    int reset = p && MR8(ctl + CTL_RESET);
+    int reset = p && MR8(ctl + CTL_RESET), fed = car && racecars_pre(car);
     sub_005f8af0_orig(c);
+    /* its own game sends it (racecars.c): drawn there; this way starts anew if those stop */
+    if (fed && racecars_step(c, ctl, car)){ if (p){ p->shown = 0; p->own = 0; } return; }
     if (!p || !p->n || !ok(car, 0x9e0) || !ok(ctl + CTL_BLEND, 0x50u)) return;
     float h = MRF32(G_WORLDDT);
     if (!(h > 0.f && h < 0.25f)) h = 0.f;
@@ -1159,11 +1196,11 @@ static void end(uint64_t t){
         double span = e->n > 1 ? (double)(e->last - e->first) / 1e6 : 0.;
         fprintf(stderr, "[racenet]   car %s: %u updates (%.1f/s, %u straight from their game), longest wait %.0f ms, "
                 "waits over 100/250/500 ms %u/%u/%u, jumps over 0.5 m %u, over 2 m %u (largest %.1f m), "
-                "as the game had them %u/%u (largest %.1f m), corrections faded %u, shown %u, far \"hits\" passed %u, "
-                "its states %.0f ms old by our race clock (%.0f to %.0f)",
+                "as the game had them %u/%u (largest %.1f m; %.1f m past a stall's), corrections faded %u, shown %u, "
+                "far \"hits\" passed %u, its states %.0f ms old by our race clock (%.0f to %.0f)",
                 e->name[0] ? e->name : "-", e->n, span > 0 ? (e->n - 1) / span : 0., e->direct, (double)e->gap_max / 1000.0,
                 e->g100, e->g250, e->g500, e->shown.jumps, e->shown.big, (double)e->shown.max,
-                e->game.jumps, e->game.big, (double)e->game.max, e->faded, e->kept, e->unhit,
+                e->game.jumps, e->game.big, (double)e->game.max, (double)e->jump, e->faded, e->kept, e->unhit,
                 e->n ? e->age_sum / e->n * 1000.0 : 0., (double)e->age_min * 1000.0, (double)e->age_max * 1000.0);
         Fps *f = 0;
         for (int j = 0; j < NCARS && e->name[0]; j++) if (!strcmp(g_fps[j].name, e->name)) f = &g_fps[j];
@@ -1172,12 +1209,13 @@ static void end(uint64_t t){
                                f->slow, f->longest_ms, f->clock / f->n);
         else fprintf(stderr, "; their frame rate unknown (an older version)\n");
     }
+    racecars_log(s);
     R.on = 0;
 }
 
-/* a car's place this frame into its jumps (racenet_frame) */
-static void jumps_add(Jumps *j, const float *p, uint64_t dt, float step){
-    float d[3];
+/* a car's place this frame into its jumps (racenet_frame): the jump's length when this frame began one (m), else 0 */
+static float jumps_add(Jumps *j, const float *p, uint64_t dt, float step){
+    float d[3], got = 0.f;
     for (int i = 0; i < 3; i++) d[i] = p[i] - j->p[i];
     if (j->have > 1 && dt && j->step > 0.f){
         float s = step / j->step, x2 = 0;
@@ -1186,10 +1224,12 @@ static void jumps_add(Jumps *j, const float *p, uint64_t dt, float step){
         int jump = __builtin_isfinite(x) && x > 0.5f;
         if (jump && !j->jumped){ j->jumps++; j->big += x > 2.f; }
         if (jump && x > j->max) j->max = x;
+        if (jump && !j->jumped) got = x;   /* (a jump's next frame, back to the car's own move, differs as much) */
         j->jumped = jump;
     }
     if (j->have) memcpy(j->d, d, sizeof d);
     memcpy(j->p, p, sizeof j->p); j->step = step; j->have += j->have < 2;
+    return got;
 }
 
 /* every frame, on the game thread (roam.c's main-loop hook) */
@@ -1203,6 +1243,7 @@ void racenet_frame(CPU *c){
     clock_frame();
     if (racing && !R.on) begin(t, me);
     else if (!racing && R.on) end(t);
+    racecars_frame(c);                               /* (after end: its lines first) */
     /* the creator's list of the joiners, the cars drawn (also once our own
      * player is through: the others still race) */
     if (direct_on() && is_host() && in_race() && ms_now() - g_pl_sent >= PL_MS){ g_pl_sent = ms_now(); list_send(); }
@@ -1249,7 +1290,11 @@ void racenet_frame(CPU *c){
         float sp[3], gp[3];
         memcpy(sp, e->shown.p, sizeof sp); memcpy(gp, e->game.p, sizeof gp);
         jumps_add(&e->shown, p, dt, step);
-        jumps_add(&e->game, g, dt, step);
+        float x = jumps_add(&e->game, g, dt, step);
+        /* (the race's report: a jump right after a wait of over STALL_US is the car shown where it went meanwhile, as
+         * far as a car drives in that time) */
+        if (x > 0.f && e->gap_last > STALL_US && t - e->gap_at < STALL_AFTER_US) x -= STALL_MPS * (float)e->gap_last / 1e6f;
+        if (x > e->jump) e->jump = x;
         if (trace){
             float ds = 0, dg = 0, o = 0;
             for (int i = 0; i < 3; i++){ ds += (p[i] - sp[i]) * (p[i] - sp[i]); dg += (g[i] - gp[i]) * (g[i] - gp[i]); o += (p[i] - g[i]) * (p[i] - g[i]); }
@@ -1275,4 +1320,33 @@ void racenet_frame(CPU *c){
         send_all(m, 0);
         R.w0 = t; R.wframes = 0; R.wslow = 0; R.wlongest = 0;
     }
+}
+
+/* the largest jump of the car of the player named so (its LAN name) in the race just raced, as our game had it, not
+ * right after a stall (m; 0: none, or no such car) */
+/* NFSU2_TEST_JUMP=<name>:<m> or <name>/<m> (tests, with NFSU2_INPUT_SCRIPT only; roam-pair splits its options at
+ * ':'): that player's car jumped so far */
+static float test_jump(const char *name){
+    const char *tj = getenv("NFSU2_TEST_JUMP"), *sc = getenv("NFSU2_INPUT_SCRIPT"), *c = tj ? strpbrk(tj, ":/") : 0;
+    if (c && sc && sc[0] && (size_t)(c - tj) == strlen(name) && !strncasecmp(tj, name, (size_t)(c - tj))) return (float)atof(c + 1);
+    return 0.f;
+}
+float racenet_jump(const char *name){
+    if (!name || !name[0]) return 0.f;
+    float t = test_jump(name);
+    if (t > 0.f) return t;
+    for (int i = 0; i < NCARS; i++) if (g_car[i].car && !strcasecmp(g_car[i].name, name)) return g_car[i].jump;
+    return 0.f;
+}
+float racenet_farthest(char name[16]){
+    float far = 0.f; int at = -1;
+    for (int i = 0; i < NCARS; i++){
+        Car *e = &g_car[i];
+        if (!e->car || !e->name[0]) continue;
+        float j = test_jump(e->name);
+        if (!(j > 0.f)) j = e->jump;
+        if (j > far){ far = j; at = i; }
+    }
+    if (name) snprintf(name, 16, "%s", at >= 0 ? g_car[at].name : "");
+    return at >= 0 ? far : 0.f;
 }

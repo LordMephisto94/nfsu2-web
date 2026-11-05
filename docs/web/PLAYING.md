@@ -114,7 +114,8 @@ While you drive:
 | Alt | Nitrous |
 | Space | Handbrake |
 | Left Shift, left Ctrl | Gear up, gear down (manual gearbox) |
-| C, B | Camera, look back |
+| C, B | Camera (the game's four views, then the drift races' camera, in every drive), look back |
+| G | Headlights: a tap turns them off, or back on; held, high beam (brighter, reaching farther) until you let go. Friends in free roam see it, so you can flash your lights at them. On a controller the right stick straight up (see Controller below). Another key, or none, in Controls, Site |
 | R | Respawn |
 | H, J | Hydraulics, with the Hydraulics part (Car Specialties): hold H to pressurize or J to bounce, then the arrows pick the corners; under 10 mph; on a touch screen the Pressurize and Bounce buttons |
 | N | Horn (free roam and races with other players) |
@@ -137,7 +138,14 @@ The start page shows these keys under **Controls**, and F9, Controls shows them 
 - **Change the keys:** in the game, Options, Controls. It opens on Keyboard Configuration; Up to that title, then
   Right, is Joypad Configuration, the controller's buttons. The game lists a controller once it has seen it: press a
   button on it before opening Controls. A controller's buttons are kept with the profile (leaving Options saves them),
-  the keys for every profile. The horn stays on N (the game has no horn of its own).
+  the keys for every profile. The site's own keys and buttons (drift mode, the trunk, the horn, the headlights, quick
+  chat's controller button, messages, friends, photo mode, the page menu, the next song, the counter) are set on the
+  start page, Controls, Site: click one, then press the new key or controller button, or pick Off (the page menu
+  always has a key, and Home). Keys the game itself uses can't be picked; one of the game's controls you put on one of
+  the site's keys in the game's Controls takes it: the site's control leaves it to the game, and Site says so. D-pad
+  down and the stick clicks with the game's own controls on them as it comes (Career Status, hydraulics) are shared as
+  before: a short press, and a car with hydraulics, stay the game's. The touch controls' Drift and Horn work whatever
+  keys those have.
 - **Drift mode (X):** in free roam, the car handles as in the game's drift races (their handling and drift assist,
   with your car's Drift tuning from Performance Tuning / Dyno in the crib; the other modes' tuning is back when drift
   mode is off), but your nitrous stays (the drift races have none; X neither empties nor fills it). The camera is the
@@ -176,6 +184,8 @@ The start page shows these keys under **Controls**, and F9, Controls shows them 
   game's own look back, as B (whatever button you bound to it). If you steer, accelerate or brake with the right
   stick (the game's Options, Controls, Joypad Configuration), the left stick looks round instead, as long as the game
   uses nothing of it (no steering or pedal, no direction bound to a control); if it does, neither stick looks round.
+  The stick that looks round, pushed straight up, is the headlights (G): a flick up turns them off or back on, held up
+  is high beam until you let go.
   In free roam and in races with other players a click of the right stick is quick chat, hydraulics or not (J still
   bounces): it shows the four groups, a flick picks one, another its phrase, and a second click closes it. With the
   right stick steering or on a pedal, its click stays the game's (bounce), and 1 to 4 open quick chat. In the
@@ -212,9 +222,23 @@ The start page shows these keys under **Controls**, and F9, Controls shows them 
   gets no controller input. A stick pressed in alone reaches the game a moment later (0.12 s), so the shortcut never
   honks or works the hydraulics.
 - **Split screen:** the main menu's item after Quick Race. Pick 2, 3 or 4 players and the race, then each player
-  presses START on their own controller (one player may press Enter and drive on the keyboard) and picks a car. Every
-  player gets their own view, HUD, minimap and camera; player 1's controller works the results and Post Race menu.
-  Each view is a whole scene, so 3 or 4 players need a fast computer.
+  presses START on their own controller and picks a car. Every player gets their own view, HUD, minimap and camera;
+  player 1's controller works the results and Post Race menu. Each view is a whole scene, so 3 or 4 players need a
+  fast computer.
+- **Two players on one keyboard** (split screen): one presses Enter to join, the other Space. Alone on the keyboard,
+  a player has all of it (arrows or WASD, Shift nitrous, Space handbrake, E and Q gears, C camera, B look back).
+  With two, the keyboard is shared:
+
+  | | Enter's player | Space's player |
+  |---|---|---|
+  | Steer, gas, brake | arrows | A and D, W, S |
+  | Nitrous | Right Shift | Left Shift |
+  | Handbrake | Right Ctrl or / | Space |
+  | Gear up, gear down | . and , | E and Q |
+  | Camera, look back | L and ; | C and B |
+
+  These keys stay as they are (Options, Controls does not change them). Many laptop and cheap keyboards cannot see
+  every key two players hold at once: a key can drop out for a moment. Gaming keyboards can.
 - **Rumble:** a controller that can rumble in Chrome (Xbox, DualSense and others) shakes when you crash, scrape a
   wall or land hard. Controls, Controller, Rumble turns it off. Firefox has no rumble.
 - **Sound** starts with the Play click. If the browser still keeps it off, a note says so, and a click on the game or
@@ -235,20 +259,23 @@ that room.
 
 | Where | Settings |
 |---|---|
-| Online | free roam with others, your name (in free roam and online), your horn, room, ghost mode (off, players or everything), players' cars shown (16, 24, 32, 40 or 48; computers start at 32, phones at 16, tablets at 24), quick chat and your phrases; more: the game's Online mode (on by default) |
+| Online | free roam with others, your name (in free roam and online), your horn, room, ghost mode (off, players or everything), players' cars shown (16, 24, 32, 48 or 64; computers start at 32, phones at 16, tablets at 24), quick chat and your phrases; more: the game's Online mode (on by default) |
 | Friends & crews | crews (with their colours), and your friends (once your name is claimed) |
 | Game, Game | language, movies, subtitles, songs (uncensored or original), autosave; more: show hidden races, startup movies (skippable, original or off), sound, pause or keep running in the background, sound output latency, highest graphics for a new save |
 | Game, Display | full screen on Play (off: the game plays in the browser window; on by default on phones), resolution scale (phones start at 75%, 100% once one shows it has the room), frame rate (auto follows the screen: 120 on a 120 Hz display, 240 on a 240 Hz one; 30, 60, 120 or 240, where 30 keeps a phone that cannot hold 60 steady; Online and LAN races at most 120); more: menus, HUD and maps (original or upscaled), HUD layout (wide, or 4:3 as phones start), movie framing, cutscene bars, 3D proportions (original, as the game drew them about 10 % too wide, or corrected: round wheels, a little more at the sides), other cars' headlights (players, all cars, off), frame-rate counter, fixed render size, pixel limit |
 | Controls, Controller | rumble; more: controller (on, hotplug or off), menu buttons, dead zones, trigger full press |
 
 - **Language:** English, French, German, Italian, Spanish, Dutch, Swedish, Danish, Korean, Chinese, Japanese, Russian,
-  Thai, Portuguese (Brazil), Polish, Turkish, Hungarian or Ukrainian, for the menus and all the game's text. Where the
-  server has the language packs, French, German, Italian, Spanish, Japanese and Russian also play with
-  their dubbed voices and movies, Chinese, Japanese and Thai with their full text, and Russian, Portuguese, Polish,
-  Turkish, Hungarian and Ukrainian with their text at all. Without the packs those six play in English, and the other
+  Thai, Portuguese (Brazil), Polish, Turkish, Hungarian, Ukrainian, Czech, Slovak or Greek, for the menus and all the
+  game's text. Where the server has the language packs, French, German, Italian, Spanish, Japanese and Russian also play
+  with their dubbed voices and movies, Chinese, Japanese and Thai with their full text, and Russian, Portuguese, Polish,
+  Turkish, Hungarian, Ukrainian, Czech, Slovak and Greek with their text at all. Without the packs those nine play in English, and the other
   languages with English voices and movies. Your browser fetches only your language's files: the dubbed voices are
   about 50 MB (Russian 94 MB), and the dubbed movies are smaller than the English ones they replace. Hungarian's
-  text writes ő and ű as õ and û, as its translation does: the game's fonts have no ő or ű. The start page follows the
+  text writes ő and ű as õ and û, as its translation does: the game's fonts have no ő or ű. Czech's writes č, ř, š and
+  the other letters with the caron as c, r, s ..., as its translation does, for the same reason; Slovak's has every
+  letter, with the fonts its translation brings, and Greek's with Greek letters added to the game's fonts. The start
+  page follows the
   same choice (the list at its top sets it too): its text, settings and messages in that language, English until you
   pick another.
   Its problems and errors carry a short code (`GPU-ADAPTER-WIN`), the same in every language, to quote when you ask
@@ -312,6 +339,13 @@ that room.
   (11 outrun wins in stage 5) comes only before the last URL race. Once you have beaten Caleb, the shops have all of
   them for every car in your career, as the original game's ending has them in Customize mode, whose cars free roam
   never drives. The unique performance parts stay one per stage.
+- **Special vinyls:** the Graphics Shop's vinyls have a Special category after Sponsor, with the game's promo vinyls
+  (Snoop Dogg, Capone, Chingy, The Doors, David Choe, D3, Japan Tuning, Shinestreet, Street Reaper), for the cars that
+  have them. The game hid them. They are free, open at the stages the game gives them (2 and 3), and add nothing to
+  the visual rating.
+- **Quick Race:** Laps go from 1 to 127 and Opponents up to 5 in every race but drags, which keep the game's 3. With
+  Lap KO on, both can still be changed: it starts at 5 laps and 5 opponents, with at least 1 opponent. In every
+  race, a race of one lap shows Completed and a percent in place of LAP 1/1, as sprints do.
 - **Power Units:** the game's Options, Gameplay (also in the pause menu's) has a row after Speedometer Units: the
   engine's power in bhp or kW wherever the game shows it (the dyno, the performance shop's parts), whatever the
   speedometer shows. Until you change it, it follows Speedometer Units, as in the original game (kW with km/h).
@@ -368,8 +402,9 @@ that room.
   - The server keeps the copy of an earlier day too: "Go back to ..." brings it back when a day went wrong.
   - Your passphrase can also claim your name (**Online, Your name**: no one else plays under it; see "Your name is
     yours" under Online), so in another browser your name comes back with your saves.
-  - Stop syncing leaves the saves where they are, and the passphrase in the box; Delete from cloud deletes them on the
-    server (your browsers keep theirs), and frees the name it claimed. A passphrase nobody used for two years is
+  - Stop syncing leaves the saves where they are, and the passphrase in the box (your claimed name stays the
+    passphrase's: without it, this browser plays it with digits); Delete from cloud deletes them on the server (your
+    browsers keep theirs), and frees the name it claimed for anyone to claim. A passphrase nobody used for two years is
     deleted from the server. A browser
     whose passphrase the server no longer has keeps it and sends nothing; Sync now looks again and offers to send its
     saves there.
@@ -435,19 +470,21 @@ Good to know:
   of that game, and when the server is full as you press Play the start page asks whether to wait in line or play
   offline (or, the first time, says so in its free-roam question). The server pairs each player with the players
   nearest to them, as many as their game shows cars (fewer while it is busy, 8 at the least): 32 on computers, 24 on
-  tablets and 16 on phones, or what you pick (Online: Players' cars shown: 16, 24, 32, 40 or 48; more cars can lower
-  the frame rate). Their names show
+  tablets and 16 on phones, or what you pick (Online: Players' cars shown: 16, 24, 32, 48 or 64; more cars can lower
+  the frame rate). Since 5 November (pending release) you get the cars of your nearest players even where they show
+  fewer than you: their game sends you their car without showing yours, and their car lets yours through (no outrun
+  or race invite between the two). Their names show
   over the cars within 100 m, and each gets an arrow on the minimap when it is near and a marker on the world map (M),
   in the game's orange. The game's own outrun challengers are grey on both (the legend's Opponent Car too), so you can
   tell them from players. The minimap also has an arrow, the same as a car's, for the players near you whose cars
   your game does not show (the nearest 64 within its reach, from the server four times a second), so a crowd looks
   as big as it is; theirs are left out at the minimap's edge, where the cars' arrows point the way. The world map
-  also marks the other players in free roam, the nearest 2048 past those
+  also marks the other players in free roam, the nearest 4096 past those (2048 on phones)
   32, and while it is open every marker moves smoothly with its player. Its legend (the list on the
   map's left) has three rows of ours after the game's: **Players**, **Players' races** and **Car meets**. Pick one with
   Up or Down and Enter crosses it out, as with the game's own rows: the map then leaves out the other players' markers
   (a crew-mate's stays), the players' race lobbies (yours stays) or the meets until you tick it again, and the game
-  remembers it. A spot where 16 or more players have been parked for a minute is a car meet: a green star and "Meet:"
+  remembers it. A spot where 20 or more players have been parked for a minute is a car meet: a green star and "Meet:"
   with its number of cars on the world map (the new career's start doesn't count). Picking the Car meets row picks
   the nearest meet, Left or Right the next, and C starts the GPS there; it stops when you arrive. A player in a
   race, a shop or the menus is not in your free roam: no car, no arrow, no marker until they are back. A player farther than 300 m
@@ -489,7 +526,8 @@ Good to know:
   Each player's horn is also pitched a little differently by their name, so two players with the same horn sound
   apart. It sounds while the game runs, not in the pause menu or on the map. It works in Online and LAN races too.
   How loud the horns are (yours and the others'): the game's Options, Audio, Horn Volume, also in the pause menu's
-  Options, from 10 % to 100 % (the most, and the default). Moving it sounds your horn at the new volume.
+  Options, from 10 % to 100 % (the most, and the default), times the game's Master Volume, as for the game's own
+  sounds (none with Master Volume at 0). Moving it sounds your horn at the new volume.
 - **Quick chat:** say one of your sixteen set phrases to the players near you. There is no typing, so there is nothing
   to read that someone made up, and everyone reads a phrase in their own language. Press 1 to 4 for a group, then 1 to
   4 for its phrase; on a controller, press the right stick in, flick it (up, right, down, left) for a group, then
@@ -781,8 +819,11 @@ Good to know:
   or another player's. **Claim** there claims it with your passphrase (the one of your cloud saves), after a check from
   Cloudflare that a person, not a script, claims it (usually it passes by itself). Without a passphrase, Claim makes
   one and turns cloud saves on, then shows it to keep: it is the only way to play under the name again, in another
-  browser or after this browser's data is cleared, and the only way back to your saves. With a passphrase, Play
-  claims a free name by itself; Cloudflare's check shows only when it wants a click.
+  browser or after this browser's data is cleared, and the only way back to your saves. With a passphrase that has
+  no name yet, Play claims a free name by itself; Cloudflare's check shows only when it wants a click.
+  - One name: once your passphrase holds a name, you always play as it, whatever Your name says. Another name you
+    type there is played only after **Change name**, and the line under Your name says which name you play as. With
+    the box empty, you play as your claimed name too.
   - While it is yours nobody else plays under it: in the Online menu and in free roam they get your name with four
     digits added (`Alex` becomes `Alex4821`; a name longer than 11 characters loses its end to them), the same
     digits each time for their browser. If someone was online under it before you came, the lobby gives it back to
@@ -790,10 +831,11 @@ Good to know:
   - It stays yours as long as your passphrase does: until you delete your cloud saves, or they go unused for two
     years. In another browser, load your passphrase under Cloud saves and the name is yours there too.
   - One name a passphrase. **Change name** (type another name) changes it once a week; the old name stays yours for
-    14 more days, and your EA Messenger friends move to the new one (their lists show it).
+    14 more days, and your friends move to the new one (their lists show it).
   - `NAME`, the game's default profile name, and `Player` can't be claimed: Play asks once for a name of your own,
     and until you pick one you play as `NAME` with your four digits. A name another player claimed: Play asks once
-    for another, and you play as it with your digits until then. Neither applies offline or with the network off.
+    for another, and you play as it with your digits until then. Neither applies offline or with the network off, nor
+    with a claimed name of your own (you play as that one).
   - A name that reads as a slur can't be claimed (the rules below).
   - Without a claim your name is anyone's: whoever is online under it first keeps it (the others get digits), and
     EA Messenger keeps no lists for it: your friends, blocked players and requests last until you leave Online.
@@ -856,14 +898,15 @@ Good to know:
 | What you see | What to do |
 |---|---|
 | "Secure, isolated page" on another PC, `PAGE-NOT-SECURE` | Open the server's `https://` address, not `http`. Only `localhost` works without HTTPS. |
-| `PAGE-NOT-ISOLATED` ("not cross-origin isolated"), and with it `MODULE-NOT-ISOLATED` | The page is not opened from the game's server, or something in the browser changes it on the way, most often an extension. A guest or private window shows whether that is it (its saves are gone when it closes); then, in a normal window, turn the extensions off one by one. |
+| `PAGE-NOT-ISOLATED` ("Something in this browser changes the page"; before 4 November "not cross-origin isolated"), and with it `MODULE-NOT-ISOLATED` | The page is not opened from the game's server, or something in the browser changes it on the way, most often an extension. A guest or private window shows whether that is it (its saves are gone when it closes); then, in a normal window, turn the extensions off one by one. |
 | `PAGE-NO-MEMORY`: "Shared WebAssembly memory is not available" | The browser cannot give the game the memory it needs. Close other tabs, update the browser and restart it. |
 | `PAGE-NO-JIT`: "The JavaScript optimizer is off for this site" (or "exnref not supported by the Wasm interpreter") | The browser runs WebAssembly without its compiler here, and the game cannot run that way. Chrome: Settings, Privacy and security, JavaScript optimization and security: allow the site (Android's Advanced Protection turns the optimizer off for every site). Edge: add the site as an exception to Enhanced security. |
 | `PAGE-NO-WAITASYNC`: "This browser is too old for the game" | Update the browser (Firefox 145 or newer), or play in Chrome. |
+| `PAGE-NO-SIMD`: "This computer's processor is too old for the game" | The game needs WebAssembly SIMD: a PC processor without SSE4.1 (an AMD Phenom II, an Intel Core 2 before Penryn) or a browser too old for it can't compile the game. Update the browser; on such a processor the game can't run. |
 | "Graphics (WebGPU)", `GPU-OFF` and the other `GPU-OFF-…` | The browser has no WebGPU, which the game needs. Chrome: update it (on Linux also turn on `chrome://flags/#enable-unsafe-webgpu`). Firefox has it on Windows and on Macs with Apple chips; elsewhere (Linux, Macs with Intel chips) play in Chrome, or set `dom.webgpu.enabled` to true in about:config. Firefox for Android has none yet: play in Chrome. iPhone and iPad: WebGPU comes with iOS 26 and iPadOS 26. `GPU-NOT-SECURE`: see "Secure, isolated page" above. |
 | `GPU-ACCEL-OFF` | Chrome uses no graphics at all (it draws WebGL in software, or not at all): "Use graphics acceleration when available" in `chrome://settings/system` is off, or Chrome gave up on the graphics after they crashed. Turn it on and restart Chrome; if it was on, update the graphics driver. |
 | `GPU-ADAPTER-LINUX`: Chrome on Linux, while `chrome://gpu` says WebGPU is hardware accelerated | Most likely the Vulkan driver is missing: Chrome runs WebGPU on Vulkan there (the rest of Chrome on OpenGL). `ls /usr/share/vulkan/icd.d/` lists the installed ones (`intel_icd` for Intel, `radeon_icd` for AMD). Install it with `sudo apt install mesa-vulkan-drivers` on Debian and Ubuntu, `sudo dnf install mesa-vulkan-drivers` on Fedora, `vulkan-intel` or `vulkan-radeon` on Arch, then quit Chrome completely and start it again. Chrome has WebGPU on by itself on Linux for Intel graphics (Gen12 and newer) and NVIDIA (Wayland); for other graphics turn on `chrome://flags/#enable-unsafe-webgpu`. If the driver is there, the Dawn Info section further down `chrome://gpu` lists each adapter WebGPU sees and why one is blocked. |
-| `GPU-ADAPTER-WIN`: Chrome on Windows | Chrome runs WebGPU on Direct3D 12 there, and older graphics have no Direct3D 12 driver (Intel HD 4000 and older, for one): the game cannot run on that computer. The Dawn Info section further down `chrome://gpu` lists each adapter WebGPU sees and why it is blocked; when it lists only "D3D11 backend" adapters, "Blocklisted - D3D11 backend not fully implemented", the graphics have no Direct3D 12. On newer graphics, update the graphics driver from Intel, AMD or NVIDIA, then quit Chrome completely and start it again. |
+| `GPU-ADAPTER-WIN`: Chrome on Windows | Chrome runs WebGPU on Direct3D 12 there, and older graphics have no Direct3D 12 driver (Intel HD 4000, 4400, 4600 and older, for one): the game cannot run on that computer. The Dawn Info section further down `chrome://gpu` lists each adapter WebGPU sees and why it is blocked; when it lists only "D3D11 backend" adapters, "Blocklisted - D3D11 backend not fully implemented", the graphics have no Direct3D 12. On newer graphics, update the graphics driver from Intel, AMD or NVIDIA, then quit Chrome completely and start it again. |
 | `GPU-ADAPTER-WIN-ARM`: Chrome on Windows on ARM (Snapdragon) | Chrome keeps WebGPU behind a flag there: turn on `chrome://flags/#enable-unsafe-webgpu`, then restart Chrome. |
 | `GPU-ADAPTER-ANDROID` | Chrome on Android has WebGPU from Android 12 on Qualcomm (Adreno), ARM (Mali) and Intel graphics, and from Android 16 on Imagination (PowerVR). Update Android and Chrome. If that does not help, turn on `chrome://flags/#enable-unsafe-webgpu` (on the phone, type it into Chrome's address bar, or open `chrome://flags` and search for "Unsafe WebGPU"), then restart Chrome: that lifts Chrome's WebGPU blocklist. Samsung's Xclipse (some Galaxy phones) is on it, and the game runs with the flag (a player's Xclipse 540 with Android 16). If the game still does not run with it, it cannot run on that phone yet. |
 | `GPU-ADAPTER`, `GPU-ADAPTER-FIREFOX` | The browser would not use the graphics. Restart it; update the graphics driver (on a Mac: macOS) and the browser. `chrome://gpu` in Chrome, about:support (Graphics) in Firefox says why. In Firefox on Windows, graphics without Direct3D 12 cannot run it either. |
@@ -874,12 +917,15 @@ Good to know:
 | `GPU-RENDERER`: "The game was stopped" | The graphics did not start: the game cannot go on without them. Restart the browser and press **Play**; if it happens again, update the graphics driver, and download the log (its `[gpu]` lines say why). |
 | `GPU-ANDROID-DRIVER`: "Did not start" | The phone's graphics driver refused the game's picture at its first frame (Chrome on some phones with Adreno 6xx graphics; the log's `[gpu] device lost` line says `VK_ERROR_FORMAT_NOT_SUPPORTED` while "checking external image import support"). Every Play ends the same way on that phone: no setting changes it. A system update for the phone (a newer graphics driver) may; another browser on Android has no WebGPU yet. |
 | `GPU-LOST`: "The game was stopped" | The graphics stopped during the game (the graphics driver reset, or the browser's graphics process crashed): the game cannot go on without them. Press **Play**: the page reloads, which starts the graphics again (Safari gives a page no graphics after that until it reloads), then **Play** starts the game. Your saves and settings stay. Download the log first if you want to keep it: after the reload, Download log has only a shorter copy of that game's. If the page then says `GPU-ADAPTER-AFTER-LOST`, see that. If it keeps happening, restart the browser and update the graphics driver. |
-| "Game module", `MODULE-LOAD` | The game did not load, or the server is not reachable. The page tries again by itself, or press **Retry**. If the module is missing, start the server with `web/start.sh`, which builds it. |
+| "Game module", `MODULE-LOAD`: "The game didn't load" | The game did not load, or the server is not reachable (the log says why). The page tries again by itself, or press **Retry**. If the module is missing, start the server with `web/start.sh`, which builds it. |
 | "A new version of the game is on the server" | Press **Reload** or **Play**: the page loads the new version, and your saves and settings stay. Download the log first if you want to keep it: after the reload, Download log has only a shorter copy of that game's. Before any game the page reloads by itself; during a game it says so over the game, and the start page offers it when you quit. |
 | "Open elsewhere" | The game runs in another tab of this browser. Switch to it, or close it. |
-| `GAME-START`: "Did not start", "The game could not start" | Press **Play** again; if it happens again, **Download log** (on the start page) and post the log with the message. "could not allocate memory" (Chrome) or "Out of memory" (Safari): the browser would not set aside the game's 1 GB, most often on phones with 2 to 4 GB (a 32-bit Chrome, an iPhone's Home Screen app). Close other apps and reload the page; the log's `[memory]` line says what the browser refused. |
+| "Not loading": "Your antivirus or network is probably blocking the game" | The page's own script never started, 15 seconds after the page opened: an antivirus (Kaspersky flagged the site in November 2026) or a network filter blocks it. Allow `nfsu2.xyz` in it, or try mobile data, then **Reload**. |
+| "The game's files didn't load properly" (error code 1 in the first minute) | The game's program file did not load: the browser's copy is damaged, or the network blocks it (the log shows `no PE signature`, or `HTTP 403` for it). **Other**, **Delete game data**, then **Play**; your saves stay. If it happens again, try another network. |
+| `GAME-START`: "Did not start", "The game couldn't start" | Press **Play** again; if it happens again, **Download log** (on the start page) and post the log with the message. "This device doesn't have enough free memory for the game" (the log: "could not allocate memory" in Chrome, "Out of memory" in Safari): the browser would not set aside the game's 1 GB, most often on phones with 2 to 4 GB (a 32-bit Chrome, an iPhone's Home Screen app). Close other apps and reload the page; the log's `[memory]` line says what the browser refused. |
 | `STORAGE-NONE`: "This browser window cannot store files" | A guest or private window cannot keep saves: open the page in a normal window. |
 | `STORAGE-OLD`: "This browser is too old for the game" | Safari before 26 (iOS 18 with Safari's WebGPU feature flag on, for one) cannot write the game's files. Update to iOS 26, iPadOS 26 or macOS with Safari 26 (Settings, General, Software Update). |
+| `SAVES-UNREADABLE`: "Play without saving?", "This browser can't read or write your saves right now" | The browser's storage for the site answered the page with an error (the message names it; Firefox says `UnknownError: Unknown failure`, a full disk among the causes). Nothing of the saves was written or removed. **Play without saving** starts the game anyway: it reads what it can, and nothing from that game is kept (no profile, setting or screenshot). Otherwise restart the browser, make sure the disk has free space, and press **Play** again. If it still fails and the message says your cloud saves have your progress: copy or download your passphrase first (**Cloud saves**; Firefox and Safari keep it only in the site's data), then remove this site's data in the browser's settings (Firefox: Settings, Privacy & Security, Cookies and Site Data, Manage Data; screenshots, covers, this device's settings, the Put back copy and the downloaded game data go too), reload, and enter the passphrase under **Cloud saves**. Otherwise don't remove it (that deletes what the cloud doesn't have) and ask on Discord. Shown over a game: the browser refused a file the game saves to, so a save may not have been kept. |
 | `STORAGE-ASK`: the browser asks whether the site may keep its data | Allow it, so that your saves stay when the disk runs low (section 5). |
 | `BROWSER-CHROME-OLD`, `BROWSER-FIREFOX-OLD` | A warning: the game may still play. Update the browser (Chrome 140 or newer, Firefox 145 or newer). |
 | `BROWSER-OTHER` | A warning: the page does not know this browser (it knows Chrome, Edge, Brave, Opera, Firefox and Safari). It may work when every other check passes. |
