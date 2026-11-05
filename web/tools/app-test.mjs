@@ -207,14 +207,14 @@ try {
     const listened = await page.waitForFunction(() => document.querySelector('.set[data-key="horn"] .listen')?.getAttribute('aria-pressed') === 'false',
       null, { timeout: 10000 }).then(() => true, () => false);
     await page.click('#online summary:has-text("More online")');
-    await page.click('.set[data-key="roam_max_cars"] .opt:has-text("40")'); await settle(page, n0++);
+    await page.click('.set[data-key="roam_max_cars"] .opt:has-text("48")'); await settle(page, n0++);
     const selectedCarCount = await page.locator('.set[data-key="roam_max_cars"] input:checked').inputValue();
     await page.click('.set[data-key="roam"] .switch'); await settle(page, n0);              // roam back off
     const file = (await readOpfs(page, SAVE, 'settings.ini')).text;
     const env = await page.evaluate(() => window.__nfsu2.env());
     const lines = file.split('\n').filter(l => /^[a-z_]+ = /.test(l));
     const fileOk = lines.includes('movies = off') && lines.includes('fps = 120') && lines.includes('fps_counter = detailed') &&
-      lines.includes('roam_name = Tester_a_comm') && lines.includes('roam = off') && lines.includes('horn = train') && lines.includes('roam_max_cars = 40');
+      lines.includes('roam_name = Tester_a_comm') && lines.includes('roam = off') && lines.includes('horn = train') && lines.includes('roam_max_cars = 48');
     const envOk = env.NOMOVIES === '1' && env.NFSU2_FPS === '120' && env.NFSU2_FPS_COUNTER === 'detailed' &&
       env.NFSU2_ROAM_NAME === 'Tester_a_comm' && env.NFSU2_ROAM === '0' && env.NFSU2_HORN === 'train' && env.SNDSYNC === '0' && !('WINDOW' in env);
     // the raw editor: a refused value is kept in the file but shown as ignored; a setting the panel has no row for
@@ -268,7 +268,7 @@ try {
     const more = page.locator('#settings details:has(> summary:has-text("More display"))');
     if (!await more.evaluate(d => d.open)) await page.click('#settings summary:has-text("More display")');
     await page.click('.set[data-key="fps_counter"] .opt:has-text("Detailed")'); await settle(page, n0++);
-    report('settings', fileOk && envOk && selectedCarCount === '40' && /ignored/.test(rawMsg) &&
+    report('settings', fileOk && envOk && selectedCarCount === '48' && /ignored/.test(rawMsg) &&
       /ultrawide/.test(hudState) && /roam_rate = 30/.test(otherText) && /roam_port = 47300 \(ignored: only used by the Mac app\)/.test(otherText) && after.movies === 'false' && after.fps === '120' && after.name === 'Tester_a_comm' && /^#hud = wide$/m.test(file2) && /\(2 changed\)$/.test(moreDisplay) &&
       resetOk && listenPlaying === 'true' && listened,
       { setLines: lines, env: { NOMOVIES: env.NOMOVIES, NFSU2_FPS: env.NFSU2_FPS, NFSU2_FPS_COUNTER: env.NFSU2_FPS_COUNTER, NFSU2_ROAM_NAME: env.NFSU2_ROAM_NAME, NFSU2_ROAM: env.NFSU2_ROAM, NFSU2_HORN: env.NFSU2_HORN, WINDOW: env.WINDOW ?? '(unset)' },
