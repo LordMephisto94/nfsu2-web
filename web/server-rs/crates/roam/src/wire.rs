@@ -42,6 +42,9 @@ pub(crate) const HF_LOBBY: u16 = 0x0080;
 pub(crate) const HF_CREW: u16 = 0x0200;
 /// HELLO's flag: this player reads the hub's crew marks (roam_core.h RC_HF_HUBCREW; `write_peers`)
 pub(crate) const HF_HUBCREW: u16 = 0x0400;
+/// HELLO's flag: this endpoint is the second local player of the browser at its address (roam_core.h RC_HF_SEAT2: co-op
+/// free roam, player 2 beside player 1 on one screen, on a port of its own): hub.rs `Player::seat2`
+pub(crate) const HF_SEAT2: u16 = 0x2000;
 /// in a list's crew marks, past the crews' bits: that player is a friend (roam_core.h RC_MARK_FRIEND; `write_peers`)
 pub(crate) const MARK_FRIEND: u8 = 0x80;
 /// in a list's marks of a player whose core reads one-way links (CORE_ONEWAY: `write_peers`): we get that player's
@@ -52,6 +55,16 @@ pub(crate) const MARK_TXONLY: u8 = 0x40;
 /// the core version from which a player takes one-way links (roam_core.h RC_CORE_VER 15), and the most players its
 /// list then names: the ones it gets cars from (its links) and the ones it sends its own to (roam_core.h RC_LIST_MAX)
 pub(crate) const CORE_ONEWAY: u16 = 15;
+/// ...and from which its lists end in hints (roam_core.h RC_CORE_VER 16: `write_peers`): which of the players who only
+/// get its car are far off (an entry's index, plus HINT_VERYFAR), and why the hub let the cars near it go that it no
+/// longer lists (the player's id and RC_GONE_*), GONE_MAX at most
+pub(crate) const CORE_HINTS: u16 = 16;
+pub(crate) const HINT_VERYFAR: u8 = 0x80;
+pub(crate) const GONE_MAX: usize = 32;
+/// where a player who only gets our car gets every 4th of our snapshots (5 a second), and every 10th (roam_core.h
+/// RC_FAR_M, RC_VERYFAR_M: as a core finds it for a peer it gets states from)
+pub(crate) const FAR_M: f64 = 300.0;
+pub(crate) const VERYFAR_M: f64 = 1000.0;
 pub(crate) const LIST_MAX: usize = 96;
 /// the most crews a player is in (roam_core.h RC_CREW_MAX: the start page's four words)
 pub(crate) const CREWS: usize = 4;
@@ -68,9 +81,32 @@ pub(crate) const LOBBY_ADVERT: u8 = 1;
 /// a player's ask to join (to its host, and a copy to the hub: the hub links the two first)
 pub(crate) const LOBBY_JOIN: u8 = 2;
 pub(crate) const LOBBY_CLOSE: u8 = 5;
-/// a LOBBIES entry: x, y (i16 LE, m), race (u32 LE), players, most players, state (u8); at most LOBBIES_MAX of them
+/// An ADVERT's t (roam_game.c MP_COUNTS_ON): set, its low 6 bits say whom a win counts for in the career (a START's
+/// t is its countdown), and LOBBY_PRIVATE says the lobby takes its host's friends and crew-mates only (roam_game.c
+/// MP_PRIVATE, "Friends & crew only"): its host sends its adverts to them alone, and the hub lists it and links its
+/// start's players for it to them alone.  An older game sends neither (t 0: its lobby is anyone's).
+pub(crate) const LOBBY_COUNTS_ON: u16 = 0x8000;
+pub(crate) const LOBBY_PRIVATE: u16 = 0x0040;
+/// ...and its lowest bit says the race counts in its host's career (a career lobby: it keeps out the players past the
+/// race's stage, but its host's friends and crew-mates), and LOBBY_STAGED that its host keeps them out (its Who can join,
+/// roam_game.c MP_STAGED; a career lobby does whatever it says)
+pub(crate) const LOBBY_COUNTS_HOST: u16 = 0x0001;
+pub(crate) const LOBBY_STAGED: u16 = 0x0080;
+/// ...and its host's stage (bits 9-11; 0 from an older game: its race's): the stage above which it keeps players out
+pub(crate) const LOBBY_HSTAGE: u16 = 9;
+/// a LOBBIES entry: x, y (i16 LE, m), race (u32 LE), players, most players, state (u8: with LOBBIES_STAGED and
+/// LOBBIES_MATE); at most LOBBIES_MAX of them
 pub(crate) const LOBBIES_ENTRY: usize = 11;
 pub(crate) const LOBBIES_MAX: usize = 96;
+/// a LOBBIES entry's state, past the lobby's own: the lobby keeps out the players past its race's stage (a career
+/// lobby, LOBBY_COUNTS_HOST, or its host's LOBBY_STAGED), and its host a friend or crew-mate of the player told
+/// (roam_core.h RC_LOBBIES_STAGED, RC_LOBBIES_MATE): the game keeps such a lobby of a race of a stage it is past off its
+/// map unless its host is a mate.  Only such a lobby's entry has them (an older game drops such an entry: a state of 3
+/// or more)
+pub(crate) const LOBBIES_STAGED: u8 = 0x80;
+/// ...and with it the host's stage, in bits 2-4 (roam_core.h RC_LOBBIES_HSTAGE)
+pub(crate) const LOBBIES_HSTAGE: u8 = 2;
+pub(crate) const LOBBIES_MATE: u8 = 0x40;
 /// the most players a lobby takes (roam_core.h RC_LOBBY_MAX)
 pub(crate) const LOBBY_PLAYERS: usize = 6;
 /// a MAPD entry (roam_core.h RC_MAPD_*): a player's key (u16 LE: the hub's slot, MAPD_GONE set when it went), then,
@@ -116,6 +152,8 @@ pub(crate) enum Msg<'a> {
         /// the other player of its outrun (core version 11: the id after the links byte, roam_core.c rc_set_duel), 0
         /// none: the two are linked first once each names the other (`duel_pairs`)
         duel: u32,
+        /// its flags say it is the second local player of its browser (HF_SEAT2)
+        seat2: bool,
     },
     /// v: the newest state's velocity, 0 where roam_core's decoder would not take it (not finite, 200 m/s or more);
     /// heading: where its car points, 256 a turn (the game's atan2 of the forward row, roam_game.c); slope: how steeply
@@ -160,6 +198,12 @@ pub(crate) enum Msg<'a> {
         state: u8,
         /// its players (n of them, the host first), 0 after them
         ids: [u32; LOBBY_PLAYERS],
+        /// an ADVERT of a lobby for its host's friends and crew-mates only (LOBBY_PRIVATE)
+        private: bool,
+        /// an ADVERT of a lobby that keeps out the players past its host's stage (LOBBY_COUNTS_HOST, LOBBY_STAGED)
+        staged: bool,
+        /// its host's stage (LOBBY_HSTAGE; 0 none said)
+        hstage: u8,
     },
     /// a player's report of a race it raced (roam_core.h rc_racerep), checked as roam_core.c's racerep_ok
     RaceRep(RaceRep<'a>),
@@ -189,6 +233,10 @@ pub(crate) struct RaceRep<'a> {
     /// the race in the reporter's career (roam_core.h rc_racerep credit, its first spare byte: 0 in older games): 0 not,
     /// 1 its own win, 2 a friend's win
     pub credit: u8,
+    /// the reporter's career stage (its second spare byte: 0 in older games, none)
+    pub stage: u8,
+    /// how its lobby was (its third spare byte, roam_core.h RC_RL_*: 0 in older games): LOBBY_BITS_*
+    pub lobby_bits: u8,
     pub car_type: u8,
     /// 0 fastest .. 3; -1 not rated
     pub class: i8,
@@ -242,6 +290,8 @@ fn racerep(d: &[u8], o: usize) -> Option<RaceRep<'_>> {
         quit: flags & 2 != 0,
         edited: flags & 4 != 0,
         credit: if d[o + 17] <= 2 { d[o + 17] } else { 0 },
+        stage: if d[o + 18] <= 9 { d[o + 18] } else { 0 },
+        lobby_bits: d[o + 19] & (RL_STAGED | RL_MATE_PAST | RL_HOST_PAST),
         car_type: d[o + 15],
         class,
         rating: nums[0],
@@ -254,6 +304,12 @@ fn racerep(d: &[u8], o: usize) -> Option<RaceRep<'_>> {
         name,
     })
 }
+
+/// a RACEREP's lobby bits (roam_core.h RC_RL_*): its lobby kept out the players past its race's stage; the reporter,
+/// past that stage, was in it as its host's friend or crew-mate; its host was past the race's stage
+pub(crate) const RL_STAGED: u8 = 0x01;
+pub(crate) const RL_MATE_PAST: u8 = 0x02;
+pub(crate) const RL_HOST_PAST: u8 = 0x04;
 
 /// roam_core.h rc_raceres: the race, and its results' rows in their order
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -432,8 +488,8 @@ pub(crate) fn decode(d: &[u8]) -> Option<(u8, u32, Msg<'_>)> {
                     }
                 }
             }
-            let (lobbies, marks) = (flags & HF_LOBBY != 0, flags & HF_HUBCREW != 0);
-            Msg::Hello { sender, core, status, room, name, lobbies, marks, crews, links, duel }
+            let (lobbies, marks, seat2) = (flags & HF_LOBBY != 0, flags & HF_HUBCREW != 0, flags & HF_SEAT2 != 0);
+            Msg::Hello { sender, core, status, room, name, lobbies, marks, crews, links, duel, seat2 }
         }
         MSG_SNAP => {
             if end < 22 + 52 {
@@ -469,7 +525,7 @@ pub(crate) fn decode(d: &[u8]) -> Option<(u8, u32, Msg<'_>)> {
             Msg::NearReq { req: u16_le(d, 16), max: u16_le(d, 18), base: u16_le(d, 20), radius: u16_le(d, 22) }
         }
         MSG_LOBBY => {
-            // op arg state max, to, lobby, race, x y, t, n, a reserved byte, then n ids (roam_core.c rc_encode)
+            // op arg state max, to, lobby, race, x y, t, n, its host's away seconds, then n ids (roam_core.c rc_encode)
             if end < HDR + 24 {
                 return None;
             }
@@ -485,7 +541,12 @@ pub(crate) fn decode(d: &[u8]) -> Option<(u8, u32, Msg<'_>)> {
             if lobby == 0 || race == 0 || ids[..n].iter().enumerate().any(|(i, &v)| v == 0 || ids[..i].contains(&v)) {
                 return None;
             }
-            Msg::Lobby { op, to: u32_le(d, 20), lobby, race, x: u16_le(d, 32) as i16, y: u16_le(d, 34) as i16, n: n as u8, max, state, ids }
+            let t = u16_le(d, 36);
+            let private = op == LOBBY_ADVERT && t & LOBBY_COUNTS_ON != 0 && t & LOBBY_PRIVATE != 0;
+            let staged = op == LOBBY_ADVERT && t & LOBBY_COUNTS_ON != 0 && t & (LOBBY_COUNTS_HOST | LOBBY_STAGED) != 0;
+            let hstage = if op == LOBBY_ADVERT && t & LOBBY_COUNTS_ON != 0 { (t >> LOBBY_HSTAGE & 7) as u8 } else { 0 };
+            let (x, y) = (u16_le(d, 32) as i16, u16_le(d, 34) as i16);
+            Msg::Lobby { op, to: u32_le(d, 20), lobby, race, x, y, n: n as u8, max, state, ids, private, staged, hstage }
         }
         MSG_RACEREP if end == HDR + RACEREP_BYTES => Msg::RaceRep(racerep(d, HDR)?),
         MSG_RACERES => Msg::RaceRes(raceres(d, HDR, end - HDR)?),
@@ -531,7 +592,15 @@ pub(crate) fn peers_crew_len(n: usize, k: usize) -> usize {
 /// list ends in the receiver's crew marks (HF_CREW on it): `mine` (its crews, at most CREWS, none 0; maybe none), then
 /// a byte per entry, `marks[i]` bit c: entry i is in crew `mine[c]` too; MARK_FRIEND: entry i is its friend.  So a
 /// player learns which of its peers are in its crews, and its friends, without anyone's crews but its own going out.
-pub(crate) fn write_peers(b: &mut [u8], sender: u32, seq: u16, list: impl ExactSizeIterator<Item = PeerEntry>, mine: &[u32], marks: &[u8]) {
+pub(crate) fn write_peers(
+    b: &mut [u8],
+    sender: u32,
+    seq: u16,
+    list: impl ExactSizeIterator<Item = PeerEntry>,
+    mine: &[u32],
+    marks: &[u8],
+    hints: &[u8],
+) {
     let len = b.len();
     let n = list.len();
     let with = len > peers_len(n);
@@ -559,6 +628,8 @@ pub(crate) fn write_peers(b: &mut [u8], sender: u32, seq: u16, list: impl ExactS
             o += 4;
         }
         b[o..o + n].copy_from_slice(&marks[..n]);
+        // (the hints after them, to a core of version 16: `hints` as `Hub::lists` wrote them)
+        b[o + n..o + n + hints.len()].copy_from_slice(hints);
     }
     let crc = crc32fast::hash(&b[..len - CRC]);
     b[len - CRC..].copy_from_slice(&crc.to_le_bytes());
@@ -573,7 +644,7 @@ pub fn encode_peers(sender: u32, seq: u16, list: &[PeerEntry]) -> Vec<u8> {
 pub fn encode_peers_crews(sender: u32, seq: u16, list: &[PeerEntry], mine: &[u32], marks: &[u8]) -> Vec<u8> {
     let with = !mine.is_empty() || !marks.is_empty();
     let mut b = vec![0u8; if with { peers_crew_len(list.len(), mine.len()) } else { peers_len(list.len()) }];
-    write_peers(&mut b, sender, seq, list.iter().copied(), mine, marks);
+    write_peers(&mut b, sender, seq, list.iter().copied(), mine, marks, &[]);
     b
 }
 

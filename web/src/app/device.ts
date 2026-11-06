@@ -10,6 +10,8 @@
 //   touch first: the primary pointer is a finger (phones, tablets), not a
 //                laptop whose screen also takes touch.
 // The Controls sheet and the hints follow touch first (html[data-touch]).
+import { allPads } from '../input/steampad';
+
 export function isPhone(): boolean {
   const uad = (navigator as unknown as { userAgentData?: { mobile?: boolean } }).userAgentData;
   return uad?.mobile === true || /Android.+Mobile|iPhone|iPod/.test(navigator.userAgent) || phoneScreen(navigator.maxTouchPoints);
@@ -28,18 +30,27 @@ export function touchFirst(): boolean { return matchMedia('(pointer: coarse)').m
  *  over the game), and the game's 4:3 HUD: on a phone's long screen the wide one puts the minimap under the touch
  *  controls' steering and the speedometer under Brake, the 4:3 one between the thumbs.  Players' cars shown in free
  *  roam: 16 on phones, 24 on tablets (an iPhone was stopped for memory as 22 friends' cars loaded at once at the new
- *  career's start, 2026-10-25), the file's 32 on computers.  48 and 64 only when the player picks them: each car past
- *  32 costs the game's thread about 0.28 ms a frame on a Ryzen 5900X (14 -> 18.5 ms with 48 in view), a laptop's
- *  several times that, and the game's own drop back to 32 (roam_game.c cars_cut) waits for frames under ~40 fps: it
- *  never helps a player who went from 144 to 100 fps (fast computers started at 48, then 40, until 2026-11-02).  The
+ *  career's start, 2026-10-25), Auto on computers: 32, and 48 or 64 while the game's own frames show room for them
+ *  with more players near (roam_game.c cars_auto: each car costs the game's thread about 0.28 ms a frame on a Ryzen
+ *  5900X, a laptop's several times that, so no computer gets more up front: fast computers started at 48, then 40,
+ *  until 2026-11-02, and lost a fifth of their frames on fast displays).  The
  *  world map's other players: 2048 on phones, the file's 4096 elsewhere (each marker costs the open map's frames,
- *  about 7 us a frame on a busy Ryzen 5900X, a phone's several times that). */
+ *  about 7 us a frame on a busy Ryzen 5900X, a phone's several times that).  Full screen stays off on phones with
+ *  PowerVR's B-Series graphics (fullScreenFails). */
 export function deviceDefaults(): Record<string, string> {
   const kind = deviceKind();
-  if (kind === 'phone') return { render: rememberedRender() === 'backing' ? 'backing' : 'scale:0.75', fullscreen: 'on', hud: '43', roam_max_cars: '16', roam_map_max: '2048' };
-  if (kind === 'tablet') return { roam_max_cars: '24' };
-  return {};
+  if (kind === 'phone') return { render: rememberedRender() === 'backing' ? 'backing' : 'scale:0.75', fullscreen: fullScreenFails() ? 'off' : 'on', hud: '43', roam_max_cars: '16', roam_map_max: '2048', coop: 'off' };
+  if (kind === 'tablet') return { roam_max_cars: '24', coop: 'off' };
+  return { roam_max_cars: 'auto' };
 }
+
+/** the graphics as the page's check named them (checks.ts checkGpu: "img-tec b-series ..."), '' until it has */
+let graphics = '';
+export function noteGraphics(info: string | undefined) { graphics = info ?? ''; }
+/** PowerVR's B-Series in Chrome (POCO M7 Pro, Honor 400 Lite and others, 2026-10/11): in full screen the graphics
+ *  stopped seconds after Play or a turn to landscape (vkBindImageMemory: VK_ERROR_OUT_OF_DEVICE_MEMORY, with the
+ *  canvas the whole screen), in the window the game ran (a player's: "without full screen game works nice") */
+export const fullScreenFails = (g = graphics) => /^img-tec b-series/i.test(g);
 
 /** the device as its defaults see it: a phone, a touch-first one that is not a phone (a tablet), or a computer */
 export function deviceKind(): 'phone' | 'tablet' | 'pc' {
@@ -50,18 +61,15 @@ export function deviceKind(): 'phone' | 'tablet' | 'pc' {
  *  game's own heap than its 512 MB, which a crowded free roam fills on its trips out and back (450-507 MB measured,
  *  2026-11-04).  On a computer only: a phone's or tablet's Chrome for Android is a 32-bit program on most such devices
  *  and sets aside 1 GB at most (host/memory.ts), and Safari keeps every buffer in one area that a few large memories
- *  use up (WebKit bug 269937).  Not Firefox: its WebGPU refuses a view into a memory of 2 GB or more ("can't be an
- *  ArrayBuffer or an ArrayBufferView larger than 2 GB"), so every texture upload failed and the game stopped as a lost
- *  GPU within seconds (Firefox 159, 2026-11-04).  Not where the browser says the device has less than 8 GB (Chrome and
- *  Edge say 8 at most): the memory counts against the computer's commit limit on Windows. */
+ *  use up (WebKit bug 269937).  Not where the browser says the device has less than 8 GB (Chrome and Edge say 8 at
+ *  most; Firefox says nothing): the memory counts against the computer's commit limit on Windows. */
 export function heapWindow(kind = deviceKind(), ua = navigator.userAgent,
                            memoryGB = (navigator as unknown as { deviceMemory?: number }).deviceMemory,
                            platform = (navigator as unknown as { userAgentData?: { platform?: string } }).userAgentData?.platform): boolean {
   const safari = /AppleWebKit\//.test(ua) && !/Chrome\/|Chromium\/|Firefox\//.test(ua);
   // (an Android tablet with a mouse, or a phone on a desktop screen (DeX), reads as a computer: its platform says Android)
   const android = platform === 'Android' || /Android/.test(ua);
-  const firefox = /Firefox\//.test(ua);
-  return kind === 'pc' && !safari && !android && !firefox && (memoryGB === undefined || memoryGB >= 8);
+  return kind === 'pc' && !safari && !android && (memoryGB === undefined || memoryGB >= 8);
 }
 
 /** the render check's verdict on this phone: in this browser only, like the other device defaults (settings.ini,
@@ -77,7 +85,7 @@ export function rememberRender(v: string | null) {
 
 /** whether the browser shows the page a controller (Chrome: only after a button press on the page) */
 export function padSeen(): boolean {
-  try { return typeof navigator.getGamepads === 'function' && navigator.getGamepads().some(g => !!g?.connected); }
+  try { return allPads().some(g => !!g?.connected); }
   catch { return false; }
 }
 

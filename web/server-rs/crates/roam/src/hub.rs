@@ -10,7 +10,7 @@ use std::time::Instant;
 
 use bytes::{Bytes, BytesMut};
 use nfsu2_util::json::num;
-use nfsu2_util::{js, vip_str};
+use nfsu2_util::{IdMap, js, vip_str};
 use serde_json::{Value, json};
 
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -27,8 +27,15 @@ use crate::{PeerEntry, ROAM_HUB_VIP, RoamOptions};
 /// no slot, no place in a room
 const NONE: u32 = u32::MAX;
 
+/// The most slots, and so the most players (`RoamOptions::max_players` at most): a world map's answer names each player
+/// by its slot, under wire::MAPD_PARKED (a key's bit past it says it is parked, to the game's map that asks so; a slot
+/// with that bit would be read as another one's, parked).  The slots of players gone wait for the next purge, an
+/// eighth of the players' worth at most (`drop_slots`): past SLOTS_MAX a new player has them purged first (`insert`).
+const SLOTS_MAX: usize = wire::MAPD_PARKED as usize;
+
 /// a race lobby a player hosts (roam_core.h RC_MSG_LOBBY, an advert to the hub): its id, the race, where it starts,
-/// its players (n, the host first), the most it takes and its state
+/// its players (n, the host first), the most it takes and its state, and whether it takes its host's friends and
+/// crew-mates only (wire::LOBBY_PRIVATE)
 #[derive(Clone, Copy, Debug)]
 struct HubLobby {
     id: u32,
@@ -39,6 +46,24 @@ struct HubLobby {
     max: u8,
     state: u8,
     ids: [u32; wire::LOBBY_PLAYERS],
+    private: bool,
+    /// it keeps out the players past its host's stage (a career lobby, wire::LOBBY_COUNTS_HOST, or its host's
+    /// wire::LOBBY_STAGED), that stage (0: an older game's, its race's)
+    staged: bool,
+    hstage: u8,
+}
+
+/// The race lobby a browser's player hosts, as its last advert to the hub had it (`Hub::hosted`), for an invite to a
+/// friend (the server's friends.rs): its host's id and its own, the race (its hash), its players and the most it
+/// takes, and the room it is in (rc_room_hash; 0: the room of everyone)
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Hosted {
+    pub host: u32,
+    pub lobby: u32,
+    pub race: u32,
+    pub n: u8,
+    pub max: u8,
+    pub room: u32,
 }
 
 /// MAPD: the page moves each player's marker on from where the hub last said, at its velocity; the hub says it again
@@ -230,7 +255,9 @@ const LOBBY_NEAR_MAX: usize = 24;
 const LOBBY_JOIN_MS: f64 = 6000.0;
 /// a lobby's host, and each player it lists, are this near its start, or the advert is no reason for a link: the host
 /// game drops a player of its lobby who is farther (roam_game.c MP_STAY_M + 10 m), and leaves the lobby itself past
-/// MP_STAY_M (40 m)
+/// MP_STAY_M (40 m).  A player it lists farther off is linked all the same when its own last ask to join (its JOIN's
+/// copy to the hub) was for this lobby: a friend the host invited joins from wherever it is, and its game and the
+/// host's keep it in the lobby there (roam_game.c, a friend from afar)
 const LOBBY_STAY_M: f64 = 50.0;
 /// a player's race reports logged: one a race (its lobby), and none sooner than this after its last
 const REPORT_GAP_MS: f64 = 20000.0;
@@ -241,6 +268,9 @@ const LOBBY_LAND_M: f64 = 30.0;
 /// of them named
 const NEAR_FRESH_MS: f64 = 2000.0;
 const NEAR_NAMED: usize = 3;
+/// a browser's second player's car this near its first one's (m) came there by the game's own hand (`beside_own`): the
+/// game puts it a car's length or two beside the first one, and a SNAP of the first is up to half a second old
+const BESIDE_M: f64 = 30.0;
 /// A player gone without its BYE (silent for gone_ms, or off the switch) keeps its cheat watch this long (ms): back on
 /// the hub in that time (a bad connection's page that stalled, or dropped and came again), it goes on with it, its
 /// counts and where its car was; its summary comes once that time is past.  A bad connection had its players gone
@@ -260,15 +290,56 @@ struct KeptWatch {
 /// heard of.  A RACERES is taken only from one of them, naming only them: no player can be named in a race it was
 /// not in.  Kept JOINED_KEEP_MS after its last advert or ask (a race and the way back take minutes), at most
 /// JOINED_PER_VIP a browser (its newest) and JOINED_IDS players a lobby (those who left before it started count too).
+///
+/// A player of it is the endpoint that joined with its id (`Racer`), and every line names it by that endpoint, never
+/// by a look for its id among all players: a game says its own id, and another player's is in any PEERS list (the
+/// 2026-11-05 security audit: a browser's second endpoint said a player's id, joined its own lobby with it, and its
+/// results had that player's car jump 300 m, a line naming a player who never raced).  An id is the first browser's
+/// to join with it: another browser's ask under it counts for nothing, the same browser's moves it to that endpoint.
+/// An endpoint is one player of it: its ask under another id (another start of its game) takes its place.
 struct Joined {
     race: u32,
     vip: u32,
-    ids: Vec<u32>,
+    racers: Vec<Racer>,
     at: f64,
 }
 const JOINED_KEEP_MS: f64 = 1_800_000.0;
 const JOINED_PER_VIP: usize = 4;
 const JOINED_IDS: usize = 12;
+
+/// one player of a lobby (`Joined`): its game's id, the endpoint that joined with it (`key`), and that endpoint's
+/// name as of its last ask (the lines' once it has gone)
+struct Racer {
+    id: u32,
+    key: u64,
+    name: String,
+}
+
+impl Joined {
+    /// an ask to join it (or its host's advert) from endpoint `key`, named `name`, under `id` (see `Joined`)
+    fn join(&mut self, id: u32, key: u64, name: &str) {
+        if self.racers.iter().any(|r| r.id == id && r.key >> 16 != key >> 16) {
+            return;
+        }
+        self.racers.retain(|r| r.key != key || r.id == id);
+        match self.racers.iter().position(|r| r.id == id) {
+            Some(k) => {
+                let r = &mut self.racers[k];
+                r.key = key;
+                if r.name != name {
+                    r.name = name.to_string();
+                }
+            }
+            None if self.racers.len() < JOINED_IDS => self.racers.push(Racer { id, key, name: name.to_string() }),
+            None => {}
+        }
+    }
+
+    /// whether endpoint `key` joined it under `id`
+    fn has(&self, id: u32, key: u64) -> bool {
+        self.racers.iter().any(|r| r.id == id && r.key == key)
+    }
+}
 /// Two players of a room who share a crew are linked after the race lobbies' links and before all others, each
 /// player with at most this many such links (`crew_pairs`): half of the 32, so that the cars around it still show
 /// (under the busy cap, 8 links a player, a crew of 9 or more in one place takes all of them); half of its own links
@@ -316,7 +387,27 @@ fn race_line(player: &str, r: &wire::RaceRep) -> String {
             2 => "; a friend's win in the career",
             _ => "",
         }
-    )
+    ) + &lobby_notes(r)
+}
+
+/// what a race report says of its player's career stage and its lobby (the stage limits: every lobby race's line, to
+/// measure them by): "; stage 3; its lobby's stage limit; past it as the host's friend or crew-mate; its host past the
+/// race's stage", none from an older game
+fn lobby_notes(r: &wire::RaceRep) -> String {
+    let mut s = String::new();
+    if r.stage > 0 {
+        s += &format!("; stage {}", r.stage);
+    }
+    if r.lobby_bits & wire::RL_STAGED != 0 {
+        s += "; its lobby's stage limit";
+    }
+    if r.lobby_bits & wire::RL_MATE_PAST != 0 {
+        s += "; past it as the host's friend or crew-mate";
+    }
+    if r.lobby_bits & wire::RL_HOST_PAST != 0 {
+        s += "; its host past the race's stage";
+    }
+    s
 }
 
 /// what no car of the game has, however tuned: engine power (kW), top speed (km/h), the game's rating (nfsu2.xyz,
@@ -491,6 +582,9 @@ const GAME_NAME_MAX: usize = 24;
 struct Page {
     name: String,
     told: Vec<String>,
+    /// the names of its second player (co-op) the console was told of: the second form of its page's name or claim
+    /// (`name_check`), NAME_LINES at most
+    coop: Vec<String>,
     /// its game said its car flew (`flew`): told once
     flew: bool,
 }
@@ -556,6 +650,14 @@ struct Player {
     lobbies: bool,
     /// ...and reads the hub's crew marks (wire::HF_HUBCREW): its friends are marked in its lists even out of crews
     marks: bool,
+    /// Its HELLO says it is the second local player of its browser (wire::HF_SEAT2: co-op free roam, player 2 beside
+    /// player 1 on one screen, on a port of its own; the first is the browser's other endpoint).  Its page's keyphrase
+    /// is the first player's, so it is nobody's friend here (`friend_ids` none: no friend marks either way, no friend
+    /// linked first, not where its owner's friends find it), its world map and minimap questions go unanswered (the
+    /// browser's are the first player's: one answer state a browser), the console tells a known second player's name
+    /// apart (`name_check`), and its car may come to the first one's side without a teleport (`beside_own`).  It is
+    /// never linked with its browser's other endpoints, as no endpoint is (`prepare`).
+    seat2: bool,
     /// its crews as its last HELLO named them (wire::HF_CREW), each once, 0 after them: its crew-mates of its room are
     /// linked with it first (`crew_pairs`), and /players counts them (`crew_counts`)
     crews: [u32; wire::CREWS],
@@ -572,8 +674,9 @@ struct Player {
     resulted: Option<(u32, f64, u8)>,
     /// its links after the last tick (a HELLO of another start of the game empties them)
     links: Vec<Link>,
-    /// its core takes one-way links (its HELLO's core: wire::CORE_ONEWAY and up)
+    /// its core takes one-way links (its HELLO's core: wire::CORE_ONEWAY and up), and its lists' hints (CORE_HINTS)
     oneway: bool,
+    hints: bool,
     /// how its car moves (watch.rs)
     watch: Watch,
     /// its place in `order`
@@ -612,11 +715,14 @@ impl Block {
         Block { names, owners: Vec::new(), checked: u64::MAX }
     }
 
-    /// the keyphrases that hold its names now, when the claims changed since it last looked
+    /// the keyphrases that hold its names now, when the claims changed since it last looked (a second form's, "Bob 2",
+    /// the owner of "Bob": its co-op second player is its owner's, nfsu2-claims `holders`).  A name of more holders than
+    /// one names none of them: a block of one player must never block another keyphrase's (a second form two claims
+    /// shared, until the 2026-11-05 security audit, blocked the other one's first player too)
     fn owners_of(&mut self, claims: Option<&nfsu2_claims::Claims>, now: f64) {
         let Some(c) = claims.filter(|c| c.generation() != self.checked) else { return };
         self.checked = c.generation();
-        self.owners = self.names.iter().filter_map(|n| c.holder(n, now as i64)).collect();
+        self.owners = self.names.iter().map(|n| c.holders(n, now as i64)).filter(|h| h.len() == 1).flatten().collect();
     }
 
     /// whether it blocks player p
@@ -659,13 +765,33 @@ fn friend_id(a: &str, b: &str) -> u32 {
     h.max(1)
 }
 
-/// a player's friendships (`friend_id`): of its owner with each of `friends` (theirs), none without an owner
-fn friend_ids(owner: Option<&Arc<str>>, friends: Option<&Vec<Arc<str>>>) -> Vec<u32> {
-    let (Some(o), Some(f)) = (owner, friends) else { return Vec::new() };
+/// a player's friendships (`friend_id`): of its owner with each of `friends` (theirs), none without an owner, nor for a
+/// browser's second player (`seat2`: the owner is its first one's, `Player::seat2`)
+fn friend_ids(owner: Option<&Arc<str>>, friends: Option<&Vec<Arc<str>>>, seat2: bool) -> Vec<u32> {
+    let (Some(o), Some(f), false) = (owner, friends, seat2) else { return Vec::new() };
     let mut ids: Vec<u32> = f.iter().filter(|x| ***x != **o).map(|x| friend_id(o, x)).collect();
     ids.sort_unstable();
     ids.dedup();
     ids
+}
+
+/// whether players p and q are friends: their owners' friendship (`friend_id`) is in both players' `friend_ids` (each
+/// one's friends list names the other)
+fn friends_both(p: &Player, q: &Player) -> bool {
+    match (&p.owner, &q.owner) {
+        (Some(a), Some(b)) if a != b => {
+            let id = friend_id(a, b);
+            p.friend_ids.binary_search(&id).is_ok() && q.friend_ids.binary_search(&id).is_ok()
+        }
+        _ => false,
+    }
+}
+
+/// whether players p and q are friends (`friends_both`) or crew-mates (of one room, a crew of both): the players a
+/// lobby for its host's friends and crew-mates takes (`HubLobby::private`), as the host's game has them (roam_game.c
+/// mp_mate, from the hub's marks)
+fn mates(p: &Player, q: &Player) -> bool {
+    friends_both(p, q) || (p.room == q.room && crews_of(q).any(|c| p.crews.contains(&c)))
 }
 
 /// Where a friend is (`Hub::whereabouts`): in free roam, in this room (rc_room_hash; 0: the room of everyone), whose
@@ -696,7 +822,7 @@ fn sanitize(o: RoamOptions) -> RoamOptions {
         keep: f(o.keep, d.keep),
         hold_ms: f(o.hold_ms, d.hold_ms),
         max_per_vip: n(o.max_per_vip, d.max_per_vip),
-        max_players: n(o.max_players, d.max_players),
+        max_players: n(o.max_players, d.max_players).min(SLOTS_MAX),
         exact_room: n(o.exact_room, d.exact_room),
         min_degree: n(o.min_degree, d.min_degree),
         busy_high: f(o.busy_high, d.busy_high),
@@ -709,6 +835,9 @@ fn sanitize(o: RoamOptions) -> RoamOptions {
         away_m: f(o.away_m, d.away_m),
         view_m: f(o.view_m, d.view_m),
         sends: n(o.sends, d.sends).min(wire::LIST_MAX),
+        near_m: f(o.near_m, d.near_m),
+        near_hold_ms: f(o.near_hold_ms, d.near_hold_ms),
+        near_fast: f(o.near_fast, d.near_fast),
         level_slack_m: f(o.level_slack_m, d.level_slack_m),
         level_grade: f(o.level_grade, d.level_grade),
         level_k: f(o.level_k, d.level_k),
@@ -742,6 +871,9 @@ struct Stats {
     crew_skips: u64,
     /// the links that went one way only at the last tick (`one_way`)
     oneway_links: u64,
+    /// ...the ones of them to players who only get the other's car, by how far they are (near, past FAR_M, past
+    /// VERYFAR_M: every one, every 4th and every 10th of the other's snapshots with the hints), at the last tick
+    tx_only: [u64; 3],
     /// players' race reports logged
     race_reports: u64,
     /// `[cheat]` lines logged
@@ -761,7 +893,7 @@ struct Pair {
 /// What one tick needs, kept from tick to tick so that a tick allocates (almost) nothing.
 #[derive(Default)]
 struct Scratch {
-    room_of: HashMap<u32, usize>,
+    room_of: IdMap<u32, usize>,
     rooms: Vec<Vec<u32>>,
     /// each slot's new links
     fresh: Vec<Vec<Link>>,
@@ -770,10 +902,15 @@ struct Scratch {
     // by the place in the room's list: where each one is, and where the links weigh it (`prepare`): soon_ms on,
     // look_ms on, and its view point
     pos: Vec<[f64; 3]>,
+    /// ...where it is now (its SNAP moved on by its age), for the near ones (RoamOptions near_m), and its speed
+    now: Vec<Place>,
+    speed: Vec<f64>,
     soon: Vec<Place>,
     ahead: Vec<Place>,
     view: Vec<Place>,
     deg: Vec<usize>,
+    /// each place's virtual address: two places of one browser are never linked (`one_browser`)
+    vips: Vec<u32>,
     /// each place's core takes one-way links (`Player::oneway`), and what `one_way` keeps from tick to tick
     newcore: Vec<bool>,
     ow: OneWay,
@@ -802,7 +939,7 @@ struct Scratch {
     /// the race lobbies' pairs (`lobby_pairs`), places in the room, the host first; the room's ids to places; the
     /// players asking to join a lobby (its id, their place); the players near a lobby's start
     lpairs: Vec<(u32, u32)>,
-    lids: HashMap<u32, u32>,
+    lids: IdMap<u32, u32>,
     ljoin: Vec<(u32, u32)>,
     lnear: Vec<(f64, u32)>,
     /// each lobby's host and its players there, as places (`lobby_pairs`)
@@ -823,8 +960,9 @@ struct Scratch {
     ccount: Vec<u32>,
     /// each place's links made first, the lobbies' and the crews' (the first of its new links: `link_every_pair`)
     npre: Vec<u32>,
-    /// a list's crew marks, one a link (`lists`)
+    /// a list's crew marks, one a link, and its hints (`lists`)
     marks: Vec<u8>,
+    hints: Vec<u8>,
     /// a large room's links of the last tick, sorted (`link_many`)
     olds: Vec<Cand>,
     /// each place's links of the last tick as places in the room: `olinks[ostart[i]..ostart[i + 1]]`, and since when
@@ -856,6 +994,10 @@ struct Weigh {
     now: f64,
     hold_ms: f64,
     keep: f64,
+    /// RoamOptions near_m, near_hold_ms, near_fast (`one_way`)
+    near_m: f64,
+    near_hold_ms: f64,
+    near_fast: f64,
     threads: usize,
     /// what a gap in height between two roads weighs (RoamOptions level_*)
     level: Level,
@@ -900,48 +1042,52 @@ pub struct Hub {
     holes: usize,
     by_key: HashMap<u64, u32>,
     /// per browser (virtual address), the players its page blocks (`blocks`), until it leaves the switch
-    blocks: HashMap<u32, Block>,
+    blocks: IdMap<u32, Block>,
     /// per browser, its page's name on the switch (`page_name`), until it leaves the switch
-    pages: HashMap<u32, Page>,
+    pages: IdMap<u32, Page>,
     /// per browser, its keyphrase's friends (their owners: `friends`), and the name of the room its page plays in
     /// (`room_name`: for its friends' Join), until it leaves the switch
-    friends: HashMap<u32, Vec<Arc<str>>>,
-    room_names: HashMap<u32, String>,
+    friends: IdMap<u32, Vec<Arc<str>>>,
+    room_names: IdMap<u32, String>,
     /// the players in free roam by their keyphrase (made at each tick): `whereabouts`
     owners_at: HashMap<Arc<str>, u32>,
     /// the pairs of players kept apart at the last tick (`block_pairs`), as slots, the lower first, sorted: the world
     /// map and the lobby list read them between ticks
     apart: Vec<(u32, u32)>,
-    /// the endpoints of each virtual address (`max_per_vip`)
-    per_vip: HashMap<u32, u32>,
+    /// the endpoints of each virtual address, their slots in the order they came (`max_per_vip`; co-op's second player
+    /// beside its first one: `beside_own`)
+    per_vip: IdMap<u32, Vec<u32>>,
     /// the players whose last HELLO named a crew: with none, a tick does not look for crews at all
     crewed: usize,
     /// the cheat watches of players gone without a BYE, by endpoint, for WATCH_KEEP_MS (at most max_players of them)
     kept: HashMap<u64, KeptWatch>,
     /// the races' results as the players' games showed them, until each race is judged (results.rs), and the lobbies
-    /// whose players' results are taken, by their ids
+    /// whose players' results are taken, by the endpoints that joined with their ids
     results: Results,
     /// the lobbies' races' honest times, an edited car's compared with them (`edited_car_line`)
     times: Times,
-    joined: HashMap<u32, Joined>,
+    joined: IdMap<u32, Joined>,
     /// each browser's lobbies in `joined`, oldest first; when `joined` was last pruned
-    joined_by_vip: HashMap<u32, Vec<u32>>,
+    joined_by_vip: IdMap<u32, Vec<u32>>,
     joined_pruned: f64,
+    /// the near links gone (`OneWay::gone`) as of the last `[roam] cars within ... that went` line, and when it was
+    near_said: [u64; GONE_N],
+    near_said_at: f64,
     /// when each virtual address's next world map is answered at the soonest (map_gap_ms), kept past its players: a BYE and a HELLO (or
     /// another port) make a new player, and when a player's own time was the limit, a new player's first answer came
     /// at once (the second security audit, 2026-10-22: a map walks every player on the hub's one thread, and a few
     /// clients asking that way kept it busy); dropped at each tick once past
-    map_at: HashMap<u32, f64>,
+    map_at: IdMap<u32, f64>,
     /// MAPD: each browser's map as it holds it (`MapHeld`), and when its next race lobbies go
-    maps: HashMap<u32, MapHeld>,
-    lobbies_at: HashMap<u32, f64>,
+    maps: IdMap<u32, MapHeld>,
+    lobbies_at: IdMap<u32, f64>,
     /// MAPD: each room's players the map shows, by slot, where they are at the time with it (made at the first
     /// question of a tick)
-    map_cands: HashMap<u32, (f64, Vec<MapCand>)>,
+    map_cands: IdMap<u32, (f64, Vec<MapCand>)>,
     /// NEARD (the minimap): as map_at and maps, for each browser's minimap; and every room's players the maps show by
     /// room and cell (`near_grid_of`), made at the first minimap question of a tick
-    near_at: HashMap<u32, f64>,
-    nears: HashMap<u32, MapHeld>,
+    near_at: IdMap<u32, f64>,
+    nears: IdMap<u32, MapHeld>,
     near_grid: Option<NearGrid>,
     /// the grids made so far (`NearGrid::nth`)
     near_gens: u64,
@@ -991,26 +1137,28 @@ impl Hub {
             order: Vec::new(),
             holes: 0,
             by_key: HashMap::new(),
-            blocks: HashMap::new(),
-            pages: HashMap::new(),
-            friends: HashMap::new(),
-            room_names: HashMap::new(),
+            blocks: IdMap::default(),
+            pages: IdMap::default(),
+            friends: IdMap::default(),
+            room_names: IdMap::default(),
             owners_at: HashMap::new(),
             apart: Vec::new(),
-            per_vip: HashMap::new(),
+            per_vip: IdMap::default(),
             crewed: 0,
             kept: HashMap::new(),
             results: Results::default(),
             times: Times::default(),
-            joined: HashMap::new(),
-            joined_by_vip: HashMap::new(),
+            joined: IdMap::default(),
+            joined_by_vip: IdMap::default(),
             joined_pruned: 0.0,
-            map_at: HashMap::new(),
-            maps: HashMap::new(),
-            lobbies_at: HashMap::new(),
-            map_cands: HashMap::new(),
-            near_at: HashMap::new(),
-            nears: HashMap::new(),
+            near_said: [0; GONE_N],
+            near_said_at: 0.0,
+            map_at: IdMap::default(),
+            maps: IdMap::default(),
+            lobbies_at: IdMap::default(),
+            map_cands: IdMap::default(),
+            near_at: IdMap::default(),
+            nears: IdMap::default(),
             near_grid: None,
             near_gens: 0,
             near_found: Vec::new(),
@@ -1043,6 +1191,7 @@ impl Hub {
         if p.checked != g {
             p.checked = g;
             let was = p.impostor;
+            // (co-op's second player's "Bob 2" of a "Bob" taken away too: the names compare by their letters, a 2 none)
             let denied = self.o.deny.as_ref().is_some_and(|d| d.has(&p.name));
             p.impostor = denied || self.claims.as_ref().is_some_and(|c| !c.may_use(&p.name, p.owner.as_deref(), now as i64));
             if p.impostor && !was {
@@ -1101,6 +1250,11 @@ impl Hub {
                 p.watch.reset();
             }
         }
+        // (a world map's key names a slot under SLOTS_MAX: past it, the players gone out of the links now, and their
+        // slots taken again, rather than one more)
+        if self.free.is_empty() && self.slots.len() >= SLOTS_MAX {
+            self.purge();
+        }
         let slot = match self.free.pop() {
             Some(s) => s,
             None => {
@@ -1108,7 +1262,7 @@ impl Hub {
                 (self.slots.len() - 1) as u32
             }
         };
-        *self.per_vip.entry(p.vip).or_insert(0) += 1;
+        self.per_vip.entry(p.vip).or_default().push(slot);
         self.order.push(slot);
         self.slots[slot as usize] = Some(Player { at: (self.order.len() - 1) as u32, ..p });
         self.by_key.insert(k, slot);
@@ -1130,9 +1284,9 @@ impl Hub {
         }
         self.by_key.remove(&p.key());
         self.crewed -= (p.crews[0] != 0) as usize;
-        if let Some(n) = self.per_vip.get_mut(&p.vip) {
-            *n -= 1;
-            if *n == 0 {
+        if let Some(mine) = self.per_vip.get_mut(&p.vip) {
+            mine.retain(|&s| s != slot);
+            if mine.is_empty() {
                 self.per_vip.remove(&p.vip);
             }
         }
@@ -1203,8 +1357,16 @@ impl Hub {
         self.frame_from(from, data, None);
     }
 
-    /// a frame from the browser at `from`, whose page plays with keyphrase `owner` (`FrameCtx::owner`)
+    /// a frame from the browser at `from`, whose page plays with keyphrase `owner` (`FrameCtx::owner`); the browser is
+    /// a client of its own
     pub fn frame_from(&mut self, from: u32, data: &[u8], owner: Option<&Arc<str>>) {
+        self.frame_of(from, data, owner, None);
+    }
+
+    /// a frame from the browser at `from`, whose page plays with keyphrase `owner` (`FrameCtx::owner`), of the client
+    /// `client` (an opaque id of its address, as the switch has it: `RoamHub`'s frames); None: the browser is a client
+    /// of its own.  A race's results count the clients that report its winner (results.rs, its clean wins).
+    pub fn frame_of(&mut self, from: u32, data: &[u8], owner: Option<&Arc<str>>, client: Option<&Arc<str>>) {
         self.st.frames += 1;
         if data.len() < F_DATA + wire::HDR + wire::CRC || data[0] != KIND_UDP {
             self.st.bad += 1;
@@ -1229,8 +1391,8 @@ impl Hub {
             Some(s) => s,
             None => {
                 // a player starts with its HELLO (the room)
-                let Msg::Hello { status, room, name, .. } = m else { return };
-                let mine = self.per_vip.get(&from).copied().unwrap_or(0) as usize;
+                let Msg::Hello { status, room, name, seat2, .. } = m else { return };
+                let mine = self.per_vip.get(&from).map_or(0, Vec::len);
                 if mine >= self.o.max_per_vip || self.by_key.len() >= self.o.max_players {
                     self.st.refused += 1;
                     return;
@@ -1255,6 +1417,7 @@ impl Hub {
                     seen: 0.0,
                     lobbies: false,
                     marks: false,
+                    seat2,
                     crews: [0; wire::CREWS],
                     lobby: None,
                     join: None,
@@ -1263,10 +1426,11 @@ impl Hub {
                     resulted: None,
                     links: Vec::new(),
                     oneway: false,
+                    hints: false,
                     watch: Watch::new((self.now)()),
                     at: 0,
                     owner: owner.cloned(),
-                    friend_ids: friend_ids(owner, self.friends.get(&from)),
+                    friend_ids: friend_ids(owner, self.friends.get(&from), seat2),
                     impostor: false,
                     checked: 0,
                     seen_claim: f64::NEG_INFINITY,
@@ -1275,6 +1439,11 @@ impl Hub {
         };
         let now = (self.now)();
         let degree = self.o.degree;
+        // (a second player's car come to its first one's side: no teleport)
+        let beside = match m {
+            Msg::Snap { p: pos, status: 2 | 5, .. } => self.beside_own(slot, &pos, now),
+            _ => false,
+        };
         let Some(Some(p)) = self.slots.get_mut(slot as usize) else { return };
         p.seen = now;
         p.hub_port = dport;
@@ -1290,7 +1459,7 @@ impl Hub {
         // (a HELLO: its name against the claims)
         let mut check = false;
         match m {
-            Msg::Hello { sender, core, status, room, name, lobbies, marks, crews, links, duel } => {
+            Msg::Hello { sender, core, status, room, name, lobbies, marks, crews, links, duel, seat2 } => {
                 // another start of the game on the same endpoint (where its car was, and its clock's epochs, start again)
                 if p.id != sender {
                     p.links.clear();
@@ -1309,10 +1478,14 @@ impl Hub {
                     p.checked = 0;
                     renamed = true;
                 }
-                if p.owner.as_ref() != owner {
+                if p.owner.as_ref() != owner || p.seat2 != seat2 {
+                    if p.seat2 != seat2 {
+                        renamed = true;
+                    }
                     p.owner = owner.cloned();
+                    p.seat2 = seat2;
                     p.checked = 0;
-                    p.friend_ids = friend_ids(owner, self.friends.get(&from));
+                    p.friend_ids = friend_ids(owner, self.friends.get(&from), seat2);
                 }
                 check = true;
                 // the links it wants (core 10), the hub's most at most, and no more than its lists take: 48 for a core
@@ -1322,6 +1495,7 @@ impl Hub {
                 p.lobbies = lobbies;
                 p.marks = marks;
                 p.oneway = core >= wire::CORE_ONEWAY;
+                p.hints = core >= wire::CORE_HINTS;
                 p.duel = duel;
                 let was = p.crews[0] != 0;
                 p.crews = distinct(crews);
@@ -1339,22 +1513,23 @@ impl Hub {
                 p.pos_at = p.seen;
                 p.status = status;
                 if matches!(status, 2 | 5) {
-                    seen = p.watch.snap(now, pos, t_us, clock);
+                    seen = p.watch.snap(now, pos, t_us, clock, beside);
                 } else {
                     p.watch.reset();
                 }
             }
-            Msg::MapReq { req, max, base, flags } if sender == p.id => ask = Some((req, max, base, flags)),
-            Msg::NearReq { req, max, base, radius } if sender == p.id => ask_near = Some((req, max, base, radius)),
-            Msg::Lobby { op, to: 0, lobby, race, x, y, n, max, state, ids } if sender == p.id => {
+            // (a browser's maps are its first player's: a second one's questions go unanswered, `Player::seat2`)
+            Msg::MapReq { req, max, base, flags } if sender == p.id && !p.seat2 => ask = Some((req, max, base, flags)),
+            Msg::NearReq { req, max, base, radius } if sender == p.id && !p.seat2 => ask_near = Some((req, max, base, radius)),
+            Msg::Lobby { op, to: 0, lobby, race, x, y, n, max, state, ids, private, staged, hstage } if sender == p.id => {
                 match op {
-                    wire::LOBBY_ADVERT => p.lobby = Some((HubLobby { id: lobby, race, x, y, n, max, state, ids }, now)),
+                    wire::LOBBY_ADVERT => p.lobby = Some((HubLobby { id: lobby, race, x, y, n, max, state, ids, private, staged, hstage }, now)),
                     wire::LOBBY_CLOSE if p.lobby.is_some_and(|(l, _)| l.id == lobby) => p.lobby = None,
                     wire::LOBBY_JOIN => p.join = Some((lobby, now)),
                     _ => {}
                 }
                 if matches!(op, wire::LOBBY_ADVERT | wire::LOBBY_JOIN) {
-                    heard = Some((op, lobby, race, p.id, p.vip));
+                    heard = Some((op, lobby, race));
                 }
             }
             // one report a race (its lobby), and none within REPORT_GAP_MS of the player's last; its results the same
@@ -1377,8 +1552,8 @@ impl Hub {
             }
             _ => {}
         }
-        if let Some((op, lobby, race, id, vip)) = heard {
-            self.lobby_heard(op, lobby, race, id, vip, now);
+        if let Some((op, lobby, race)) = heard {
+            self.lobby_heard(slot, op, lobby, race, now);
         }
         if let Some((was, is)) = crewed {
             self.crewed = self.crewed + is as usize - was as usize;
@@ -1401,19 +1576,20 @@ impl Hub {
         for s in seen.into_iter().flatten() {
             self.cheat(slot, s, now);
         }
-        // a race's results from one of its lobby's players, naming only them (a racer not of it is nobody: no line
-        // names it); none of a lobby the hub did not see
+        // a race's results from one of its lobby's players (the endpoint that joined with its id), naming only them (a
+        // racer not of it is nobody: no line names it), each as the endpoint that joined with its id; none of a lobby
+        // the hub did not see
         if let Some((by, mut r)) = res
-            && let Some(ids) = self.joined.get(&r.lobby).filter(|j| j.race == r.race && j.ids.contains(&by)).map(|j| j.ids.clone())
+            && let Some(j) = self.joined.get(&r.lobby).filter(|j| j.race == r.race && j.has(by, k))
         {
             for x in &mut r.rows[..r.n] {
-                if !ids.contains(&x.id) {
+                if !j.racers.iter().any(|m| m.id == x.id) {
                     x.id = 0;
                 }
             }
-            let mut results = std::mem::take(&mut self.results);
-            results.add(now, by, r, &|id| self.who(id));
-            self.results = results;
+            let names: Vec<(u32, String)> = j.racers.iter().map(|m| (m.id, self.racer_name(m))).collect();
+            let client = client.cloned().unwrap_or_else(|| Arc::from(vip_str(from)));
+            self.results.add(now, by, client, r, &|id| names.iter().find(|m| m.0 == id).map(|m| m.1.clone()));
         }
         if let Some((req, max, base, flags)) = ask {
             self.mapd(slot, req, max, base, flags, now);
@@ -1423,15 +1599,15 @@ impl Hub {
         }
     }
 
-    /// A lobby's advert (from its host) or a player's own ask to join it: its players, for its races' results
-    /// (`Joined`).  An advert of a lobby another browser hosts, and an ask for a lobby the hub did not see, count for
-    /// nothing.
-    fn lobby_heard(&mut self, op: u8, lobby: u32, race: u32, id: u32, vip: u32, now: f64) {
+    /// A lobby's advert (from its host) or a player's own ask to join it, from the player in `slot`: its players, for
+    /// its races' results (`Joined`).  An advert of a lobby another browser hosts, an ask for a lobby the hub did not
+    /// see, and an ask under an id another browser joined it with, count for nothing.
+    fn lobby_heard(&mut self, slot: u32, op: u8, lobby: u32, race: u32, now: f64) {
+        let Some(Some(p)) = self.slots.get(slot as usize) else { return };
+        let (id, key, vip) = (p.id, p.key(), p.vip);
         if let Some(j) = self.joined.get_mut(&lobby) {
             if j.race == race && (op != wire::LOBBY_ADVERT || j.vip == vip) {
-                if !j.ids.contains(&id) && j.ids.len() < JOINED_IDS {
-                    j.ids.push(id);
-                }
+                j.join(id, key, &p.name);
                 j.at = now;
             }
             return;
@@ -1446,7 +1622,7 @@ impl Hub {
             self.joined.remove(&old);
         }
         mine.push(lobby);
-        self.joined.insert(lobby, Joined { race, vip, ids: vec![id], at: now });
+        self.joined.insert(lobby, Joined { race, vip, racers: vec![Racer { id, key, name: p.name.clone() }], at: now });
     }
 
     /// What a player's SNAP showed of its car (watch.rs) as a `[cheat]` line, while it has lines: who was next to where
@@ -1491,13 +1667,32 @@ impl Hub {
         (self.log)(&line);
     }
 
-    /// a player by its game's id, as a line names it: its address and name (one gone a while ago by its kept watch)
-    fn who(&self, id: u32) -> Option<String> {
-        if let Some(p) = self.players().find(|p| p.id == id) {
-            return Some(format!("{} \"{}\"", nfsu2_util::vip_str(p.vip), p.name));
-        }
-        let (k, w) = self.kept.iter().find(|(_, w)| w.id == id)?;
-        Some(format!("{} \"{}\"", nfsu2_util::vip_str((k >> 16) as u32), w.name))
+    /// Whether a SNAP of the player in `slot`, a browser's second player (`Player::seat2`), has its car at `to` beside
+    /// its first player's (an endpoint of its browser without the flag: two flagged ones excuse nothing of each
+    /// other's): within BESIDE_M of where that one's last SNAP, younger than NEAR_FRESH_MS in free roam (or paused
+    /// there) in its room, and its speed have it now.  The game puts the second player's car there when it joins and
+    /// after each world load, from wherever it was: that jump is no teleport (watch.rs `Watch::snap`).
+    fn beside_own(&self, slot: u32, to: &[f64; 3], now: f64) -> bool {
+        let Some(p) = self.player(slot).filter(|p| p.seat2) else { return false };
+        let Some(mine) = self.per_vip.get(&p.vip).filter(|m| m.len() > 1) else { return false };
+        mine.iter().filter(|&&s| s != slot).filter_map(|&s| self.player(s)).any(|o| {
+            !o.seat2
+                && !o.impostor
+                && o.room == p.room
+                && matches!(o.status, 2 | 5)
+                && now - o.pos_at <= NEAR_FRESH_MS
+                && o.p.is_some_and(|at| {
+                    let k = (now - o.pos_at).max(0.0) / 1000.0;
+                    watch::distance(&[at[0] + o.v[0] * k, at[1] + o.v[1] * k, at[2] + o.v[2] * k], to) <= BESIDE_M
+                })
+        })
+    }
+
+    /// a lobby's player as a line names it: its endpoint's address and name (its name now while it is on the hub
+    /// under that id, else as of its last ask to join)
+    fn racer_name(&self, r: &Racer) -> String {
+        let now = self.by_key.get(&r.key).and_then(|&s| self.player(s)).filter(|p| p.id == r.id);
+        format!("{} \"{}\"", vip_str((r.key >> 16) as u32), now.map_or(&r.name, |p| &p.name))
     }
 
     /// The world map's answer to the player in `slot` (roam_core.h RC_MSG_MAPD): the players of its room in free roam
@@ -1522,13 +1717,13 @@ impl Hub {
         let mut links: Vec<u32> = p.links.iter().filter(|l| l.dir & DIR_RECV != 0).map(|l| l.slot).collect();
         links.sort_unstable();
         // (by their places in the room's list, which is by slot; past max, the nearest: each one's distance once, its
-        // square, which orders them alike)
+        // square, which orders them alike; not its browser's other endpoints, whose cars its game shows itself)
         let mut pick: Vec<u32> = (0..cands.len() as u32)
             .filter(|&i| {
                 let c = &cands[i as usize];
                 c.slot != slot
                     && links.binary_search(&c.slot).is_err()
-                    && !self.player(c.slot).is_some_and(|o| self.apart_from(slot, c.slot, p, o))
+                    && !self.player(c.slot).is_some_and(|o| o.vip == vip || self.apart_from(slot, c.slot, p, o))
             })
             .collect();
         let total = pick.len().min(u16::MAX as usize) as u16;
@@ -1610,6 +1805,8 @@ impl Hub {
             return;
         }
         let (room, vip, port, hub_port) = (p.room, p.vip, p.port, p.hub_port);
+        // (its browser has other endpoints: none of them are its answer's, their cars its game shows itself)
+        let own = self.per_vip.get(&vip).is_some_and(|m| m.len() > 1);
         if self.near_grid.as_ref().is_none_or(|g| g.at > now) {
             self.near_gens += 1;
             self.near_grid = Some(self.near_grid_of(now, self.near_gens));
@@ -1673,7 +1870,9 @@ impl Hub {
                             if d2 > k2 || mark.get(it.slot as usize) == Some(&stamp) {
                                 continue;
                             }
-                            if blocks && self.player(it.slot).is_some_and(|o| self.apart_from(slot, it.slot, p, o)) {
+                            if (blocks || own)
+                                && self.player(it.slot).is_some_and(|o| o.vip == vip || self.apart_from(slot, it.slot, p, o))
+                            {
                                 continue;
                             }
                             // (a distance's bits are in its order: it is not negative)
@@ -1729,7 +1928,8 @@ impl Hub {
                     let dt = since.min(it.left);
                     let (dx, dy) = (it.x + it.vx * dt - mx, it.y + it.vy * dt - my);
                     let d2 = dx * dx + dy * dy;
-                    if d2 <= r2 {
+                    // (a candidate's slot taken since by its browser's other endpoint: not that one)
+                    if d2 <= r2 && !(own && self.player(it.slot).is_some_and(|o| o.vip == vip)) {
                         picks.push((d2.to_bits(), it.slot, k));
                     }
                 }
@@ -1855,7 +2055,13 @@ impl Hub {
     }
 
     /// With the world map's answer, to a player that takes race lobbies: the open lobbies of its room (any player's,
-    /// its own too, an advert younger than LOBBY_STALE_MS), nearest first, LOBBIES_MAX at most, in one datagram
+    /// its own too, an advert younger than LOBBY_STALE_MS), nearest first, LOBBIES_MAX at most, in one datagram.  A
+    /// lobby for its host's friends and crew-mates only (`HubLobby::private`) only to them, to the players it lists
+    /// and to its host.  One the player could not join, full or starting its race (a map showed them all, and
+    /// players drove to lobbies that were not there for them, 2026-11-05), only to its own players.  The entry of a
+    /// lobby that keeps out the players past its host's stage says so, with that stage, and whether its host is the
+    /// player's friend or crew-mate (wire::LOBBIES_STAGED, LOBBIES_HSTAGE, LOBBIES_MATE): the game keeps it off the map
+    /// for a player past that stage, as it keeps that one out.
     fn lobbies(&mut self, slot: u32, req: u16, now: f64) {
         let Some(p) = self.player(slot) else { return };
         if !p.lobbies || p.impostor {
@@ -1872,8 +2078,20 @@ impl Hub {
             if self.apart_from(slot, q, p, o) {
                 continue;
             }
+            let ours = q == slot || l.ids[..(l.n as usize).min(wire::LOBBY_PLAYERS)].contains(&p.id);
+            if l.private && !ours && !mates(p, o) {
+                continue;
+            }
+            if !ours && (l.state != 0 || l.n >= l.max) {
+                continue;
+            }
+            let state = if l.staged {
+                l.state | wire::LOBBIES_STAGED | (l.hstage & 7) << wire::LOBBIES_HSTAGE | if mates(p, o) { wire::LOBBIES_MATE } else { 0 }
+            } else {
+                l.state
+            };
             let d = distance(&at, &[l.x as f64, l.y as f64, at[2]]);
-            near.push((order_key(d), (l.x, l.y, l.race, l.n, l.max, l.state)));
+            near.push((order_key(d), (l.x, l.y, l.race, l.n, l.max, state)));
         }
         near.sort_by_key(|e| e.0);
         near.truncate(wire::LOBBIES_MAX);
@@ -1896,10 +2114,7 @@ impl Hub {
         self.pages.remove(&vip);
         self.friends.remove(&vip);
         self.room_names.remove(&vip);
-        if !self.per_vip.contains_key(&vip) {
-            return;
-        }
-        let mine: Vec<u32> = self.order.iter().copied().filter(|&s| self.player(s).is_some_and(|p| p.vip == vip)).collect();
+        let Some(mine) = self.per_vip.get(&vip).cloned() else { return };
         self.drop_slots(&mine, true);
     }
 
@@ -1915,8 +2130,11 @@ impl Hub {
 
     /// Browser `vip`'s keyphrase (`me`) has these friends (their keyphrases: the server reads its friends list when its
     /// page asks): each one in its room is linked with it first, while each one's list here names the other
-    /// (`friend_id`).  A friendship goes both ways in the server's lists, so each of these friends in free roam now (as
-    /// of the last tick) has `me` on its list here too: one befriended while it was away is linked from now on.
+    /// (`friend_id`).  The server tells only friendships that go both ways in its lists (its friends.rs: each one's
+    /// list names the other, as an accepted request makes them), so each of these friends in free roam now (as of the
+    /// last tick) has `me` on its list here too: one befriended while it was away is linked from now on.  (Until the
+    /// 2026-11-05 security audit a name on one list alone came here too, and this linked its player with the other one
+    /// from anywhere in the room.)
     pub fn friends(&mut self, vip: u32, me: Arc<str>, owners: Vec<Arc<str>>) {
         let theirs: Vec<u32> =
             owners.iter().filter_map(|o| self.player(*self.owners_at.get(o)?)).map(|p| p.vip).filter(|&v| v != vip).collect();
@@ -1934,7 +2152,7 @@ impl Hub {
         for v in std::iter::once(vip).chain(theirs) {
             let f = self.friends.get(&v);
             for p in self.slots.iter_mut().flatten().filter(|p| p.vip == v) {
-                p.friend_ids = friend_ids(p.owner.as_ref(), f);
+                p.friend_ids = friend_ids(p.owner.as_ref(), f, p.seat2);
             }
         }
     }
@@ -1964,6 +2182,19 @@ impl Hub {
         })
     }
 
+    /// The race lobby the player of browser `vip` hosts (`Hosted`; its first player's, not a co-op second one's), when
+    /// its last advert came within LOBBY_STALE_MS and says it is open (it takes players now, full or not): an invite
+    /// to a friend (the server's friends.rs) names it, and the friend's game joins it from wherever it is
+    pub fn hosted(&self, vip: u32) -> Option<Hosted> {
+        let now = (self.now)();
+        let mine = self.per_vip.get(&vip)?;
+        mine.iter().filter_map(|&s| self.player(s)).filter(|p| p.vip == vip && !p.seat2 && !p.impostor).find_map(|p| {
+            let (l, t) = p.lobby?;
+            let open = now - t <= LOBBY_STALE_MS && l.state == 0 && l.n >= 1 && l.ids[0] == p.id;
+            open.then_some(Hosted { host: p.id, lobby: l.id, race: l.race, n: l.n, max: l.max, room: p.room })
+        })
+    }
+
     /// Where each of these keyphrases plays in free roam (as of the last tick), None: it does not
     pub fn whereabouts(&self, owners: &[Arc<str>]) -> Vec<Option<Whereabouts>> {
         owners
@@ -1978,12 +2209,9 @@ impl Hub {
     /// browser `vip`'s page goes by `name` on the switch (its hello's): its players' names are held against it
     /// (`name_check`)
     pub fn page_name(&mut self, vip: u32, name: String) {
-        self.pages.insert(vip, Page { name, told: Vec::new(), flew: false });
-        if self.per_vip.contains_key(&vip) {
-            let mine: Vec<u32> = self.order.iter().copied().filter(|&s| self.player(s).is_some_and(|p| p.vip == vip)).collect();
-            for s in mine {
-                self.name_check(s);
-            }
+        self.pages.insert(vip, Page { name, told: Vec::new(), coop: Vec::new(), flew: false });
+        for s in self.per_vip.get(&vip).cloned().unwrap_or_default() {
+            self.name_check(s);
         }
     }
 
@@ -2034,11 +2262,32 @@ impl Hub {
 
     /// The name over the car of the player in `slot` (its HELLO's) against its page's on the switch: another one is a
     /// console line, so that the operator finds the player by the name the others see (its `who` finds both).  Each
-    /// name once, NAME_LINES a page at most.  A page that is not known yet is held against it when it is.
+    /// name once, NAME_LINES a page at most.  A page that is not known yet is held against it when it is.  A browser's
+    /// second player (`Player::seat2`) under the second form of its page's name, or of its keyphrase's claimed name
+    /// (nfsu2-claims `second`: "Alex 2" beside "Alex"), is the page's own co-op player, not a game that shows another
+    /// name than its page's (an edited page's sign): a line of its own, each name once, NAME_LINES a page at most.
     fn name_check(&mut self, slot: u32) {
         let Some(Some(p)) = self.slots.get(slot as usize) else { return };
         let Some(page) = self.pages.get_mut(&p.vip) else { return };
-        if p.name.is_empty() || same_name(&page.name, &p.name) || page.told.len() >= NAME_LINES || page.told.contains(&p.name) {
+        if p.name.is_empty() || same_name(&page.name, &p.name) {
+            return;
+        }
+        let second = |n: &str| nfsu2_claims::second(n).is_some_and(|s| s.eq_ignore_ascii_case(&p.canon));
+        let now = (self.now)() as i64;
+        let claimed = || p.owner.as_deref().and_then(|o| self.claims.as_ref()?.mine(o, now)).is_some_and(|m| second(&m.name));
+        if p.seat2 && (second(&page.name) || claimed()) {
+            if page.coop.len() < NAME_LINES && !page.coop.contains(&p.name) {
+                page.coop.push(p.name.clone());
+                (self.log)(&format!(
+                    "[roam] {} \"{}\": its second player (co-op) shows \"{}\" over its car",
+                    vip_str(p.vip),
+                    js::printable(&page.name, 32),
+                    js::printable(&p.name, 32)
+                ));
+            }
+            return;
+        }
+        if page.told.len() >= NAME_LINES || page.told.contains(&p.name) {
             return;
         }
         page.told.push(p.name.clone());
@@ -2115,7 +2364,8 @@ impl Hub {
         }
         // the races whose results all came (or a while ago): each one's result, and the ones won by cheating
         for (o, v) in self.results.judged(now) {
-            let who = |id: u32| o.names.get(&id).cloned().or_else(|| self.who(id)).unwrap_or_else(|| format!("player {id:08x}"));
+            // (every racer as its lobby's endpoint that joined with its id, `Joined`: never another player of that id)
+            let who = |id: u32| o.names.get(&id).cloned().unwrap_or_else(|| format!("player {id:08x}"));
             let result = results::result_line(&o, &who);
             let cheats: Vec<String> =
                 v.map(|v| results::line(&v, &who)).into_iter().chain(o.jumps.iter().map(|j| results::jump_line(&o, j, &who))).collect();
@@ -2154,7 +2404,8 @@ impl Hub {
                 continue;
             }
             dueling += (p.duel != 0) as usize;
-            if let Some(o) = &p.owner {
+            // (a browser's second player is not where its owner is: its first one is, `Player::seat2`)
+            if let Some(o) = p.owner.as_ref().filter(|_| !p.seat2) {
                 self.owners_at.insert(o.clone(), slot);
             }
             let r = *s.room_of.entry(p.room).or_insert_with(|| {
@@ -2167,13 +2418,23 @@ impl Hub {
             });
             s.rooms[r].push(slot);
         }
+        s.ow.gone_out.clear();
         // (empty already, unless a tick before broke off)
         s.fresh.iter_mut().for_each(Vec::clear);
         s.fresh.resize_with(self.slots.len(), Vec::new);
         s.local.clear();
         s.local.resize(self.slots.len(), NONE);
         let level = Level::new(self.o.level_slack_m, self.o.level_grade, self.o.level_k);
-        let w = Weigh { now, hold_ms: self.o.hold_ms, keep: self.o.keep, threads: self.o.link_threads, level };
+        let w = Weigh {
+            now,
+            hold_ms: self.o.hold_ms,
+            keep: self.o.keep,
+            near_m: self.o.near_m,
+            near_hold_ms: self.o.near_hold_ms,
+            near_fast: self.o.near_fast,
+            threads: self.o.link_threads,
+            level,
+        };
         let (mut duel_links, mut lobby_links, mut crew_links, mut crew_skips, mut oneway_links) = (0, 0, 0, 0, 0);
         for r in 0..rooms {
             let list = std::mem::take(&mut s.rooms[r]);
@@ -2217,6 +2478,7 @@ impl Hub {
         self.st.crew_links = crew_links;
         self.st.crew_skips = crew_skips;
         self.st.oneway_links = oneway_links;
+        self.near_line(now);
         self.lists();
         let ms = t0.elapsed().as_secs_f64() * 1000.0;
         self.st.ticks += 1;
@@ -2225,24 +2487,108 @@ impl Hub {
         }
     }
 
+    /// every NEAR_SAY_MS: how many of the cars players got from within NEAR_GONE_M went, and why (`near_gone`), when
+    /// any did
+    fn near_line(&mut self, now: f64) {
+        if self.near_said_at == 0.0 {
+            self.near_said_at = now;
+        }
+        if now - self.near_said_at < NEAR_SAY_MS {
+            return;
+        }
+        let g = self.s.ow.gone;
+        let d: Vec<u64> = g.iter().zip(self.near_said.iter()).map(|(a, b)| a - b).collect();
+        let all: u64 = d.iter().sum();
+        let mins = (now - self.near_said_at) / 60_000.0;
+        self.near_said = g;
+        self.near_said_at = now;
+        // (the lists of the last tick: the players who only get another's car, by how far: `lists`)
+        let [a, b, c] = self.st.tx_only;
+        if a + b + c > 0 {
+            (self.log)(&format!(
+                "[roam] one-way links at the last tick: {} (a player gets the other's car, the other none of its): {a} near, \
+                 {b} past {} m, {c} past {} m (a core of 16 and up sends those every 4th and 10th car state)",
+                a + b + c,
+                wire::FAR_M,
+                wire::VERYFAR_M
+            ));
+        }
+        if all == 0 {
+            return;
+        }
+        let names = ["the player's links full", "its player's sends full", "a list full", "off free roam", "left the room", "other"];
+        let why: Vec<String> = d.iter().zip(names).filter(|(n, _)| **n > 0).map(|(n, w)| format!("{w} {n}")).collect();
+        (self.log)(&format!(
+            "[roam] cars within {NEAR_GONE_M} m of a player that went in the last {} min: {all} ({:.1} a minute): {}",
+            js::number_to_string(js_round(mins)),
+            all as f64 / mins.max(1e-9),
+            why.join(", ")
+        ));
+    }
+
     /// every player's new links in place, and its PEERS list sent.  The lists are cut from blocks of LIST_BLOCK
     /// bytes, about 11 lists each: the switch queues a list as it is until the player's writer takes it, and one
     /// buffer for all of them (700 KB for 2000 players) was kept whole for as long as any list of its tick waited in
     /// a slow player's queue, one such buffer a second; a list of its own each was 2000 allocations a tick.
     fn lists(&mut self) {
+        let now = (self.now)();
+        let look_s = self.o.look_ms / 1000.0;
         let s = &mut self.s;
+        s.ow.gone_out.sort_unstable();
+        self.st.tx_only = [0; 3];
         for &slot in &self.order {
             let Some(Some(p)) = self.slots.get(slot as usize) else { continue };
             let links = &s.fresh[slot as usize];
             let slots = &self.slots;
             // its crews and, a link each, which of them that player is in too: only to a player in a crew (so no crews
             // but its own go out); and which are its friends (both ways: the friendship's id is both players'), to a
-            // player with friends whose core reads it
+            // player with friends whose core reads it (a browser's second player has none, nor is it one's: its
+            // `friend_ids` are none)
             let mine = if self.crewed > 0 { &p.crews[..crews_of(p).count()] } else { &[][..] };
             let befriended = p.marks && !p.friend_ids.is_empty();
             // (one-way links: to a core that takes them, `one_way`)
             let oneway = p.oneway && links.iter().any(|l| l.dir != DIR_BOTH);
-            let with = !mine.is_empty() || befriended || oneway;
+            // the hints, to a core of version 16 (wire::CORE_HINTS): the ones far off of the players who only get its
+            // car (it knows nothing of where they are), and why the cars near it went that this list leaves out
+            s.hints.clear();
+            if oneway {
+                let mut far = 0u8;
+                for (k, l) in links.iter().enumerate().filter(|(_, l)| l.dir == DIR_SEND) {
+                    let code = match slots.get(l.slot as usize) {
+                        Some(Some(q)) => far_code(p, q, now, look_s),
+                        _ => 1,
+                    };
+                    self.st.tx_only[match code { 1 => 0, 4 => 1, _ => 2 }] += 1;
+                    if p.hints && code > 1 && k < wire::LIST_MAX {
+                        if far == 0 {
+                            s.hints.push(0);
+                        }
+                        far += 1;
+                        s.hints.push(k as u8 | if code > 4 { wire::HINT_VERYFAR } else { 0 });
+                    }
+                }
+                if far > 0 {
+                    s.hints[0] = far;
+                }
+            }
+            let gone = if p.hints {
+                let g = &s.ow.gone_out;
+                &g[g.partition_point(|e| e.0 < slot)..g.partition_point(|e| e.0 <= slot)]
+            } else {
+                &[][..]
+            };
+            if !s.hints.is_empty() || !gone.is_empty() {
+                if s.hints.is_empty() {
+                    s.hints.push(0);
+                }
+                let g = &gone[..gone.len().min(wire::GONE_MAX)];
+                s.hints.push(g.len() as u8);
+                for &(_, id, why) in g {
+                    s.hints.extend_from_slice(&id.to_le_bytes());
+                    s.hints.push(why + 1);
+                }
+            }
+            let with = !mine.is_empty() || befriended || oneway || !s.hints.is_empty();
             s.marks.clear();
             if with {
                 let way = |l: &Link| match l.dir {
@@ -2255,21 +2601,15 @@ impl Hub {
                         | match slots.get(l.slot as usize) {
                             Some(Some(q)) => {
                                 let crews = mine.iter().enumerate().fold(0u8, |m, (c, h)| m | (q.crews.contains(h) as u8) << c);
-                                let friend = befriended
-                                    && match (&p.owner, &q.owner) {
-                                        (Some(a), Some(b)) if a != b => {
-                                            let id = friend_id(a, b);
-                                            p.friend_ids.binary_search(&id).is_ok() && q.friend_ids.binary_search(&id).is_ok()
-                                        }
-                                        _ => false,
-                                    };
+                                let friend = befriended && friends_both(p, q);
                                 crews | if friend { wire::MARK_FRIEND } else { 0 }
                             }
                             _ => 0,
                         }
                 }));
             }
-            let n = F_DATA + if with { wire::peers_crew_len(links.len(), mine.len()) } else { wire::peers_len(links.len()) };
+            let n =
+                F_DATA + if with { wire::peers_crew_len(links.len(), mine.len()) + s.hints.len() } else { wire::peers_len(links.len()) };
             if s.buf.capacity() < n {
                 s.buf = BytesMut::with_capacity(LIST_BLOCK.max(n));
             }
@@ -2284,7 +2624,7 @@ impl Hub {
                 Some(Some(q)) => PeerEntry { vip: q.vip, port: q.port, id: q.id },
                 _ => PeerEntry { vip: 0, port: 0, id: 0 },
             });
-            wire::write_peers(&mut buf[F_DATA..], self.id, self.seq, list, mine, &s.marks);
+            wire::write_peers(&mut buf[F_DATA..], self.id, self.seq, list, mine, &s.marks, &s.hints);
             self.seq = self.seq.wrapping_add(1);
             if (self.send)(p.vip, buf.split().freeze()) {
                 self.st.lists += 1;
@@ -2334,7 +2674,7 @@ impl Hub {
         self.thread_busy = if busy.is_finite() { busy.clamp(0.0, 1.0) } else { 0.0 };
     }
 
-    /// free roam is busy: the cap is under `ask_cap` (the start page does not ask new players then)
+    /// free roam is busy: the cap is under `ask_cap` (until 2026-11-05 the start page did not ask new players then)
     pub fn crowded(&self) -> bool {
         self.cap < self.o.ask_cap
     }
@@ -2348,6 +2688,12 @@ impl Hub {
     /// /players `roam`): one a browser whatever its endpoints; in a race, a shop, the menus or loading, not
     pub fn in_roam(&self) -> usize {
         self.players().filter(|p| matches!(p.status, 2 | 5)).map(|p| p.vip).collect::<HashSet<u32>>().len()
+    }
+
+    /// how many second players of co-op free roam drive there now, or paused there (`Player::seat2`; each is one more
+    /// endpoint of a browser `in_roam()` counts once): the server's `[players]` lines
+    pub fn coop_seats(&self) -> usize {
+        self.players().filter(|p| p.seat2 && matches!(p.status, 2 | 5) && !p.impostor).count()
     }
 
     /// `in_roam()` by room, for the rooms with a name (room 0, none, is everyone's and not here): the server's
@@ -2422,6 +2768,8 @@ impl Hub {
             "crewLinks": st.crew_links,
             "crewSkips": st.crew_skips,
             "onewayLinks": st.oneway_links,
+            "txOnly": st.tx_only.to_vec(),
+            "nearGone": self.s.ow.gone.to_vec(),
             "raceReports": st.race_reports,
             "cheatLines": st.cheat_lines,
             "nears": st.nears,
@@ -2429,6 +2777,7 @@ impl Hub {
             "watchesKept": self.kept.len(),
             "blocking": self.blocks.len(),
             "keptApart": self.apart.len(),
+            "coopSeats": self.coop_seats(),
         })
     }
 
@@ -2469,13 +2818,21 @@ const AGE_MAX_S: f64 = 1.0;
 /// or down the slope its car's nose is on (wire `slope`) for the way they are along it: else a car 150 m on up a hill
 /// was 20 m over the view point, and weighed as on a road above.  The "up" of a player not in free roam is a place's
 /// fourth number, apart from its height.
+///
+/// And each place's virtual address (`s.vips`): two endpoints of one browser are never linked, by any of the link
+/// functions' ways (`one_browser`).  Co-op's second player is one (`Player::seat2`), its game shows its first one's car
+/// itself; so is a game started again while its last start's endpoint lingers (a page's restart on another port, until
+/// `gone_ms`), whose car would be a ghost of its own.
 fn prepare(slots: &[Option<Player>], list: &[u32], cap: usize, o: &RoamOptions, now: f64, s: &mut Scratch) {
     s.newcore.clear();
     s.pos.clear();
+    s.now.clear();
+    s.speed.clear();
     s.soon.clear();
     s.ahead.clear();
     s.view.clear();
     s.deg.clear();
+    s.vips.clear();
     s.ccap.clear();
     for (i, &slot) in list.iter().enumerate() {
         let p = player(slots, slot);
@@ -2493,12 +2850,15 @@ fn prepare(slots: &[Option<Player>], list: &[u32], cap: usize, o: &RoamOptions, 
         let ts = age + o.soon_ms / 1000.0;
         let soon = [at[0] + v[0] * ts, at[1] + v[1] * ts, at[2], up];
         s.pos.push(at);
+        s.now.push([at[0] + v[0] * age, at[1] + v[1] * age, at[2], up]);
+        s.speed.push(v[0].hypot(v[1]));
         s.soon.push(soon);
         s.ahead.push(on(age + o.look_ms / 1000.0));
         s.view.push([soon[0] + fx * view, soon[1] + fy * view, at[2] + s1 * (along * ts + view), up]);
 
         // a player's links at most: its degree, under the cap
         s.deg.push(p.map_or(0, |p| p.degree.min(cap)));
+        s.vips.push(p.map_or(0, |p| p.vip));
         s.newcore.push(p.is_some_and(|p| p.oneway));
         s.ccap.push(p.map_or(0, |p| crew_cap(p.degree)));
         s.local[slot as usize] = i as u32;
@@ -2561,9 +2921,13 @@ fn duel_pairs(slots: &[Option<Player>], list: &[u32], s: &mut Scratch) {
 ///
 /// Only for a lobby whose start is where its host is, and for the players it lists who are there too (LOBBY_STAY_M):
 /// an advert says what it likes, and one placed at a crowd, or listing the ids of players anywhere in the room, had
-/// the hub link its sender with all of them first (the third security audit, 2026-10-23).
+/// the hub link its sender with all of them first (the third security audit, 2026-10-23).  A player it lists who is
+/// not there is linked when its own last ask to join was for this lobby (its JOIN's copy to the hub, of any age): both
+/// ends asked for that link, the host by listing it and the player by asking, and a friend the host invited joins
+/// from wherever it is.  A lobby for its host's friends and crew-mates only (`HubLobby::private`) takes only those of
+/// the players near its start (`mates`): nobody else may join it.
 fn lobby_pairs(slots: &[Option<Player>], list: &[u32], now: f64, s: &mut Scratch) {
-    let Scratch { pos, lpairs, lids, ljoin, lnear, lmembers, .. } = s;
+    let Scratch { pos, lpairs, lids, ljoin, lnear, lmembers, vips, .. } = s;
     lpairs.clear();
     lids.clear();
     ljoin.clear();
@@ -2588,8 +2952,10 @@ fn lobby_pairs(slots: &[Option<Player>], list: &[u32], now: f64, s: &mut Scratch
                 }
             }
         }
+        // (a player it lists far off: when that player's own last JOIN was for this lobby)
+        let asked = |j: u32| player(slots, list[j as usize]).and_then(|o| o.join).is_some_and(|(id, _)| id == l.id);
         for id in &l.ids[1..(l.n as usize).clamp(1, wire::LOBBY_PLAYERS)] {
-            if let Some(&j) = lids.get(id).filter(|&&j| j != i as u32 && there(j as usize)) {
+            if let Some(&j) = lids.get(id).filter(|&&j| j != i as u32 && (there(j as usize) || asked(j))) {
                 lpairs.push((i as u32, j));
                 lmembers.push((i as u32, j));
             }
@@ -2597,8 +2963,13 @@ fn lobby_pairs(slots: &[Option<Player>], list: &[u32], now: f64, s: &mut Scratch
         lpairs.extend(ljoin.iter().filter(|&&(id, j)| id == l.id && j != i as u32).map(|&(_, j)| (i as u32, j)));
         lnear.clear();
         for (j, &q) in list.iter().enumerate() {
-            // in free roam or paused there (RC_ST_ROAM, RC_ST_PAUSED), as the map's
-            if j == i || !player(slots, q).is_some_and(|o| matches!(o.status, 2 | 5)) {
+            // in free roam or paused there (RC_ST_ROAM, RC_ST_PAUSED), as the map's; not of the host's own browser (no
+            // link: `one_browser`)
+            if j == i || one_browser(vips, i, j) || !player(slots, q).is_some_and(|o| matches!(o.status, 2 | 5)) {
+                continue;
+            }
+            // (a lobby for the host's friends and crew-mates: them alone)
+            if l.private && !matches!((player(slots, slot), player(slots, q)), (Some(h), Some(o)) if mates(h, o)) {
                 continue;
             }
             let d = (pos[j][0] - x).powi(2) + (pos[j][1] - y).powi(2);
@@ -2618,7 +2989,7 @@ fn lobby_pairs(slots: &[Option<Player>], list: &[u32], now: f64, s: &mut Scratch
 /// other.  The link functions make no link of a pair, and the world map and the lobby list leave each out for the
 /// other (`Hub::apart`).  Two who join one lobby within a tick of each other are both in it.  Only a room with a
 /// blocker in it looks: at each of its players once, then up each blocker's names and keyphrases.
-fn block_pairs(slots: &[Option<Player>], list: &[u32], blocks: &HashMap<u32, Block>, s: &mut Scratch) {
+fn block_pairs(slots: &[Option<Player>], list: &[u32], blocks: &IdMap<u32, Block>, s: &mut Scratch) {
     let Scratch { bpairs, bstart, bnext, bfrom, lmembers, .. } = s;
     bpairs.clear();
     bstart.clear();
@@ -2697,6 +3068,12 @@ fn block_pairs(slots: &[Option<Player>], list: &[u32], blocks: &HashMap<u32, Blo
 #[inline]
 fn kept_apart(bstart: &[u32], bnext: &[u32], a: usize, b: usize) -> bool {
     !bstart.is_empty() && bnext[bstart[a] as usize..bstart[a + 1] as usize].contains(&(b as u32))
+}
+
+/// whether places a and b of the room are two endpoints of one browser (`prepare`: never linked)
+#[inline]
+fn one_browser(vips: &[u32], a: usize, b: usize) -> bool {
+    vips[a] == vips[b]
 }
 
 /// The crews' pairs, linked after the race lobbies' and before any other: two players of the room who share a crew
@@ -2855,6 +3232,7 @@ fn link_every_pair(slots: &[Option<Player>], list: &[u32], w: &Weigh, s: &mut Sc
         npre,
         bstart,
         bnext,
+        vips,
         ..
     } = s;
     // the outruns' links first, then the race lobbies', then the crews'
@@ -2867,6 +3245,7 @@ fn link_every_pair(slots: &[Option<Player>], list: &[u32], w: &Weigh, s: &mut Sc
             && fresh[sb as usize].len() < deg[b]
             && !linked(fresh, sa, sb)
             && !kept_apart(bstart, bnext, a, b)
+            && !one_browser(vips, a, b)
         {
             join(fresh, sa, sb, since_of(slots, sa, sb, w.now));
             if k < dpairs.len() {
@@ -2889,6 +3268,7 @@ fn link_every_pair(slots: &[Option<Player>], list: &[u32], w: &Weigh, s: &mut Sc
                 && fresh[sb as usize].len() < deg[b]
                 && !linked(fresh, sa, sb)
                 && !kept_apart(bstart, bnext, a, b)
+                && !one_browser(vips, a, b)
             {
                 join(fresh, sa, sb, since_of(slots, sa, sb, w.now));
                 ccount[a] += 1;
@@ -2921,6 +3301,10 @@ fn link_every_pair(slots: &[Option<Player>], list: &[u32], w: &Weigh, s: &mut Sc
             }
         }
         for j in i + 1..m {
+            // (two endpoints of one browser: no pair)
+            if one_browser(vips, i, j) {
+                continue;
+            }
             let linked = mark[j] == stamp;
             let d = if linked { old_key(soon, ahead, view, i, j, since[j], w) } else { apart(soon, ahead, view, i, j, &w.level) };
             order.push((order_key(d), pairs.len() as u32));
@@ -2957,6 +3341,8 @@ struct Gather<'a> {
     pahead: &'a [Place],
     grid: &'a Grid,
     grid_a: &'a Grid,
+    now: &'a [Place],
+    speed: &'a [f64],
     soon: &'a [Place],
     ahead: &'a [Place],
     view: &'a [Place],
@@ -2986,6 +3372,12 @@ impl GatherBufs {
         GatherBufs { cand: Vec::new(), stamp: vec![0; n], ostamp: vec![0; m], osince: vec![0.0; m], odir: vec![0; m], found }
     }
 }
+
+/// a link's place in `one_way`'s order: a held one's (`Gather::key`), and a near one's, plus its distance: before every
+/// other (which are 0 and up)
+const KEY_HELD: f64 = -3.0e6;
+const KEY_NEAR: f64 = -2.0e6;
+const KEY_FAR_HELD: f64 = -1.0e6;
 
 /// a receiver's candidates past its links, as far as its walks read: its links and ONEWAY_MORE more (the ones whose
 /// senders are full are passed by, and the next ones take their place)
@@ -3027,6 +3419,25 @@ impl Gather<'_> {
         });
         for d in done {
             out.extend(d.into_inner().unwrap_or_else(|e| e.into_inner()));
+        }
+    }
+
+    /// where receiver i's link with sender j goes in the order (`read`; d: the nearest of its walks' distances, `had`:
+    /// since when it is linked, None new).  For a receiver slower than near_fast, the near ones (RoamOptions near_m,
+    /// by where the two are now) first: the ones younger than near_hold_ms (KEY_HELD), then the others (KEY_NEAR),
+    /// each by that distance (at `keep` of it for a link of the last tick); then the ones farther off, younger than
+    /// hold_ms first (KEY_FAR_HELD), the rest by d (at `keep` of it)
+    fn key(&self, i: usize, j: usize, d: f64, had: Option<f64>) -> f64 {
+        let w = self.w;
+        let dn = weigh(&self.now[i], &self.now[j], &w.level);
+        let near = dn < w.near_m && self.speed[i] < w.near_fast;
+        match had {
+            Some(since) if near && w.now - since < w.near_hold_ms.max(w.hold_ms) => KEY_HELD + dn,
+            Some(_) if near => KEY_NEAR + dn * w.keep,
+            None if near => KEY_NEAR + dn,
+            Some(since) if w.now - since < w.hold_ms => KEY_FAR_HELD + d,
+            Some(_) => d * w.keep,
+            None => d,
         }
     }
 
@@ -3093,11 +3504,8 @@ impl Gather<'_> {
                     continue;
                 }
                 let was = (b.ostamp[j] == stamp).then(|| (b.odir[j], b.osince[j]));
-                let key = match was {
-                    Some((dir, since)) if dir & DIR_RECV != 0 && w.now - since < w.hold_ms => -1.0,
-                    Some((dir, _)) if dir & DIR_RECV != 0 => d * w.keep,
-                    _ => d,
-                };
+                let had = was.filter(|e| e.0 & DIR_RECV != 0).map(|e| e.1);
+                let key = self.key(i, j, d, had);
                 out.push((order_key(key), i as u32, j as u32, was.map_or(0, |e| e.1.to_bits())));
             }
             // the ones it got at the last tick and did not walk to this far (farther now, or the walks' ties); not in a
@@ -3113,7 +3521,7 @@ impl Gather<'_> {
                 }
                 let d =
                     weigh(&soon[i], &soon[j], &w.level).min(weigh(&ahead[i], &ahead[j], &w.level)).min(weigh(&view[i], &soon[j], &w.level));
-                let key = if w.now - l.since < w.hold_ms { -1.0 } else { d * w.keep };
+                let key = self.key(i, j, d, Some(l.since));
                 out.push((order_key(key), i as u32, j as u32, l.since.to_bits()));
             }
         }
@@ -3145,7 +3553,29 @@ struct OneWay {
     /// the receivers read (as indices into `news`), and the (receiver, sender) pairs of the first round
     ks: Vec<u32>,
     got: Vec<(u32, u32)>,
+    /// the links of the last tick passed by in a round (receiver, sender, why: GONE_*), and the near ones of them that
+    /// went for good, by why (`near_gone`)
+    skips: Vec<(u32, u32, u8)>,
+    gone: [u64; GONE_N],
+    /// this tick's near links gone, for the receivers' lists' hints: (the receiver's slot, the sender's id, why: GONE_*)
+    gone_out: Vec<(u32, u32, u8)>,
 }
+
+/// why a link of the last tick went (`one_way`): the receiver had its links already, the sender sent to as many as it
+/// may, a list was full (LIST_MAX), the sender went off free roam (a shop, a race, the menus), it left the room (gone,
+/// its position old), none of these (a link made first, a block)
+const GONE_RX_FULL: u8 = 0;
+const GONE_TX_FULL: u8 = 1;
+const GONE_LIST_FULL: u8 = 2;
+const GONE_AWAY: u8 = 3;
+const GONE_LEFT: u8 = 4;
+const GONE_OTHER: u8 = 5;
+const GONE_N: usize = 6;
+/// a link counted as near when it went (`OneWay::gone`): a car this near (m, as the players stood) that vanishes
+/// vanishes in front of the player
+const NEAR_GONE_M: f64 = 60.0;
+/// how often the hub says how many near cars went (`Hub::near_line`)
+const NEAR_SAY_MS: f64 = 300_000.0;
 
 /// One-way links (a core of version 15 and up, `wire::CORE_ONEWAY`), after the links of either function above.  A
 /// link goes both ways, so a player shows another's car only while that player has room for it too: a player who
@@ -3164,7 +3594,7 @@ struct OneWay {
 #[inline(never)]
 fn one_way(slots: &[Option<Player>], list: &[u32], full: bool, o: &RoamOptions, w: &Weigh, s: &mut Scratch) -> u64 {
     let m = list.len();
-    let Scratch { soon, ahead, view, deg, newcore, local: at, fresh, dpairs, lpairs, cpairs, bstart, bnext, ow, .. } = s;
+    let Scratch { pos, now, speed, soon, ahead, view, deg, newcore, vips, local: at, fresh, dpairs, lpairs, cpairs, bstart, bnext, ow, .. } = s;
     ow.news.clear();
     ow.news.extend((0..m as u32).filter(|&i| newcore[i as usize]));
     if ow.news.len() < 2 {
@@ -3209,6 +3639,8 @@ fn one_way(slots: &[Option<Player>], list: &[u32], full: bool, o: &RoamOptions, 
         pahead: &ow.pahead,
         grid: &ow.grid,
         grid_a: &ow.grid_a,
+        now,
+        speed,
         soon,
         ahead,
         view,
@@ -3251,6 +3683,7 @@ fn one_way(slots: &[Option<Player>], list: &[u32], full: bool, o: &RoamOptions, 
     ow.base.clear();
     ow.base.extend(list.iter().map(|&slot| fresh[slot as usize].len() as u16));
     ow.got.clear();
+    ow.skips.clear();
     // the edges in order, while the receiver has room and the sender does: twice, the second time for the receivers
     // still short of their links (their nearest senders full), walked further (ONEWAY_FAR past their links) over
     // the senders' room left
@@ -3270,12 +3703,22 @@ fn one_way(slots: &[Option<Player>], list: &[u32], full: bool, o: &RoamOptions, 
         }
         for &(_, i, j, since) in &ow.edges {
             let (i, j) = (i as usize, j as usize);
+            // (two places of one browser never: `one_browser`)
+            if one_browser(vips, i, j) {
+                continue;
+            }
             if ow.inn[i] as usize >= deg[i] || ow.out[j] as usize >= sends(j) {
+                if since != 0 {
+                    ow.skips.push((i as u32, j as u32, if ow.inn[i] as usize >= deg[i] { GONE_RX_FULL } else { GONE_TX_FULL }));
+                }
                 continue;
             }
             let (h, key, known) = find(&ow.pairs, i, j);
             if !known {
                 if ow.listed[i] as usize >= wire::LIST_MAX || ow.listed[j] as usize >= wire::LIST_MAX {
+                    if since != 0 {
+                        ow.skips.push((i as u32, j as u32, GONE_LIST_FULL));
+                    }
                     continue;
                 }
                 ow.pairs[h] = key;
@@ -3292,6 +3735,7 @@ fn one_way(slots: &[Option<Player>], list: &[u32], full: bool, o: &RoamOptions, 
             }
         }
     }
+    near_gone(slots, list, pos, at, fresh, ow);
     let mut oneway = 0;
     for &i in &ow.news {
         let l = &mut fresh[list[i as usize] as usize];
@@ -3314,6 +3758,45 @@ fn one_way(slots: &[Option<Player>], list: &[u32], full: bool, o: &RoamOptions, 
         oneway += l[from..].iter().filter(|x| x.dir == DIR_RECV).count() as u64;
     }
     oneway
+}
+
+/// The links of the last tick to a car within NEAR_GONE_M that no round made again (`one_way`), counted by why into
+/// `ow.gone`: the receivers' cars that vanish in front of them
+#[inline(never)]
+fn near_gone(slots: &[Option<Player>], list: &[u32], pos: &[[f64; 3]], at: &[u32], fresh: &[Vec<Link>], ow: &mut OneWay) {
+    ow.skips.sort_unstable();
+    for &i in &ow.news {
+        // (not a receiver off free roam: its game shows no cars there)
+        let Some(p) = player(slots, list[i as usize]).filter(|p| matches!(p.status, 2 | 5)) else { continue };
+        let a = pos[i as usize];
+        for l in p.links.iter().filter(|l| l.dir & DIR_RECV != 0) {
+            let Some(q) = player(slots, l.slot) else { continue };
+            let Some(b) = q.p else { continue };
+            if (a[0] - b[0]).hypot(a[1] - b[1]) >= NEAR_GONE_M {
+                continue;
+            }
+            let Some(j) = local(at, l.slot) else {
+                ow.gone[GONE_LEFT as usize] += 1;
+                ow.gone_out.push((list[i as usize], q.id, GONE_LEFT));
+                continue;
+            };
+            if fresh[list[i as usize] as usize].iter().any(|x| x.slot == l.slot && x.dir & DIR_RECV != 0) {
+                continue;
+            }
+            let why = if !matches!(q.status, 2 | 5) {
+                GONE_AWAY
+            } else {
+                // (the last round's why: a pair passed by in both rounds went at the second)
+                let k = ow.skips.partition_point(|&(x, y, _)| (x, y) <= (i, j as u32));
+                match k.checked_sub(1).map(|k| ow.skips[k]) {
+                    Some((x, y, why)) if (x, y) == (i, j as u32) => why,
+                    _ => GONE_OTHER,
+                }
+            };
+            ow.gone[why as usize] += 1;
+            ow.gone_out.push((list[i as usize], q.id, why));
+        }
+    }
 }
 
 /// whether `places` has `j` (every one compared, without a branch: there are at most a degree of them, and this
@@ -3526,6 +4009,7 @@ fn link_many(slots: &[Option<Player>], list: &[u32], w: &Weigh, s: &mut Scratch)
         ccount,
         bstart,
         bnext,
+        vips,
         ..
     } = s;
     let cand = |d: f64, i: usize, j: usize, nearest: bool| Cand::new(d, i as u32, j as u32, nearest);
@@ -3562,8 +4046,9 @@ fn link_many(slots: &[Option<Player>], list: &[u32], w: &Weigh, s: &mut Scratch)
                 let Some(j) = local(at, l.slot) else { continue };
                 olinks.push(j as u32);
                 osince.push(l.since);
-                // each link once: by its lower end, or by the only end that lists it (j's links are in already)
-                if i < j || !has_place(&olinks[ostart[j] as usize..ostart[j + 1] as usize], i as u32) {
+                // each link once: by its lower end, or by the only end that lists it (j's links are in already); none
+                // of two endpoints of one browser (none is made)
+                if (i < j || !has_place(&olinks[ostart[j] as usize..ostart[j + 1] as usize], i as u32)) && !one_browser(vips, i, j) {
                     // a link's place in the order: younger than `hold_ms` first, older at `keep` its distance
                     let d = old_key(soon, ahead, view, i, j, l.since, w);
                     olds.push(cand(d, i, j, false));
@@ -3591,6 +4076,7 @@ fn link_many(slots: &[Option<Player>], list: &[u32], w: &Weigh, s: &mut Scratch)
             && room(fcount, j)
             && !has_place(&flinks[i * stride..i * stride + fcount[i] as usize], b)
             && !kept_apart(bstart, bnext, i, j)
+            && !one_browser(vips, i, j)
         {
             join(fresh, list[i], list[j], since_of(slots, list[i], list[j], w.now));
             for (a, b) in [(i, j), (j, i)] {
@@ -3616,6 +4102,7 @@ fn link_many(slots: &[Option<Player>], list: &[u32], w: &Weigh, s: &mut Scratch)
                 && room(fcount, j)
                 && !has_place(&flinks[i * stride..i * stride + fcount[i] as usize], b)
                 && !kept_apart(bstart, bnext, i, j)
+                && !one_browser(vips, i, j)
             {
                 join(fresh, list[i], list[j], since_of(slots, list[i], list[j], w.now));
                 for (a, b) in [(i, j), (j, i)] {
@@ -3630,7 +4117,8 @@ fn link_many(slots: &[Option<Player>], list: &[u32], w: &Weigh, s: &mut Scratch)
     // Walk w of place i on to its next one that can still link: read ahead, or on from where the reading stopped
     // (`pre_at` counts what it gave, read ahead or not: the next tick reads that far ahead).  One that cannot link is
     // passed over at once, where the order would have taken it only to read the walk's next one: the other player
-    // full, the pair linked already, a link of the last tick (taken at its own place, `olds`) or kept apart.  None of
+    // full, the pair linked already, a link of the last tick (taken at its own place, `olds`), kept apart, or an
+    // endpoint of its own browser.  None of
     // that changes later in the tick (no player gets room back, no link goes), so the links are the same, and a
     // player looking for one more link in a crowd of full ones no longer sends each of them through the heap.
     macro_rules! advance {
@@ -3659,6 +4147,7 @@ fn link_many(slots: &[Option<Player>], list: &[u32], w: &Weigh, s: &mut Scratch)
                     || old(i, jl)
                     || has_place(&flinks[i * stride..i * stride + fcount[i] as usize], j)
                     || kept_apart(bstart, bnext, i, jl)
+                    || one_browser(vips, i, jl)
                 {
                     continue;
                 }
@@ -3749,7 +4238,7 @@ fn link_many(slots: &[Option<Player>], list: &[u32], w: &Weigh, s: &mut Scratch)
 }
 
 /// whether one of the two players' browsers blocks the other (`Hub::blocks`)
-fn blocked(blocks: &HashMap<u32, Block>, a: &Player, b: &Player) -> bool {
+fn blocked(blocks: &IdMap<u32, Block>, a: &Player, b: &Player) -> bool {
     blocks.get(&a.vip).is_some_and(|k| k.has(b)) || blocks.get(&b.vip).is_some_and(|k| k.has(a))
 }
 
@@ -3759,6 +4248,31 @@ fn ahead(o: &Player, now: f64) -> [f64; 2] {
 }
 
 /// `ahead` of a player at `pos` at `pos_at`, going at `v`
+/// how far player q is from p, who sends it its car and gets none of q's (`lists`' hints): every one of p's snapshots
+/// (1), every 4th past FAR_M, every 10th past VERYFAR_M, as a core counts for a peer it gets states from
+/// (roam_core.c snap_every); by the nearer of where the two are now and where they are look_s on, so that two cars
+/// that drive at each other count as near before they are
+fn far_code(p: &Player, q: &Player, now: f64, look_s: f64) -> u8 {
+    let (Some(a), Some(b)) = (p.p, q.p) else { return 1 };
+    let at = |o: &Player, x: [f64; 3], t: f64| {
+        let age = ((now - o.pos_at) / 1000.0).clamp(0.0, AGE_MAX_S);
+        let v = if o.status == 2 { o.v } else { [0.0; 3] };
+        [x[0] + v[0] * (age + t), x[1] + v[1] * (age + t)]
+    };
+    let apart = |t: f64| {
+        let (u, w) = (at(p, a, t), at(q, b, t));
+        (u[0] - w[0]).hypot(u[1] - w[1])
+    };
+    let d = apart(0.0).min(apart(look_s));
+    if d > wire::VERYFAR_M {
+        10
+    } else if d > wire::FAR_M {
+        4
+    } else {
+        1
+    }
+}
+
 fn ahead_of(pos: [f64; 3], v: [f64; 2], pos_at: f64, now: f64) -> [f64; 2] {
     let dt = (now - pos_at).clamp(0.0, MAP_AHEAD_MS) / 1000.0;
     [pos[0] + v[0] * dt, pos[1] + v[1] * dt]

@@ -206,7 +206,14 @@ static void key_down(const InEv *e){
     if (!dik || dik == 0xDB || dik == 0xDC) return;            /* Meta: the browser's */
     int repeat = (e->flags & IKF_REPEAT) != 0, again = 0;
     if (repeat && !g_down[dik].down){
-        if (!g_down[dik].lost) return;                              /* pressed with Meta */
+        /* pressed with Meta: the browser's; but a modifier types nothing, and its first keydown can come marked as a
+         * repeat (a program that grabs and sends modifiers again sets that bit on Windows): a player's Alt and Shift
+         * did nothing in Firefox, 2026-11-05, so a modifier's is a press (said once) */
+        if (!g_down[dik].lost && !is_modifier(dik)) return;
+        if (!g_down[dik].lost){
+            static uint8_t told[256];
+            if (!told[dik]){ told[dik] = 1; fprintf(stderr, "[key] dik=0x%02x's first keydown came as a repeat: taken as a press\n", dik); }
+        }
         repeat = 0; again = 1;                    /* held through a focus loss: down again */
     }
     if (!repeat && g_down[dik].down) repeat = 1;                  /* its key up was lost */
@@ -479,6 +486,8 @@ int mprace_owns_input(void);
 void sms_request(int id);
 void photo_input(int cmd, int a, int b);                 /* photo.c */
 void roam_plat_name_piece(int off, int total, const char *b, int n);    /* roam_web.c */
+void roam_plat_name2_piece(int off, int total, const char *b, int n);   /* ...player 2's (co-op) */
+void roam_plat_lobby_input(int act, uint32_t host, uint32_t lobby, uint32_t race);   /* roam_web.c */
 static int g_muted;
 static void handle(const InEv *e){
     int mute = mprace_owns_input();
@@ -519,10 +528,15 @@ static void handle(const InEv *e){
     case IEV_LOG: watchdog_log_download(); break;
     case IEV_SMS: sms_request(e->a); break;
     case IEV_PHOTO: photo_input(e->dik, e->a, e->b); break;
+    case IEV_LOBBY:
+        roam_plat_lobby_input(e->dik, (uint32_t)e->a, (uint32_t)e->b,
+                              (uint32_t)e->vk | (uint32_t)e->flags << 8 | (uint32_t)e->ch[0] << 16 | (uint32_t)e->ch[1] << 24);
+        break;
     case IEV_NAME: {
         char b[11];
         memcpy(b, e->ch, 3); memcpy(b + 3, &e->a, 4); memcpy(b + 7, &e->b, 4);   /* (wasm is little-endian) */
-        roam_plat_name_piece(e->dik, e->vk, b, (int)sizeof b);
+        if (e->flags & INAME_SEAT2) roam_plat_name2_piece(e->dik, e->vk, b, (int)sizeof b);
+        else roam_plat_name_piece(e->dik, e->vk, b, (int)sizeof b);
         break; }
     default: break;
     }
@@ -1042,6 +1056,12 @@ static void stick_dz(float *x, float *y, float dz){
 static float trig_dz(float v, float dz){
     if (v <= dz) return 0.f;
     return v >= 1.f ? 1.f : (v - dz) / (1.f - dz);
+}
+/* co-op free roam (coop.c): the local seat whose controller is player 2's (-1 none); the page then lets that
+ * controller drive nothing but its seat (not the pad the game's own input reads) */
+void gamepad_local_coop(int seat){
+    for (unsigned k = 0; k < INPUT_LOCAL_PADS; ++k)
+        atomic_store_explicit(g_mb.local_pad[k] + IM_LOCAL_COOP, (int)k == seat ? 1u : 0u, memory_order_release);
 }
 uint32_t gamepad_local_join_stamp(unsigned seat){
     return seat < INPUT_LOCAL_PADS ? atomic_load_explicit(g_mb.local_pad[seat] + IM_LOCAL_JOIN, memory_order_acquire) : 0;

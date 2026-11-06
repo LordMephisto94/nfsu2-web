@@ -2,6 +2,8 @@
 The FAQ the bot posts with /faq (faq.mjs). A push changes the posted message within minutes.
 "# " the title, the lines under it the intro; "## " a topic; "### " a question, its answer below it.
 "label:" right under a question names its button (80 characters at most); without one the question is the label.
+A comment line "for: problems" under it (an HTML comment, so the posted FAQ never shows it) marks an answer to
+something going wrong: #help answers a problem only with one of those.
 A button keeps working while its label stays the same. #channel-name becomes a link to that channel.
 Answers go to each reader in their Discord language (translated once, kept until the answer changes).
 The bot also replies with an answer in #help (help.mjs) when a question there asks exactly that: keep each one whole on its own.
@@ -15,6 +17,7 @@ Pick a question: only you see the answer, in your Discord language.
 ## Starting
 ### Which devices and browsers can run it?
 label: Devices and browsers
+<!-- for: problems -->
 - **PC and Mac:** Chrome or Edge (the most tested), Brave, Opera, Firefox, or Safari 26.
 - **Android:** Chrome. Firefox for Android can't run it.
 - **iPhone and iPad:** Safari on iOS 26 or iPadOS 26.
@@ -22,17 +25,19 @@ label: Devices and browsers
 
 ### The game won't start
 label: It won't start
+<!-- for: problems -->
 The start page says what is wrong, with a code. The most common:
 - `GPU-ACCEL-OFF`: turn on "Use graphics acceleration when available" in `chrome://settings/system`, then restart Chrome.
 - `PAGE-NOT-ISOLATED`: an extension changes the page. Try a guest window; if it starts there, turn your extensions off one by one.
 - `GPU-ADAPTER-WIN`: your graphics have no Direct3D 12 driver. Update the graphics driver; older graphics (Intel HD 4000, 4400, 4600 and older) can't run it.
 - `GPU-ADAPTER-ANDROID`: update Android and Chrome. Then turn on `chrome://flags/#enable-unsafe-webgpu` and restart Chrome.
-- `Error code 1` right after Play: on the start page, Other, **Delete game data**, then reload and Play. Your saves stay.
+- `Error code 1` right after Play: on the start page, Game, **Delete game data** (at the tab's end), then reload and Play. Your saves stay.
 - `MODULE-LOAD` with "Wasm SIMD unsupported": the processor is too old (no SSE4.1, such as an AMD Phenom II). No browser can run the game on it.
 It worked yesterday? Reload the page (Ctrl+F5 on a PC). Something else: post a screenshot of the message in #bug-reports.
 
 ### The site or the server can't be reached
 label: Can't connect
+<!-- for: problems -->
 Your network blocks it: the game works wherever Cloudflare does. Try mobile data to see whether it is your network.
 - **Spain:** providers block Cloudflare during LaLiga matches. It works again after the match.
 - **Kaspersky, other antivirus, NordVPN Threat Protection:** allow `nfsu2.xyz`, or turn the web filter off.
@@ -40,10 +45,12 @@ Your network blocks it: the game works wherever Cloudflare does. Try mobile data
 
 ### There's no sound on my iPhone
 label: No sound on iPhone
-Turn off Silent mode: the switch on the side, or on newer iPhones the Action button or Control Center. In Silent mode Safari plays no sound from a page.
+<!-- for: problems -->
+Reload the page: since 4 November the game plays its sound in Silent mode too. Other apps' music pauses while the game plays.
 
 ### The game runs slowly
 label: Low frame rate
+<!-- for: problems -->
 - **Laptop with a graphics card:** Windows Settings, System, Display, Graphics: set Chrome to **High performance**, then quit Chrome completely and start it again.
 - **Phone that stutters:** on the start page, Game, Display, **Frame rate** 30 is the steady choice.
 - Keep the game's tab in front, and close other heavy tabs.
@@ -57,6 +64,7 @@ Your saves are in this browser on this device, not on the server. To take them a
 
 ### My saves are gone
 label: Saves gone
+<!-- for: problems -->
 - Most often the browser deleted the site's data (some do when they close). In Chrome, allow nfsu2.xyz in `chrome://settings/content/siteData`.
 - Lost saves can't be brought back, unless you had cloud saves or a backup.
 - The game says "Unable to load" with your profile's name: the profile is there, but the game can't read it. Post it in #bug-reports with the log (F9, **Download log**).
@@ -68,14 +76,16 @@ Yes. Zip the folder `%LOCALAPPDATA%\NFS Underground 2` (type that into Explorer'
 
 ### My progress isn't saved
 label: Progress not saved
+<!-- for: problems -->
 A new profile starts on the game's Save = Prompt: its "save?" question opens on **No**, so tapping through skips the save. Pick **Yes** there, or set the game's Options, Gameplay, Save to **Autosave**. "Progress saved" shows over the game each time it saves.
 
 ## Career
 ### There are no races left on my map
 label: No races left
+<!-- for: problems -->
 1. Press **T** or **F4** (D-pad Down on a controller): Career Status says what the stage still needs.
 2. Most often it is your car's stars. A sponsor's DVD shoot only shows once your car has enough: add body kits, paint, vinyls, rims, neons, tint, hydraulics or audio.
-3. Still nothing? The game's hidden races only show on the street when you drive near. On the start page, Game, More game settings, **Show hidden races** puts them on the map.
+3. Still nothing? The game's hidden races only show on the street when you drive near. On the start page, Mods, **Show Hidden Races Mod** puts them on the map.
 
 ### How do I get wide body kits?
 label: Wide body kits
@@ -84,7 +94,7 @@ label: Wide body kits
 
 ### Can I unlock everything or get more money?
 label: Unlock everything
-There's no unlock-all: the career plays as in the original game. Cars and parts unlock as you win a stage's races, and money comes from races. A save you have goes in with Saves, **Restore** on the start page. In the game's Online mode every track is open, whatever your career has unlocked. Profiles changed by a save editor may crash the game or break the career.
+Cars and parts unlock as you win a stage's races, and money comes from races, as in the original game: there's no unlock-all or money cheat. A save you have goes in with Saves, **Restore** on the start page. Profiles changed by a save editor may crash the game or break the career.
 
 ### Do races with other players count in my career?
 label: Online wins in the career
@@ -95,7 +105,7 @@ Yes. In free roam, win a race of your stage you haven't won yet in a lobby, and 
 label: Play with others
 1. Start page, Online: turn on **Free roam with others**, and set **Your name**.
 2. Drive in your career's free roam: the other players are there. Alone there? Leave **Room** (start page, Online) empty: with a name in it, you see only the players in the same room.
-3. To find your friends: type the same crew name in Friends & crews, **Crews**. You always see each other.
+3. To find your friends: add them in the **F9** menu, **Friends** (by name; both need a claimed name), or type the same crew name in Friends & crews, **Crews**. You always see each other. A friend in free roam can be invited to your crew from their line in Friends (the two-people icon); they press **Z** to join.
 4. To race: drive to a race's start, press **Enter** and pick **Multiplayer**. The others join your lobby.
 
 Cars in your way? **Ghost mode** (on the start page, Online, or in the **F9** menu): **Players** lets the other players' cars pass through yours, **Everything** also the traffic and the game's tuners in free roam.
@@ -109,10 +119,12 @@ label: Chat
 ## Controls
 ### My controller doesn't work
 label: Controller
+<!-- for: problems -->
 - Press a button on it with the game's page in front: the browser shows a pad only after that.
-- On the start page, Controls, More controller settings: set **Controller** to **On** or **Hotplug** (not **Off**).
+- On the start page, Controls, **Controller**, More controller settings: **Controller** must be **On** (the default) or **Hotplug**, not **Off**.
 - Close Steam, DS4Windows and other pad software. Still nothing? Try Edge.
-- Steering wheels work too, without force feedback.
+- A Steam Controller or a Steam Deck: start page, Controls, **Controller**, **Connect a Steam Controller** (Chrome or Edge on a computer).
+- Steering wheels work too, without force feedback: start page, Controls, **Controller**, **Set up the wheel**.
 
 ### How do I change my controller's buttons?
 label: Controller buttons
@@ -123,7 +135,7 @@ In the game: **Options**, **Controls**. It opens on Keyboard Configuration: go *
 ### Which key does what?
 label: Keys
 - **R** respawn, **T** career status, **M** map, **X** drift mode, **N** horn
-- **O** open the trunk, hood and doors (parked; on a controller hold D-pad Down; the touch controls have no button for it), **H** / **J** hydraulics
+- **O** parked in free roam: the hood, pressed again the trunk, then the doors, then all of them (on a controller hold D-pad Down a second), **H** / **J** hydraulics
 - **F7** next song, **F12** photo mode, **F9** the page menu: log, radio, controls, full screen
 - The whole list: start page, **Controls**.
 
@@ -131,8 +143,8 @@ label: Keys
 ### Can I add mods or my own music?
 label: Mods and music
 - **Music:** F9, **Radio** plays a folder of your own songs in place of the game's (not on iPhone or iPad).
-- **The game's songs:** start page, Game, **Songs**: Uncensored (the default, some in longer versions) or Original, as the game shipped them. **F7** plays the next song.
-- **Mods:** you can't add your own. A few come built in: Upscaled HUD and Detailed Map (start page, Game, Display: Upscaled), English Subtitles Fixed and Show hidden races (start page, Game).
+- **The game's songs:** start page, Mods, **Uncensored & Restored Soundtrack**: Uncensored (the default, some in longer versions) or Original, as the game shipped them. **F7** plays the next song.
+- **Mods:** you can't add your own. The ones built in are in the start page's **Mods** tab, with their makers and settings.
 - **Other games:** this project is Underground 2. Nothing else has been announced.
 
 ### How do I report a bug?
@@ -149,11 +161,26 @@ On the start page: Saves, **Restore**, and pick the file: a backup (a zip) or on
 label: Claim your name
 On the start page, Online, **Your name**: press **Claim**. Until a name is claimed anyone can play as it. Claiming makes an 8-word passphrase that holds the name and your cloud saves: keep it safe. Someone claimed yours first? Pick another name.
 
+### I lost my cloud saves passphrase
+label: Lost passphrase
+<!-- for: problems -->
+Nobody can look it up for you. Look in your browser's saved passwords under nfsu2.xyz (user name "Cloud saves"): clearing the cache keeps them. A browser that still syncs has it on the start page, Saves, Cloud saves, with a button to download it. The passphrase that claimed your name is the same one.
+
+### My name got four digits, or someone took it
+label: Name with four digits
+<!-- for: problems -->
+Someone else claimed or was using your name, so you play as it with four digits at its end. A claimed name stays with the passphrase that claimed it: if that was you, enter that passphrase on the start page, Saves, Cloud saves (**Stop syncing** first if another one is in the box) and press **Load**. Never claimed it? Claim another name: start page, Online, **Your name**, **Claim**.
+
 ### How do I rename or delete a profile?
 label: Rename or delete a profile
 - **Rename:** start page, Saves, **Rename** beside the profile.
-- **Delete:** the game's main menu, Profile Manager, Delete.
+- **Delete:** start page, Saves, the bin beside the profile (or the game's main menu, Profile Manager, Delete).
 - **Start over:** a new profile, or Career, Start New Career.
+
+### I don't see other players in free roam
+label: No other players
+<!-- for: problems -->
+On the start page, Online: turn on **Free roam with others**, set **Your name** and leave **Room** empty (with a name in it you see only that room's players), then load your career and drive in its free roam.
 
 ### How do I turn off vibration?
 label: Vibration
@@ -173,4 +200,4 @@ A controller's right stick looks round the car while you drive. A keyboard and t
 
 ### The game's data doesn't fit on my drive
 label: Game data space
-The browser keeps the game's data in its own folder, so it can't go on another drive. Preloading is optional: the game loads what it needs as you play. Start page, Other, **Delete game data** frees the space; your saves stay.
+The browser keeps the game's data in its own folder, so it can't go on another drive. Preloading is optional: the game loads what it needs as you play. Start page, Game, **Delete game data** (at the tab's end) frees the space; your saves stay.

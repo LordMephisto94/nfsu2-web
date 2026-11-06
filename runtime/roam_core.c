@@ -380,7 +380,7 @@ static int in(float f, float lo, float hi){ return f_finite(f) && f >= lo && f <
 static int racerep_ok(const rc_racerep *r){
     if (!r->lobby || !r->race || r->players < 1 || r->players > RC_LOBBY_MAX || r->place > r->players) return 0;
     if (r->cls < -1 || r->cls > 3 || r->flags & ~(RC_RR_HOST | RC_RR_QUIT | RC_RR_EDITED)) return 0;
-    if (r->credit > 2) return 0;
+    if (r->credit > 2 || r->stage > 9 || r->lobby_bits & ~(RC_RL_STAGED | RC_RL_MATE_PAST | RC_RL_HOST_PAST)) return 0;
     if (!in(r->rating, 0.f, 5000.f) || !in(r->field, 0.f, 5000.f) || !in(r->factor, 0.01f, 100.f) || !in(r->kw, 0.f, 10000.f)
         || !in(r->kg, 0.f, 50000.f) || !in(r->kmh, 0.f, 2000.f) || !in(r->time, 0.f, 100000.f)) return 0;
     uint32_t n = 0; while (n < RC_RACEREP_NAME && r->name[n]) n++;
@@ -436,6 +436,16 @@ int rc_encode(const rc_msg *m, uint8_t *out, int cap){
             rc_put8(&w, m->u.peers.n_mine);
             for (int i = 0; i < m->u.peers.n_mine; i++){ if (!m->u.peers.mine[i]) return -1; rc_put32(&w, m->u.peers.mine[i]); }
             for (int i = 0; i < m->u.peers.n; i++) rc_put8(&w, m->u.peers.crew[i]);
+            if (m->u.peers.hints){                                     /* the hints (a hub's, core 16) */
+                int nf = 0;
+                for (int i = 0; i < m->u.peers.n; i++) nf += m->u.peers.far[i] > 1;
+                rc_put8(&w, (uint32_t)nf);
+                for (int i = 0; i < m->u.peers.n; i++)
+                    if (m->u.peers.far[i] > 1) rc_put8(&w, (uint32_t)i | (m->u.peers.far[i] > 4 ? RC_HINT_VERYFAR : 0));
+                if (m->u.peers.n_gone > RC_GONE_MAX) return -1;
+                rc_put8(&w, m->u.peers.n_gone);
+                for (int i = 0; i < m->u.peers.n_gone; i++){ rc_put32(&w, m->u.peers.gone[i].id); rc_put8(&w, m->u.peers.gone[i].why); }
+            }
         }
         break;
     case RC_MSG_SNAP:
@@ -492,7 +502,7 @@ int rc_encode(const rc_msg *m, uint8_t *out, int cap){
         if (!racerep_ok(r)) return -1;
         rc_put32(&w, r->lobby); rc_put32(&w, r->race); rc_put8(&w, r->mode); rc_put8(&w, r->laps); rc_put16(&w, r->track);
         rc_put8(&w, r->place); rc_put8(&w, r->players); rc_put8(&w, r->flags); rc_put8(&w, r->type); rc_put8(&w, (uint8_t)r->cls);
-        rc_put8(&w, r->credit); rc_put8(&w, 0); rc_put8(&w, 0);
+        rc_put8(&w, r->credit); rc_put8(&w, r->stage); rc_put8(&w, r->lobby_bits);
         rc_putf(&w, r->rating); rc_putf(&w, r->field); rc_putf(&w, r->factor); rc_putf(&w, r->kw); rc_putf(&w, r->kg);
         rc_putf(&w, r->kmh); rc_putf(&w, r->time);
         uint8_t nm[RC_RACEREP_NAME] = {0};
@@ -584,6 +594,23 @@ int rc_decode(const uint8_t *buf, int len, rc_msg *m){
             for (int i = 0; i < m->u.peers.n; i++) m->u.peers.crew[i] = (uint8_t)rc_get8(&r);
             if (r.err) return RC_E_SHORT;
             for (int i = 0; i < m->u.peers.n_mine; i++) if (!m->u.peers.mine[i]) return RC_E_FIELD;
+            /* the hints (a hub of core 16's); ones that do not read as hints are none (the list stands) */
+            if (r.n < r.len){
+                int ok = 1, nf = (int)rc_get8(&r);
+                for (int i = 0; i < m->u.peers.n; i++) m->u.peers.far[i] = 1;
+                for (int k = 0; k < nf && ok; k++){
+                    uint32_t b = rc_get8(&r), i = b & ~(uint32_t)RC_HINT_VERYFAR;
+                    if (r.err || i >= m->u.peers.n) ok = 0;
+                    else m->u.peers.far[i] = b & RC_HINT_VERYFAR ? 10 : 4;
+                }
+                m->u.peers.n_gone = ok ? (uint8_t)rc_get8(&r) : 0;
+                if (r.err || m->u.peers.n_gone > RC_GONE_MAX) ok = 0;
+                for (int i = 0; ok && i < m->u.peers.n_gone; i++){
+                    m->u.peers.gone[i].id = rc_get32(&r); m->u.peers.gone[i].why = (uint8_t)rc_get8(&r); }
+                if (r.err) ok = 0;
+                m->u.peers.hints = (uint8_t)ok;
+                if (!ok){ memset(m->u.peers.far, 0, sizeof m->u.peers.far); m->u.peers.n_gone = 0; }
+            }
             r.n = r.len;                                              /* (a newer hub's additions) */
         }
         break;
@@ -675,7 +702,7 @@ int rc_decode(const uint8_t *buf, int len, rc_msg *m){
         q->lobby = rc_get32(&r); q->race = rc_get32(&r); q->mode = (uint8_t)rc_get8(&r); q->laps = (uint8_t)rc_get8(&r);
         q->track = (uint16_t)rc_get16(&r); q->place = (uint8_t)rc_get8(&r); q->players = (uint8_t)rc_get8(&r);
         q->flags = (uint8_t)rc_get8(&r); q->type = (uint8_t)rc_get8(&r); q->cls = (int8_t)rc_get8(&r);
-        q->credit = (uint8_t)rc_get8(&r); (void)rc_get8(&r); (void)rc_get8(&r);
+        q->credit = (uint8_t)rc_get8(&r); q->stage = (uint8_t)rc_get8(&r); q->lobby_bits = (uint8_t)rc_get8(&r);
         q->rating = rc_getf(&r); q->field = rc_getf(&r); q->factor = rc_getf(&r); q->kw = rc_getf(&r); q->kg = rc_getf(&r);
         q->kmh = rc_getf(&r); q->time = rc_getf(&r);
         rc_getb(&r, q->name, RC_RACEREP_NAME); q->name[RC_RACEREP_NAME] = 0;
@@ -720,9 +747,10 @@ int rc_carcfg_encode(const rc_carcfg *c, uint8_t *out, int cap){
     for (int i = 0; i < c->n_parts; i++){ rc_put8(&w, c->part[i].slot); rc_put32(&w, c->part[i].key); rc_put32(&w, c->part[i].owner); }
     /* extensions: count, then {u8 tag, u8 length, bytes}; unknown tags are
      * skipped by the reader */
-    rc_put8(&w, (c->has_perf ? 1u : 0u) + (c->has_horn ? 1u : 0u));
+    rc_put8(&w, (c->has_perf ? 1u : 0u) + (c->has_horn ? 1u : 0u) + (c->has_rating ? 1u : 0u));
     if (c->has_perf){ rc_put8(&w, RC_EXT_PERF); rc_put8(&w, RC_PERF_BYTES); rc_putb(&w, c->perf, RC_PERF_BYTES); }
     if (c->has_horn){ rc_put8(&w, RC_EXT_HORN); rc_put8(&w, 1); rc_put8(&w, c->horn); }
+    if (c->has_rating){ rc_put8(&w, RC_EXT_RATING); rc_put8(&w, 3); rc_put8(&w, (uint8_t)c->rating_cls); rc_put16(&w, c->rating); }
     return w.err ? -1 : (int)w.n;
 }
 int rc_carcfg_decode(const uint8_t *p, int len, rc_carcfg *c){
@@ -753,6 +781,10 @@ int rc_carcfg_decode(const uint8_t *p, int len, rc_carcfg *c){
         uint32_t tag = rc_get8(&r), l = rc_get8(&r);
         if (tag == RC_EXT_PERF && l == RC_PERF_BYTES){ rc_getb(&r, c->perf, RC_PERF_BYTES); c->has_perf = !r.err; }
         else if (tag == RC_EXT_HORN && l == 1){ c->horn = (uint8_t)rc_get8(&r); c->has_horn = !r.err; }
+        else if (tag == RC_EXT_RATING && l == 3){
+            c->rating_cls = (int8_t)rc_get8(&r); c->rating = (uint16_t)rc_get16(&r);
+            c->has_rating = !r.err && c->rating_cls >= -1 && c->rating_cls <= 3 && c->rating <= 5000;
+        }
         else if (r_have(&r, l)) r.n += l;
     }
     if (r.err) return RC_E_SHORT;
@@ -1143,9 +1175,11 @@ static void lobbies_from_hub(rc_session *s, const rc_msg *m){
     for (int k = 0; k < m->u.lobbies.n; k++){
         const uint8_t *e = m->u.lobbies.data + (size_t)k * RC_LOBBIES_ENTRY;
         uint32_t race = (uint32_t)e[4] | (uint32_t)e[5] << 8 | (uint32_t)e[6] << 16 | (uint32_t)e[7] << 24;
-        if (!race || e[9] < 2 || e[9] > RC_LOBBY_MAX || e[8] > e[9] || e[10] >= RC_LS__N) continue;
+        uint8_t st = e[10] & 3u;
+        if (!race || e[9] < 2 || e[9] > RC_LOBBY_MAX || e[8] > e[9] || st >= RC_LS__N) continue;
         s->lobbies_e[n].x = (int16_t)(e[0] | e[1] << 8); s->lobbies_e[n].y = (int16_t)(e[2] | e[3] << 8);
-        s->lobbies_e[n].race = race; s->lobbies_e[n].n = e[8]; s->lobbies_e[n].max = e[9]; s->lobbies_e[n].state = e[10];
+        s->lobbies_e[n].race = race; s->lobbies_e[n].n = e[8]; s->lobbies_e[n].max = e[9]; s->lobbies_e[n].state = st;
+        s->lobbies_e[n].flags = e[10] & (RC_LOBBIES_STAGED | RC_LOBBIES_MATE); s->lobbies_e[n].hstage = e[10] >> RC_LOBBIES_HSTAGE & 7u;
         n++;
     }
     s->lobbies_n = n; s->lobbies_gen++;
@@ -1300,6 +1334,11 @@ int rc_peer_crew(const rc_session *s, int i){
 int rc_peer_way(const rc_session *s, int i){
     return i >= 0 && i < RC_TABLE && s->conf.hub_ip && in_group(s, &s->peer[i]) ? s->peer[i].hub_way : 0;
 }
+int rc_hub_gone(const rc_session *s, uint32_t id, int64_t now_us){
+    for (int k = s->n_hub_gone - 1; k >= 0; k--)
+        if (s->hub_gone[k].id == id) return now_us - s->hub_gone[k].at < 10000000 ? s->hub_gone[k].why : RC_GONE_NONE;
+    return RC_GONE_NONE;
+}
 int rc_peer_friend(const rc_session *s, int i){
     return i >= 0 && i < RC_TABLE && s->peer[i].hub_friend;
 }
@@ -1383,6 +1422,7 @@ static void fill_hello(rc_session *s, rc_msg *m, const rc_peer *to, int crews){
     if (s->conf.duels && s->conf.drifts) m->h.flags |= RC_HF_DRIFT;
     if (s->conf.lobbies) m->h.flags |= RC_HF_LOBBY;
     if (s->conf.say) m->h.flags |= RC_HF_SAY;
+    if (s->conf.seat2) m->h.flags |= RC_HF_SEAT2;
     if (!to) m->h.flags |= RC_HF_ALL;
     m->u.hello.core_ver = RC_CORE_VER; m->u.hello.platform = s->conf.platform; m->u.hello.status = s->status;
     m->u.hello.listen_port = s->conf.port; m->u.hello.cfg_rev = s->cfg_rev; m->u.hello.room = s->conf.room;
@@ -1521,6 +1561,13 @@ void rc_receive(rc_session *s, uint32_t ip, uint16_t port, const uint8_t *buf, i
                 if (m.u.peers.crew[k] >> c & 1u) q->hub_crews[q->n_hub_crews++] = m.u.peers.mine[c];
             q->hub_friend = marks && (m.u.peers.crew[k] & RC_MARK_FRIEND);
             q->hub_way = marks ? m.u.peers.crew[k] & (RC_MARK_RXONLY | RC_MARK_TXONLY) : 0;
+            q->hub_far = m.u.peers.hints ? m.u.peers.far[k] : 0;
+        }
+        /* why the cars near us that it left out went (rc_hub_gone), the oldest out first */
+        for (int k = 0; k < m.u.peers.n_gone; k++){
+            if (s->n_hub_gone == RC_GONE_MAX){ memmove(&s->hub_gone[0], &s->hub_gone[1], sizeof s->hub_gone[0] * (RC_GONE_MAX - 1)); s->n_hub_gone--; }
+            s->hub_gone[s->n_hub_gone].id = m.u.peers.gone[k].id; s->hub_gone[s->n_hub_gone].why = m.u.peers.gone[k].why;
+            s->hub_gone[s->n_hub_gone++].at = now;
         }
         return;
     }
@@ -1782,7 +1829,8 @@ void rc_set_status(rc_session *s, uint8_t st){
     for (int i = 0; i < RC_TABLE; i++) if (s->peer[i].state == RC_PS_EST){ rc_msg m; fill_hello(s, &m, &s->peer[i], s->peer[i].reads_crews); tx(s, &s->peer[i], &m); }
     if (s->conf.hub_ip){ rc_msg m; fill_hello(s, &m, 0, 1); tx_to(s, s->conf.hub_ip, s->conf.hub_port, &m); }
 }
-void rc_bump_epoch(rc_session *s){ s->epoch++; s->nlast = 0; }
+/* (and the hub hears where we are at the next snapshot, not up to T_HUB_SNAP later: a jump's list comes sooner) */
+void rc_bump_epoch(rc_session *s){ s->epoch++; s->nlast = 0; s->hub_snap_tx = INT64_MIN / 4; }
 void rc_bump_clock(rc_session *s){ s->clock++; s->nlast = 0; }
 void rc_set_cfg(rc_session *s, const uint8_t *rec, int len, int64_t now){
     (void)now;
@@ -1797,6 +1845,9 @@ void rc_set_cfg(rc_session *s, const uint8_t *rec, int len, int64_t now){
  * out of sight, and with the hub's 32 nearest players most of a crowd's
  * links cross the map.  Our position against its newest state's. */
 static int snap_every(const rc_peer *p, const rc_state *st){
+    /* a player who only gets our car sends none (or one of before, from when the link went both ways): how far it is
+     * is what the hub's hints say (hub_far; none: every one, as before them) */
+    if (p->hub_far && (!p->mo.n || (p->hub_way & RC_MARK_TXONLY))) return p->hub_far;
     if (!p->mo.n) return 1;
     const float *q = p->mo.s[p->mo.n - 1].p;
     float dx = q[0] - st->p[0], dy = q[1] - st->p[1], d2 = dx * dx + dy * dy;

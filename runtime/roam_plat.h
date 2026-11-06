@@ -30,6 +30,17 @@ int      roam_plat_test_mode(void);
  * session and starts the network thread; 0 on success */
 int      roam_plat_start(const roam_plat_cfg *cfg, rc_session *s);
 void     roam_plat_stop(uint8_t bye_reason);       /* BYE, close, join */
+/* co-op free roam (web): player 2's session, a second endpoint of this browser on port (player 1's + 1), fed and ticked
+ * by the network thread with player 1's, until roam_plat_stop2 (its BYE).  With the lock free; 0: started */
+int      roam_plat_start2(rc_session *s, uint16_t port);
+void     roam_plat_stop2(uint8_t bye_reason);
+/* ip:port is one of this browser's own endpoints (player 1's or player 2's): never a peer.  With the lock held */
+int      roam_plat_own(uint32_t ip, uint16_t port);
+/* co-op: player 2's endpoint for the page, as a JSON object {"name"} when it starts or renames, "{}" when it ends (1
+ * sent, 0 no page, -1 the ring is full); and player 2's name the page sent (roam_plat_name's way: 0 none).  The first
+ * with the lock held */
+int      roam_plat_coop(const char *json);
+uint32_t roam_plat_name2(char out[33]);
 void     roam_plat_lock(void);
 void     roam_plat_unlock(void);
 int64_t  roam_plat_now_us(void);                   /* host monotonic clock */
@@ -52,6 +63,10 @@ void     roam_plat_get_stats(roam_plat_stats *out);
  * what alone, as the room's "Nobody else"): the page shows it (web);
  * elsewhere a log line.  With the session lock held */
 void     roam_plat_notice(const char *name, const char *what);
+/* a hint the page words itself (id "ghost": Ghost mode is in its menu, as a
+ * car drives off the new career's start among other players).  1 shown
+ * (web), 0 not here (no such menu).  With the session lock held */
+int      roam_plat_hint(const char *id);
 /* the race lobby's panel over the game (roam_game.c mp_panel): its state as
  * a JSON object, "{}" for none, sent when it changes.  1: the page shows it
  * (web); 0: this platform has no panel, the game's top line says it.  With
@@ -105,6 +120,11 @@ uint32_t roam_plat_room(char name[64]);
  * old one away (web): into out (ending in a 0 byte), and a number that changes
  * with each one (0: none, NFSU2_ROAM_NAME holds) */
 uint32_t roam_plat_name(char out[33]);
+/* a race lobby action the player took on the page (web: its lobby card's keys and buttons, an invite's Join), one a
+ * call, oldest first: ROAM_LB_* (0: none), with its values (ROAM_LB_JOIN: the lobby's host's id, the lobby's id and
+ * its race's hash, as the invite named them).  On the game thread, without the lock */
+enum { ROAM_LB_NONE = 0, ROAM_LB_NEXT = 1, ROAM_LB_PRIVATE = 2, ROAM_LB_LEAVE = 3, ROAM_LB_JOIN = 4, ROAM_LB_NEW = 5 };
+int      roam_plat_lobby_act(uint32_t *host, uint32_t *lobby, uint32_t *race);
 const char *roam_ip_str(uint32_t ip, char *buf);   /* buf >= 16 */
 
 #endif

@@ -197,6 +197,7 @@ pub async fn run(o: Options, cores: usize) {
         // LAN play's clock, 4 ms; NFSU2_LAN_MS another (0: none, each datagram at once), for measurements
         lan_ms: env_num("NFSU2_LAN_MS", d.lan_ms),
         fpred: env_num("NFSU2_FPRED", 1) != 0,
+        probe_echo: env_num("NFSU2_PROBE_ECHO", 1) != 0,
         send_buffer_os: lan_sndbuf,
         ..d
     };
@@ -246,6 +247,7 @@ pub async fn run(o: Options, cores: usize) {
         lan_sndbuf,
         compress_threads,
     ));
+    log::line(if app.lastfm.is_some() { "[lastfm] scrobbles on" } else { "[lastfm] scrobbles off (no NFSU2_LASTFM_KEY and NFSU2_LASTFM_SECRET)" });
     // the pages' friend messages (friends.rs)
     if let Some(f) = &app.friends {
         f.attach();
@@ -256,6 +258,7 @@ pub async fn run(o: Options, cores: usize) {
     // the switch's players, every 5 minutes while any are on
     {
         let lan = lan.clone();
+        let roam = app.roam.clone();
         tokio::spawn(async move {
             let mut shown = false;
             let mut thinned = 0;
@@ -292,6 +295,10 @@ pub async fn run(o: Options, cores: usize) {
                     b.thinning,
                     b.thinned - thinned
                 ));
+                // co-op free roam's second players (nfsu2-roam `coop_seats`): one more endpoint on their page's place each
+                if let Some(n) = roam.as_ref().map(|r| r.coop_seats()).filter(|&n| n > 0) {
+                    log::line(&format!("[players] of them in free roam, {n} with a second player beside them (co-op)"));
+                }
                 // LAN broadcasts (server.dll's adverts) not sent to pages with LAN play open but no socket on their port
                 // (nfsu2-lan Peer::takes_udp)
                 let skipped = b.bcast_skipped - was.bcast_skipped;
@@ -334,6 +341,11 @@ pub async fn run(o: Options, cores: usize) {
                 }
                 if let Some(l) = nfsu2_lan::mix::msg_line(&b.msgs, &was.msgs, BREAKDOWN_EVERY.as_secs_f64()) {
                     log::line(&format!("[players] WebSocket messages since the last count: {l}"));
+                }
+                // the same by kind of player: who costs the messages (the one place that takes these counts)
+                let kinds = lan.messages_by_kind().await;
+                if let Some(l) = nfsu2_lan::mix::kinds_line(&kinds, BREAKDOWN_EVERY.as_secs_f64()) {
+                    log::line(&format!("[players] WebSocket messages by kind of player since the last count (those on now): {l}"));
                 }
                 // where the players are (Cloudflare's country) and how long their paths are: to the server, and from one
                 // player to another through it, of free roam's links and LAN play's pairs (nfsu2-lan paths.rs)
@@ -416,6 +428,9 @@ pub async fn run(o: Options, cores: usize) {
                 }
                 if let Some(f) = &app.friends {
                     f.prune();
+                }
+                if let Some(l) = &app.lastfm {
+                    l.prune();
                 }
                 // the claimed names: the ended ones go, names.json written when anything changed
                 if let Some(n) = &app.names {

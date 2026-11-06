@@ -11,20 +11,73 @@ first, smaller fixes last. Left out: the server's insides, the forum
 bot, logs, tests, docs and cheat checks. A change that may or may not belong here is asked about before the release,
 not guessed.
 
-## 2026-11-05 (7225898)
+## 2026-11-06 (0d7cf05)
 
+- **Friends:** in the page menu (F9) in free roam: requests, your friends and Add a player by name. Requests from afar show at the top (F accepts).
+- **Crews:** invite a friend in free roam to one of your crews from Friends; they press Z to join. The Crews box says how to start one.
+- **Page menu:** F9 is a short list showing each setting's state. Quit game warns when you haven't saved in 10 minutes.
+- **Page menu:** Crews and Friends open inside the F9 menu instead of a box over it; Esc or B goes back.
+- **Free roam:** the notes over the game share one look; invites and friend requests have a lime border.
+- **Free roam:** new players with Ghost mode off are told where to turn it on.
+- **Start page:** a lime dot on Friends & crews when requests or messages wait.
+- **Loading screens:** nfsu2.xyz in the corner.
+- **iPhone and iPad:** no more one-second freeze every 10 to 20 seconds in a busy free roam.
+- **Garage:** Split Screen no longer locks career slots 6 to 10 and loses their cars.
+- **Vinyls:** Special shows Street Reaper, Japan Tuning, David Choe, Snoop Dogg and The Doors only on the cars they were made for.
+- **Controllers:** Xbox Bluetooth triggers drive and brake in Firefox on a Mac.
+- **Phones:** POCO M7 Pro and other PowerVR B-Series phones start in the window, where they don't crash.
+- **Career:** no more error 134 after trading a car when the career car was missing.
+- **Races:** the lobby speedometer counts how the race evens out the engines, so an upgraded car no longer reads deep in the red.
+- **Races:** joining a race after using Options or Car Select in the Online menu no longer hangs for 3 minutes.
+- **Photo mode:** the camera no longer spins on its own; Reset stops Auto-turn.
+- **iPhone:** turning the car with two fingers in the garage works again.
+- **Free roam:** Enter at a shop, race or cover shoot no longer stops working until a reload.
+- **Keyboard:** Alt, Shift and Ctrl work in Firefox with privacy protection on.
+
+## 2026-11-05 (0e56c9b)
+
+- **Races:** several lobbies can wait at one start: E shows the next, B opens your own beside them, and the card starts on one a friend or crew-mate is in. Hosts can invite friends (Z), who join from wherever they are. Lobbies you can't join no longer show on the map or at the start.
+- **Races:** lobbies keep out players past the host's stage unless the host lets everyone in (V); friends and crew can always join. A cleaner lobby card with a speedometer of the fastest car against yours, and its keys on a controller's D-pad.
+- **Free roam:** the box at the top left shows only when it says something: a new message, at a race, shop or outrun, and for a moment at the start and after a menu.
+- **Touch controls:** Reset shows only when the car is slow, and Pressurize and Bounce only when they can be used; the other buttons stay where they are.
+- **Vinyls:** Art Factory 28 to 34, Sha_Do's designs that only the Japanese release had, on every car after Art Factory 27 (ported to the PC by the underground2.net team).
 - **Languages:** Czech, Slovak and Greek, the game and the start page.
+- **Music:** scrobble the songs you hear, EA Trax and the Radio, to Last.fm: Settings, Game.
+- **Controllers:** the Steam Controller (the 2015 and the 2026 one) and a Steam Deck's controls work without Steam in Chrome and Edge: Controls, Controller, Connect a Steam Controller.
+- **Start page:** a Mods tab: every mod in the game with its makers, its switch where it has one, and an (i) for what it does. The Other tab's settings are now at the end of Game.
+- **Mods:** thelink2012's Visual Reputation Remover: the career's visual rating comes from the stage, not your car's parts, and the shops have no Visual Rating box. Off by default, in Mods.
+- **Free roam:** a second player on the same computer joins your career's free roam, the screen split in two: pause, Add Player 2, then START on a controller or the keyboard's left half, and a car from your garage. Online they show as your name and " 2".
+- **Free roam:** with player 2 in, a career race asks Together or Alone (only player 1's place counts), and the two of you can outrun each other.
+- **Free roam:** at a busy car meet the cars around you stay shown, and on a slow connection they show up sooner.
 - **Free roam:** the cars of the players nearest you stay shown instead of coming and going, and friends' cars load faster.
 - **Photo mode:** the panel in tabs: Camera, Picture, Scene and Controls. The camera can glide, turn by itself, keep its height and play through up to 8 points for clips. Shutter blurs what moves, Fisheye bends the picture, and pictures can be up to 4 times as big. Scene picks which cars show (yours, friends, crews, players, traffic, racers), their headlights, and dry or rain.
+- **Free roam:** with others is on from the start, without the question at the first Play.
+- **Free roam:** Players' cars shown starts on Auto on a computer: 32, then 48 or 64 while the game has frames to spare.
+- **Free roam:** O (D-pad down held) opens the hood, then the trunk, then the doors, one at a time.
+- **Free roam:** F10 hides the HUD and the names over cars; Controls, Site has it and a Free look row to turn stick looking off.
+- **Free roam:** the Bank shows only for a while after it changes.
+- **Horns:** six more: Dixie, an old car, a broken horn, The Car (1977) and a sputtering one, and every horn as loud as the next.
+- **Quick chat:** I need NOS! and ten film quotes in a new Quotes category.
+- **Options:** Show Player Names in Gameplay hides the names over other players' cars.
+- **Settings:** Music in drag and drift races, off as in the original.
+- **Friends:** add your Discord username in Friends & crews; only friends see it and can copy it.
+- **Saves:** screenshots first, the newest one big; profiles can be deleted, and the time you have played shows.
+- **Screenshots:** Delete all.
+- **Menus, HUD and maps:** Map only, the Detailed Map without the Upscaled HUD.
+- **Your flag:** Quebec.
+- **Bans:** a ban shows its number, name and date; someone on a banned player's network or VPN can still play, only not race.
+- **Firefox:** the game's extra memory on a computer, as in the other browsers.
 - **Races:** other players' cars no longer bounce, stand on their tails or flip over.
 - **Ghost mode:** near misses with traffic on Everything give nitrous again.
 - **Menus:** the cars' paint and chrome reflect the studio's walls and lights, as on the PC, instead of black.
 - **Names:** with a claimed name you always play as it, whatever Your name says, so friends find you by it.
+- **Free roam:** an error 134 crash with country flags shown after a shop or race is fixed.
+- **Quick chat:** on a controller, saying a phrase no longer switches the headlights or turns the view.
 
 ## 2026-11-04 (af448e5)
 
 - **Races:** other players' cars come straight from their games every frame; close ones drive on the game's physics and bump back.
-- **Headlights:** G turns them off or on, hold it for high beam; friends see them.
+- **Headlights:** G turns them off or on, hold it for high beam; other players see them.
 - **Free roam:** a country flag before your name: pick yours on the start page, in Online, Your flag.
 - **Free roam:** up to 64 players' cars shown: Online, Players' cars shown.
 - **Quick Race:** up to 127 laps and 5 opponents.

@@ -33,6 +33,7 @@ import type { GameSession } from './game';
 import { chatBit, gameHas } from './gamekeys';
 import { t } from './i18n';
 import { catName, COUNTDOWN, DEFAULT_GROUPS, DEFAULT_PHRASES, PHRASES, type CatId } from './phrases';
+import { act, block, el } from './cards';
 
 /** the picker closes this long after it opened or the last pick in it (ms) */
 const PICK_MS = 4000;
@@ -117,6 +118,10 @@ export class QuickChat {
   private rstick = 0;
   private driveAt = 0;
   private armed = true;
+  /** the stick is out from a flick the picker took: it stays the picker's until back at rest, also once that flick said
+   *  the phrase and closed it (given back still up, the game took the stick up from rest and back as a tap of the
+   *  headlights, runtime/lightkey.c, and the view looked round: a Discord report, 2026-11-05) */
+  private tail = false;
   /** the player's sixteen: the phrase in each slot (group * 4 + place), and each group's name */
   private layout: readonly number[] = DEFAULT_PHRASES;
   private groups: readonly CatId[] = DEFAULT_GROUPS;
@@ -128,7 +133,7 @@ export class QuickChat {
     this.layer = document.createElement('div');
     this.layer.className = 'qc-lines';
     this.picker = document.createElement('div');
-    this.picker.className = 'qc-picker';
+    this.picker.className = 'ov-card qc-picker';
     this.picker.hidden = true;
     this.picker.dataset.nfsu2Ui = '';
     this.picker.addEventListener('click', e => {
@@ -172,7 +177,11 @@ export class QuickChat {
   /** driving in free roam with others (the game's status: runtime/web/status_web.c "drive" 2, not in a cutscene; it
    *  says 2 in the career's free roam with free roam off too); messages.ts asks too */
   driving(): boolean {
-    if (!this.session || !this.on || !this.roam) return false;
+    return this.on && this.roaming();
+  }
+  /** driving in free roam with others, quick chat on or off (shell.ts: the crews' counts) */
+  roaming(): boolean {
+    if (!this.session || !this.roam) return false;
     this.readStatus();
     return (this.drive & 3) === 2 && (this.drive & 8) === 0;
   }
@@ -222,11 +231,12 @@ export class QuickChat {
    *  by the stick's click), else the game looks round with it */
   stick(x: number, y: number): boolean {
     const r = Math.hypot(x, y), mine = this.open >= 0 && this.mode === 'pad';
-    if (r < REST) { this.armed = true; return mine; }
-    if (!mine) return false;
+    if (r < REST) { this.armed = true; this.tail = false; return mine; }
+    if (!mine) return this.tail;
+    this.tail = true;
     if (r < FLICK || !this.armed) return true;
     this.armed = false;
-    if (!this.can()) { this.close(); return false; }
+    if (!this.can()) { this.close(); this.tail = false; return false; }
     const dir = Math.abs(x) > Math.abs(y) ? (x > 0 ? 1 : 3) : (y < 0 ? 0 : 2);
     if (this.open === GROUPS) this.group(dir, 'pad');
     else this.pick(this.open * 4 + dir);
@@ -306,36 +316,28 @@ export class QuickChat {
     this.draw(0, t('You are not allowed to start a countdown here'));
   }
 
+  /** the picker as a card (cards.ts): its title, then the four (a key cap and the phrase; with the controller its
+   *  arrows), then "Esc closes"; waiting or refused, why; on a touch screen all sixteen, four columns of buttons */
   private draw(hold = 0, no = '') {
     clearTimeout(this.closeTimer);
     const p = this.picker, wait = no ? 0 : Math.max(hold, this.wait(performance.now()));
     this.deps.place();
     p.dataset.mode = this.mode;
     p.hidden = false;
-    const kids: HTMLElement[] = [];
-    const el = (tag: string, cls: string, text?: string) => {
-      const e = document.createElement(tag); e.className = cls; if (text !== undefined) e.textContent = text; return e;
-    };
-    if (no) {
-      kids.push(el('div', 'qc-title', t('Quick chat')), el('div', 'qc-wait qc-no', no));
-      this.closeTimer = window.setTimeout(() => this.close(), PICK_MS);
-    } else if (wait > 0) {
-      kids.push(el('div', 'qc-title', t('Quick chat')), el('div', 'qc-wait', t('Wait a moment')));
-      this.closeTimer = window.setTimeout(() => this.close(), Math.min(wait, PICK_MS));
+    const kids: HTMLElement[] = [], title = (text: string) => block(el('div', 'ov-title', text));
+    if (no || wait > 0) {
+      kids.push(title(t('Quick chat')), block(el('div', no ? 'ov-dim qc-wait qc-no' : 'ov-dim qc-wait', no || t('Wait a moment'))));
+      this.closeTimer = window.setTimeout(() => this.close(), no ? PICK_MS : Math.min(wait, PICK_MS));
     } else if (this.open === GROUPS) {
-      kids.push(el('div', 'qc-title', t('Quick chat')));
-      for (let g = 0; g < 4; g++) {
-        const row = el('div', 'qc-row');
-        row.append(el('kbd', '', ARROWS[g]), el('span', 'qc-text', t(catName(this.groups[g]))));
-        kids.push(row);
-      }
+      const rows = [0, 1, 2, 3].map(g => { const r = act(ARROWS[g], t(catName(this.groups[g]))); r.classList.add('qc-row'); return r; });
+      kids.push(title(t('Quick chat')), block(...rows));
       this.closeTimer = window.setTimeout(() => this.close(), PICK_MS);
     } else if (this.open === ALL) {
       for (let g = 0; g < 4; g++) {
         const col = el('div', 'qc-group');
-        col.append(el('div', 'qc-title', t(catName(this.groups[g]))));
+        col.append(el('div', 'ov-title', t(catName(this.groups[g]))));
         for (let i = 0; i < 4; i++) {
-          const b = el('button', 'qc-say') as HTMLButtonElement;
+          const b = el('button', 'qc-say');
           this.slotText(b, g * 4 + i);
           b.type = 'button'; b.dataset.slot = String(g * 4 + i);
           col.append(b);
@@ -344,22 +346,21 @@ export class QuickChat {
       }
       const m = this.deps.message;
       if (m?.on() && this.driving()) {               // (messages go in free roam: messages.ts)
-        const b = el('button', 'qc-say qc-msg', t('Message a friend')) as HTMLButtonElement;
+        const b = el('button', 'qc-say qc-msg', t('Message a friend'));
         b.type = 'button';
         b.addEventListener('click', () => { this.close(); m.open(); });
         kids.push(b);
       }
     } else {
-      kids.push(el('div', 'qc-title', t(catName(this.groups[this.open]))));
-      for (let i = 0; i < 4; i++) {
-        const row = el('div', 'qc-row');
-        row.dataset.slot = String(this.open * 4 + i);
+      const rows = [0, 1, 2, 3].map(i => {
         const tx = el('span', 'qc-text');
         this.slotText(tx, this.open * 4 + i);
-        row.append(el('kbd', '', this.mode === 'pad' ? ARROWS[i] : String(i + 1)), tx);
-        kids.push(row);
-      }
-      if (this.mode === 'keys') kids.push(el('div', 'qc-foot', t('Esc closes')));
+        const r = act(this.mode === 'pad' ? ARROWS[i] : String(i + 1), tx);
+        r.classList.add('qc-row'); r.dataset.slot = String(this.open * 4 + i);
+        return r;
+      });
+      kids.push(title(t(catName(this.groups[this.open]))), block(...rows));
+      if (this.mode === 'keys') kids.push(block(el('div', 'ov-small', t('Esc closes'))));
       this.closeTimer = window.setTimeout(() => this.close(), PICK_MS);
     }
     p.replaceChildren(...kids);

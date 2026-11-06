@@ -32,6 +32,14 @@ test('8BitDo\'s controllers by vendor, in Chrome\'s and Firefox\'s ids, and how 
   assert.equal(D.eightBitDoFace('8BitDo Ultimate 2C (STANDARD GAMEPAD Vendor: 2dc8 Product: 310a)'), 'xbox');
   assert.equal(D.eightBitDoFace('Xbox 360 Controller (XInput STANDARD GAMEPAD)'), null);      // its X-input mode
   assert.equal(D.eightBitDoFace('Pro Controller (STANDARD GAMEPAD Vendor: 057e Product: 2009)'), null);   // Switch mode
+  const ZIKWAY = 'Zikway HID gamepad (Vendor: 3537 Product: 1041)';             // another maker's, 8BitDo's report
+  assert.equal(D.eightBitDoFace(ZIKWAY), null);
+  assert.deepEqual(D.knownPad(ZIKWAY), { face: 'xbox', maker: 'Zikway', ltFirst: false });
+  assert.equal(D.knownPad('3537-1041-Zikway HID gamepad')?.maker, 'Zikway');      // Firefox's id
+  assert.equal(D.knownPad('3537-1042-Some other pad'), null);                     // that maker's others: not known
+  assert.equal(G.familyOf(ZIKWAY).family, P.PADF_XBOX);
+  assert.match(new D.HidPadReader('xbox', Array(10).fill(0), false, 'Zikway').describe(), /^a Zikway controller/);
+  assert.ok(G.mayDrive({ id: ZIKWAY, mapping: '' }));
   assert.equal(G.familyOf(PRO2).family, P.PADF_NINTENDO);
   assert.equal(G.familyOf(ULTIMATE).family, P.PADF_XBOX);
   assert.equal(G.familyOf(PRO2).name, '8BitDo Pro 2');
@@ -170,4 +178,29 @@ test('an 8BitDo pad under Chrome on Android: Android\'s places as they come, not
   const linux = await ultimate2On(DESKTOP_SITE_UA, 0);
   assert.ok(linux.logs.some(s => /read as an 8BitDo controller \(xbox buttons\)/.test(s)));
   assert.equal(linux.face[2], 0);                                  // its index 2 is a gap there
+});
+
+test('Xbox\'s Bluetooth controllers in Firefox on a Mac: their own layout, LT before RT (a Mac player\'s: the triggers did nothing)', () => {
+  const MAC = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:153.0) Gecko/20100101 Firefox/153.0';
+  const WIN = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0';
+  const ONE_S = '45e-b20-Xbox Wireless Controller';                  // Firefox's id on macOS (no leading zeros)
+  assert.deepEqual(D.knownPad(ONE_S, MAC), { face: 'xbox', maker: 'Xbox', ltFirst: true });
+  assert.equal(D.knownPad('45e-b22-Xbox Elite Wireless Controller Series 2', MAC)?.maker, 'Xbox');
+  assert.equal(D.knownPad(ONE_S, WIN), null);                        // Windows: no triggers in such a pad, read as before
+  assert.equal(D.knownPad(ONE_S, 'Mozilla/5.0 (X11; Linux x86_64; rv:153.0) Gecko/20100101 Firefox/153.0'), null);
+  assert.equal(D.knownPad('45e-2e0-Xbox Wireless Controller', MAC), null);   // the older firmware: Firefox maps it
+  assert.equal(D.knownPad(ULTIMATE, WIN)?.maker, '8BitDo');
+  // the report's order: the sticks X Y and Z Rz, the Brake (LT) and the Accelerator (RT) let go at -1, the hat switch
+  const ff = [c, c, c, c, -1, -1, H], k = D.knownPad(ONE_S, MAC);
+  const r = new D.HidPadReader(k.face, ff, k.ltFirst, k.maker);
+  assert.deepEqual(r.read(ff, press(15)), { buttons: 0, axes: [c, c, c, c, 0, 0] });
+  assert.deepEqual(r.read([c, c, c, c, -1, 1, H], press(15)).axes.slice(4), [0, 1]);   // RT all the way: throttle
+  assert.deepEqual(r.read([c, c, c, c, 0, -1, H], press(15)).axes.slice(4), [0.5, 0]); // LT half way: brake
+  assert.equal(r.read(ff, press(15, 0)).buttons, bit(P.PAD_A));
+  assert.equal(r.read(ff, press(15, 3)).buttons, bit(P.PAD_X));
+  assert.equal(r.read(ff, press(15, 4)).buttons, bit(P.PAD_Y));
+  assert.equal(r.read(ff, press(15, 6, 7, 10, 11, 13, 14)).buttons, bit(P.PAD_LB, P.PAD_RB, P.PAD_BACK, P.PAD_START, P.PAD_LS, P.PAD_RS));
+  assert.match(r.describe(), /^an Xbox controller \(xbox buttons\), sticks on axes 0 1 and 2 3, triggers L2 4 R2 5/);
+  // where Chrome places them by usage (no mapping of its own): LT on 3, RT on 4, as Chromium's MapperXboxBluetooth
+  assert.deepEqual(D.placeHidAxes([c, c, c, -1, -1, c, 0, 0, 0, H], true), { lx: 0, ly: 1, rx: 2, ry: 5, lt: 3, rt: 4, hat: 9 });
 });

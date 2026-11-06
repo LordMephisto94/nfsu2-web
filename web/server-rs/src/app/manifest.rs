@@ -26,7 +26,7 @@ use super::etag;
 use crate::options::within;
 
 /// what /data/ and /data-blocks/ serve: the top-level entries of the install folder that are the game's
-pub const GAME_ENTRIES: [&str; 19] = [
+pub const GAME_ENTRIES: [&str; 20] = [
     "speed2.exe",
     "server.dll",
     "server.cfg",
@@ -46,6 +46,7 @@ pub const GAME_ENTRIES: [&str; 19] = [
     "subtitles",
     "texpacks", // the texture packs (tools/texpacks.py), if the folder has them
     "tracks",
+    "vinylpacks", // the Japanese release's vinyls (tools/vinylpacks.py), if the folder has them
 ];
 
 /// the blocks of /data-blocks/: 1 MiB each, at most 8 in one answer

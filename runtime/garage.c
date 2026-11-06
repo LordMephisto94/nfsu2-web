@@ -345,6 +345,8 @@ uint32_t garage_find(uint32_t db, uint32_t h){
 }
 
 /* --- new careers, stages --------------------------------------------------- */
+/* slots 6-10 as split screen found them (garage_split_keep, below) */
+static struct { int on; uint8_t cars[XN * SAVE_REC]; } g_split;
 /* thiscall cars: the 5 slots as a new profile's; ours too */
 void sub_0052a5d0_orig(CPU *c);
 void sub_0052a5d0(CPU *c){ sub_0052a5d0_orig(c); ensure(c); }
@@ -352,6 +354,7 @@ void sub_00516480_orig(CPU *c);
 void sub_00516480(CPU *c){
     uint32_t db = c->ecx;
     sub_00516480_orig(c);
+    if (MR32(G_GAMEMODE) != 4u) g_split.on = 0;
     if (player_of(db) >= 0 && ensure(c)) xinit(c, db);
 }
 /* thiscall Career (1): a new career, its first slot open; and the second */
@@ -380,10 +383,28 @@ void sub_00551320_orig(CPU *c);
 void sub_00551320(CPU *c){ stages(c, sub_00551320_orig); }
 void sub_00532cf0_orig(CPU *c);
 void sub_00532cf0(CPU *c){ stages(c, sub_00532cf0_orig); }
-/* thiscall FEDatabase: Online's end puts player 1's cars back as its copy has
- * them (+0x1677C, as made); ours as made too */
+/* thiscall FEDatabase: the end of the game's split-screen mode (4: 0x4B2A00
+ * leaving it) puts player 1's cars back as its backup has them (+0x1677C,
+ * which splitscreen.c fills as the mode starts); slots 6-10 go back as they
+ * were then too (garage_split_keep), or stay as they are.  Until 2026-11-06
+ * they were made empty and locked here (the mode was out of reach when this
+ * was written): a career saved after split screen lost the cars in slots
+ * 6-10 and those slots ("5 cars, 5 of 10 slots open" at the next load of a
+ * career that had 8 cars and 10). */
+void garage_split_keep(CPU *c){
+    if (!g_blk) return;
+    xsave(c, CARS0, g_split.cars); g_split.on = 1;
+    fprintf(stderr, "[garage] split screen: slots 6-10 kept aside, %u cars of yours, %u of %u slots open\n",
+            owned_n(CARS0), open_n(CARS0), SLOTS);
+}
 void sub_00515d70_orig(CPU *c);
-void sub_00515d70(CPU *c){ sub_00515d70_orig(c); if (g_blk) xinit(c, CARS0); }
+void sub_00515d70(CPU *c){
+    sub_00515d70_orig(c);
+    if (!g_blk || !g_split.on) return;
+    xload(c, CARS0, g_split.cars); g_split.on = 0;
+    fprintf(stderr, "[garage] split screen's end: slots 6-10 as they were, %u cars of yours, %u of %u slots open\n",
+            owned_n(CARS0), open_n(CARS0), SLOTS);
+}
 
 /* --- the profile ------------------------------------------------------------ */
 /* What a profile's payload leaves to us: slots 6-10, and the cars driven when
@@ -564,6 +585,7 @@ void sub_00516850(CPU *c){
     if (p == 0) g_p1_loads++;
     if (p < 0 || !ensure(c)) return;
     if (!p) g_back.on = 0;
+    if (MR32(G_GAMEMODE) != 4u) g_split.on = 0;  /* (a load in split screen is undone at its end: kept) */
     xinit(c, db);
     char name[33] = "";
     uint64_t fp = fnv(in, CARS_PART);
@@ -638,6 +660,18 @@ void sub_005344d0(CPU *c){
     }
     not_empty(CAREER + K_CAR, "the career's car");
     not_empty(G_QR_CAR, "the Quick Race car");
+    /* a career past the prologue whose car is in none of the 10 slots, while it has cars: the first car you have.
+     * The game never leaves a career so (from the first car bought on it drives one of the slots': CAREER_SLOT_n),
+     * but a profile came so (2026-11-05: 10 cars, the career's car none of them): the car lot then took the missing
+     * car for one to trade (0x4ED9E0: Career::GetCar() 0x513C30, the slots' record of the handle, 0, called
+     * through) and built the new one at address 0, and the next world load ended in error 134, at every load of
+     * that profile.  Before the first car (the prologue, the first car lot) the career has none: left as it is. */
+    uint32_t h = MR32(CAREER + K_CAR), to;
+    if (MR32(CAREER + K_STAGE) >= 1u && slot_of(CARS0, garage_find(CARS0, h)) < 0 && (to = first_car(CARS0, SLOTS))){
+        gcall(c, FN_SET_CAR, CAREER, 1, &to);
+        fprintf(stderr, "[garage] the career's car 0x%08x was in none of the slots: now the one in slot %d (0x%08x)\n",
+                h, slot_of(CARS0, garage_find(CARS0, to)) + 1, MR32(CAREER + K_CAR));
+    }
 }
 
 /* The shop's buys (0x547570) add each part to the career car it finds among

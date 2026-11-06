@@ -53,13 +53,14 @@
  *    sub_005c7ec0).  Player 0x5FA820 (0) gives the player's own camera back.
  *  - The front end draws the HUD, the names over friends' cars and any
  *    screen in 0x5378C0 (from the frame's render 0x5CBF40): skipped while
- *    photo mode is on.  With the names on it runs, every object of the
- *    packages on (the package manager's lists at +0xE4 and +0xF4, records
- *    chained through +4 with the name at +0xC; FEPackage +0x4C the first
- *    object, each +4 the next; a group, type +0x18 5, has its own at +0x64)
- *    but the names hidden for it (+0x1C bit 1 and 0x400000, as FEngHide
- *    0x50CA00 sets them), and those hidden ones shown after (as FEngShow
- *    0x50CA50: bit 1 off, 0x400000 on).
+ *    photo mode is on, and while the player hides the HUD with the HUD on
+ *    top (below, "the HUD hidden").  With the names on it runs, every
+ *    object of the packages on (the package manager's lists at +0xE4 and
+ *    +0xF4, records chained through +4 with the name at +0xC; FEPackage
+ *    +0x4C the first object, each +4 the next; a group, type +0x18 5, has
+ *    its own at +0x64) but the names hidden for it (+0x1C bit 1 and
+ *    0x400000, as FEngHide 0x50CA00 sets them), and those hidden ones shown
+ *    after (as FEngShow 0x50CA50: bit 1 off, 0x400000 on).
  *  - The sound manager ([0x82B884]) plays at the volumes its 0x469050
  *    (thiscall: volumes*) points it to, the Audio options' (0x83AA28: +0
  *    master, +4 speech, +8 menu music, +0xC game music, +0x10 effects,
@@ -93,6 +94,8 @@
  *   photo_target the kind of car the camera is on (KIND_*: 0 the player's, 1 a friend's, 2 a crew-mate's, 3 another
  *               player's, 4 traffic, 5 a racer's) */
 #include "cpu.h"
+#include "coop.h"
+#include "kbd.h"
 #include <math.h>
 #include <stdatomic.h>
 #include <stdio.h>
@@ -295,6 +298,7 @@ static struct {
     long n, pause_at;
     double t, val[NSLOTS];
     uint32_t freeze_was, label, quiet, after;    /* after: the Replay item Photo Mode goes in behind */
+    uint32_t coop_after;                         /* the item coop.c's Add Player 2 goes in behind */
     uint32_t least[2];                           /* the Car detail option's least models, while photo mode has 0 there */
     uint32_t mb_was, hl_was;                     /* the Motion Blur and Headlights options, while photo mode changes them */
     int speed_blur;                              /* tests (photo speedblur 1): the game's motion blur stays on */
@@ -378,7 +382,7 @@ static int network_race(void){
 }
 /* the HUD is the top package: no screen over it */
 static int hud_on_top(uint32_t pl){
-    uint32_t hud = rd32(pl + PL_HUD), fe = rd32(G_FENG), mg = fe ? rd32(fe + 8u) : 0, top = mg ? rd32(mg + 0xe4u) : 0;
+    uint32_t hud = rd32(pl + PL_HUD), fe = rd32(G_FENG), mg = fe ? rd32(fe + 8u) : 0, top = mg ? coop_fe_top(mg) : 0;
     char a[40], b[40];
     cstr(top ? rd32(top + 0xcu) : 0, a, sizeof a); cstr(hud ? rd32(hud + 0x10u) : 0, b, sizeof b);
     return a[0] && !strcasecmp(a, b);
@@ -516,6 +520,62 @@ static void lights_off(uint32_t mine){
         if (k == P.ndark && P.ndark < DARK_MAX) P.dark[P.ndark++] = car;
     }
 }
+/* ---- the HUD hidden ---------------------------------------------------------------------------------------------
+ * The player's key for it (the start page's Controls, Site, Hide HUD: settings.ini key_hud, NFSU2_KEY_HUD, F10 by
+ * default, or off: dinput_kbd.c dikbd_site_key; none while the player has one of the game's controls on it,
+ * dikbd_ours) hides the HUD while it is the top package (driving: free roam, races, outruns, Online and LAN), and the
+ * next press shows it again (players asked for a HUD-free drive, 2026-11-04).  Hidden, the front end's frame
+ * (sub_005378c0, below) is skipped while the HUD is on top, as photo mode skips it: the names over the cars go with
+ * it, and quick chat's lines over them (the page's: roam_game.c sends no places for them, photo_hud_hidden); the
+ * page's own (the quick chat list, its menu's hint) stay.  Anything over the HUD (the pause menu, the map, the phone's
+ * messages, a race's results) draws as the game draws it.  For the game's session only: off at each start.  No touch
+ * button.  "[hud]" log lines; tests: tests/scripts/hud_hide.txt (free roam, the page's F10, its pictures),
+ * hud_hide_race.txt (a Quick Race), hud_hide_pair_a/b.txt (a friend's name and line go too). */
+#define DIK_F10        0x44u         /* in none of the game's key maps */
+static struct {
+    int hidden;                       /* the player hid the HUD */
+    int kinit, kdown; uint32_t kseq;  /* the key's events read up to kseq; the key held */
+    int note;                         /* the last press that did nothing, logged once */
+} H;
+int dikbd_ours(unsigned dik, const char *what);
+unsigned dikbd_site_key(const char *env, unsigned dflt);
+const char *dik_name(unsigned dik);
+/* the HUD is the top package now, out in the world */
+static int hud_top(void){ uint32_t pl = player(); return MR32(G_FLOW) == 6u && pl && car_of(pl) && hud_on_top(pl); }
+/* the key's presses since the last frame (a tap between frames counts) */
+static int hud_presses(unsigned dik){
+    uint32_t head = kbd_ev_head();
+    if (!H.kinit){ H.kinit = 1; H.kseq = head; return 0; }
+    int n = 0;
+    for (; H.kseq != head; H.kseq++){
+        KbdEv e;
+        int r = kbd_ev_get(H.kseq, &e);
+        if (r == 0) break;
+        if (r > 0 && dik && e.dik == dik){ if (e.down && !H.kdown && dikbd_ours(dik, "hiding the HUD")) n++; H.kdown = e.down; }
+    }
+    return n;
+}
+/* each frame (photo_frame): the presses, on or off */
+static void hud_frame(void){
+    static unsigned dik = 0x100u;
+    if (dik == 0x100u) dik = dikbd_site_key("NFSU2_KEY_HUD", DIK_F10);
+    int n = hud_presses(dik), top = !P.on && hud_top();
+    const char *key = dik_name(dik) ? dik_name(dik) : "the key";
+    for (int i = 0; i < n; i++){
+        if (!top){
+            if (!H.note) fprintf(stderr, "[hud] f=%ld %s: nothing (%s)\n", autotest_frame(), key,
+                                 P.on ? "photo mode" : MR32(G_FLOW) != 6u ? "not in the world" : "a screen over the HUD");
+            H.note = 1;
+            continue;
+        }
+        H.note = 0;
+        H.hidden = !H.hidden;
+        fprintf(stderr, "[hud] f=%ld %s: the HUD %s\n", autotest_frame(), key, H.hidden ? "hidden" : "shown");
+    }
+}
+/* roam_game.c: the HUD is hidden now (quick chat's lines over the cars go with the names) */
+int photo_hud_hidden(void){ return H.hidden && !P.on && hud_top(); }
+
 /* rain.c's (overrides.c sub_0061f120): the weather photo mode asks for, -1 the game's; whether its world stands */
 int photo_weather(void){ return P.on ? P.weather : -1; }
 /* headlights.c: a car whose headlights photo mode turned off casts no light on the road either */
@@ -1089,6 +1149,7 @@ void photo_frame(CPU *c){
     P.t = t;
     if (dt < 0.f) dt = 0.f; else if (dt > 0.1f) dt = 0.1f;
     if (!P.patched){ P.patched = 1; dispatch_patch(FN_REPLAY_ACT, act); dispatch_patch(FN_ADD_ITEM, add_item); }
+    hud_frame();
     if (!P.shown_set){ P.shown_set = 1; P.show = SHOW_ALL; P.lights = 1; P.horns = 1; P.weather = -1; }
     label();
     int req = atomic_exchange(&I.open, 0);
@@ -1216,10 +1277,14 @@ static void hide_but(uint32_t first, const uint32_t *keep, int nk, int depth){
 }
 
 /* The front end's frame (cdecl, no arguments): not while photo mode is on, but for the names over friends' cars
- * when they are on. */
+ * when they are on; nor while the HUD is hidden and on top. */
 void sub_005378c0_orig(CPU *c);
 void sub_005378c0(CPU *c){
-    if (!P.on){ sub_005378c0_orig(c); return; }
+    if (!P.on){
+        if (H.hidden && hud_top()){ POP32(c->eip); return; }
+        sub_005378c0_orig(c);
+        return;
+    }
     if (S.mode == (int)GW_CAP_TILES){ POP32(c->eip); return; }       /* tiles: the names would be where the whole view has them */
     uint32_t keep[NAMES_MAX], fe = rd32(G_FENG), mg = fe ? rd32(fe + 8u) : 0;
     int nk = P.names && (P.show & SHOW_PEOPLE) == SHOW_PEOPLE && ok(mg, 0xf7) ? roam_game_names(c, keep, NAMES_MAX) : 0;   /* (players' cars hidden: no names) */
@@ -1252,16 +1317,20 @@ void sub_004c2640(CPU *c){
     fprintf(stderr, "[photo] f=%ld the pause menu's Replay%s, Photo Mode %s%s (camera %u)\n", autotest_frame(),
             ok(it, IT_GREY) && MR8(it + IT_GREY) ? " (greyed out)" : "", no ? "not: " : "after it", no ? no : "", mover_type(pl));
     P.after = no ? 0u : it;
+    P.coop_after = no ? it : 0u;        /* coop.c's Add Player 2 after Photo Mode, or after Replay without it */
 }
 /* A menu's AddOption (thiscall: item; ret 4): after that Replay, Photo Mode, an item of Replay's kind with its own
  * icon and label (and savegame.c's Save after Return to Explore Mode). */
 void sub_0050dab0(CPU *c);
 void savegame_item(CPU *c, uint32_t menu, uint32_t it);
 int savegame_accept(CPU *c);
+void coop_item(CPU *c, uint32_t menu);
+int coop_act(CPU *c);
 static void add_item(CPU *c){
     uint32_t menu = c->ecx, it = MR32(c->esp + 4u);
     sub_0050dab0(c);
     savegame_item(c, menu, it);
+    if (it && it == P.coop_after){ P.coop_after = 0; coop_item(c, menu); }
     if (!it || it != P.after) return;
     P.after = 0;
     uint32_t n = ITEM_BYTES, ph = gcall(c, FN_NEW, 0, 1, &n);
@@ -1269,6 +1338,7 @@ static void add_item(CPU *c){
     uint32_t arg[3] = { ICON_PHOTO, P.label, 0 };
     gcall(c, FN_ITEM, ph, 3, arg);
     MR32(ph) = VT_REPLAY;
+    P.coop_after = ph;
     gcall(c, FN_ADD_ITEM, menu, 1, &ph);
 }
 /* Their action (thiscall: package, message, ...; ret 0x14): Photo Mode's Accept asks for photo mode, then resumes
@@ -1278,6 +1348,10 @@ void sub_004c2510(CPU *c);
 void sub_004c24c0(CPU *c);
 static void act(CPU *c){
     if (savegame_accept(c)) return;
+    /* coop.c's item: 1 handled (thiscall, 5 arguments), 2 handled and returned (the menu's Resume) */
+    int co = coop_act(c);
+    if (co == 1){ POP32(c->eip); c->esp += 0x14u; return; }
+    if (co == 2) return;
     uint32_t it = c->ecx, msg = MR32(c->esp + 8u);
     if (msg != MSG_ACCEPT || !ok(it, IT_LABEL + 4u) || MR32(it + IT_LABEL) != P.label || MR8(it + IT_GREY)){ sub_004c26b0(c); return; }
     P.pause_at = autotest_frame();

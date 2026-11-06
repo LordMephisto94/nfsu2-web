@@ -62,7 +62,8 @@
 #define NET_KIND_LAN_ICMP  5u   /* LAN play: an ICMP message (raw socket; echo answered by the receiver) */
 #define NET_KIND_NOTICE   16u   /* TX ring only, never on the switch: a line of UTF-8 text the page shows
                                    over the game (free roam: a friend joined, left, went into a race);
-                                   the friend's name first, ended by 0x1F (none: a line of the game's own) */
+                                   the friend's name first, ended by 0x1F (none: a line of the game's own);
+                                   0x1E first: a hint by its id, worded by the page (roam_plat_hint) */
 #define NET_KIND_LOBBY    17u   /* TX ring only, never on the switch: the free-roam race lobby's panel over
                                    the game, its state as a JSON object ("{}": none), sent when it changes
                                    (roam_game.c mp_panel) */
@@ -78,6 +79,10 @@
 #define NET_KIND_BATTLE   21u   /* TX ring only, never on the switch: a drift battle's scoreboard while it counts, as a
                                    JSON object {"t","me","a","vs","b"} (seconds left, our name and points, the other
                                    player's; roam_game.c db_panel), "{}" when there is none (drift.ts) */
+#define NET_KIND_COOP     22u   /* TX ring only, never on the switch: co-op free roam's player 2 online, as a JSON
+                                   object {"name"} (its name on the switch: player 1's + " 2"; roam_game.c c2_*), sent
+                                   when its endpoint starts or renames, "{}" when it ends: the page checks the name as
+                                   player 1's (a claim, the server's names) and may send another (IEV_NAME, INAME_SEAT2) */
 #define NET_BROADCAST      0xFFFFFFFFu
 #define NET_ROAM_HUB       0x0A4D00FDu  /* 10.77.0.253: the server's free-roam hub (web/server-rs/crates/roam),
                                    an address the switch never hands out */
