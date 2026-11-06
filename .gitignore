@@ -19,3 +19,16 @@ __pycache__/
 *.o
 *.log
 .DS_Store
+
+# IronWing instance: game files copied beside the repo, local backups and server secrets never go in either
+/SPEED2.EXE
+/server.dll
+/FRONTEND/
+/Game-files/
+*.backup
+*.bak
+*.before-*
+.env
+.env.*
+*.key
+/.aws/

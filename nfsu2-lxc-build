@@ -1,0 +1,128 @@
+#!/usr/bin/env bash
+# Build and test the fork on this PC. Nothing is built or restarted on the LXC.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+BUILDS="$ROOT/out/lxc-builds"
+CACHE="$ROOT/out/lxc-build-cache"
+GAME="${NFSU2_GAME_DIR:-$HOME/.local/share/wineprefixes/nfsu2-ogd/drive_c/Program Files (x86)/NFS Underground 2}"
+JOBS="${NFSU2_BUILD_JOBS:-2}"
+
+if [ "${1:-}" = --help ]; then
+  printf '%s\n' 'Usage: ./nfsu2-lxc-build' \
+    'Builds and tests the current main branch of the IronWing fork on this PC.' \
+    'The completed release is placed under out/lxc-builds/releases/; it does not restart the LXC.' \
+    'Optional: NFSU2_GAME_DIR and NFSU2_BUILD_JOBS (default 2).'
+  exit 0
+fi
+[ "$#" -eq 0 ] || { echo 'Unknown argument; use --help.' >&2; exit 2; }
+case "$JOBS" in ''|*[!0-9]*|0) echo 'NFSU2_BUILD_JOBS must be a positive integer.' >&2; exit 2;; esac
+for cmd in git node npm cargo rustc python3 taskset nice rsync sha256sum flock curl timeout; do
+  command -v "$cmd" >/dev/null || { echo "Missing required tool: $cmd" >&2; exit 1; }
+done
+[ -x "$ROOT/.venv/bin/python" ] || { echo 'Missing the project Python environment (.venv).' >&2; exit 1; }
+[ -d "$ROOT/deps" ] || { echo 'Missing the project WASI SDK (deps).' >&2; exit 1; }
+[ -f "$GAME/SPEED2.EXE" ] && [ -f "$GAME/server.dll" ] || { echo 'The configured game executable or server.dll is missing.' >&2; exit 1; }
+GAME_SHA="$(sha256sum "$GAME/SPEED2.EXE" | cut -d' ' -f1)"
+DLL_SHA="$(sha256sum "$GAME/server.dll" | cut -d' ' -f1)"
+mkdir -p "$BUILDS/work" "$BUILDS/releases" "$CACHE/cargo" "$CACHE/obj" "$CACHE/playwright"
+exec 9>"$BUILDS/.lock"
+flock -n 9 || { echo 'Another LXC build is already running.' >&2; exit 1; }
+WORK="$(mktemp -d "$BUILDS/work/build.XXXXXXXX")"
+SRC="$WORK/source"
+echo "Building in $WORK"
+git clone --quiet --branch main --single-branch https://github.com/LordMephisto94/nfsu2-web.git "$SRC"
+REV="$(git -C "$SRC" rev-parse HEAD)"
+SHORT="$(git -C "$SRC" rev-parse --short HEAD)"
+KEY="$REV-${GAME_SHA:0:12}-${DLL_SHA:0:12}"
+OUTPUT="$BUILDS/releases/$KEY"
+if [ -e "$OUTPUT" ]; then
+  (cd "$OUTPUT" && sha256sum --quiet -c SHA256SUMS) || { echo "Existing build is incomplete or damaged: $OUTPUT" >&2; exit 1; }
+  [ "$(cat "$OUTPUT/BUILD_REVISION")" = "$REV" ] && [ "$(cat "$OUTPUT/BUILD_GAME_SHA256")" = "$GAME_SHA" ] &&
+    [ "$(cat "$OUTPUT/BUILD_SERVER_DLL_SHA256")" = "$DLL_SHA" ] && [ "$(cat "$OUTPUT/BUILD_TESTED")" = 'web lan-wasm rust browser-settings quickrace' ] ||
+    { echo "Existing build has missing or mismatched test/input metadata: $OUTPUT" >&2; exit 1; }
+  echo "A verified build for $REV already exists."
+  echo "Release: $OUTPUT"
+  exit 0
+fi
+ln -s "$ROOT/deps" "$SRC/deps"
+ln -s "$ROOT/.venv" "$SRC/.venv"
+mkdir "$WORK/game-input"
+cp "$GAME/SPEED2.EXE" "$GAME/server.dll" "$WORK/game-input/"
+[ "$(sha256sum "$WORK/game-input/SPEED2.EXE" | cut -d' ' -f1)" = "$GAME_SHA" ] &&
+  [ "$(sha256sum "$WORK/game-input/server.dll" | cut -d' ' -f1)" = "$DLL_SHA" ] ||
+  { echo 'Game inputs changed while they were copied; build stopped.' >&2; exit 1; }
+
+# Match the Node version used by the project's CI; keep the tool and browser caches inside the workspace.
+NODE_VERSION="$(sed -nE 's/^[[:space:]]*node-version:[[:space:]]*["\x27]?([0-9]+(\.[0-9]+){0,2})["\x27]?[[:space:]]*$/\1/p' "$SRC/.github/workflows/tests.yml" | head -1)"
+[ -n "$NODE_VERSION" ] || { echo 'Could not determine the Node version from the project CI workflow.' >&2; exit 1; }
+NODE_CACHE="$CACHE/node-$NODE_VERSION"
+if [ ! -x "$NODE_CACHE/node_modules/.bin/node" ]; then
+  npm_config_cache="$CACHE/npm" npm install --prefix "$NODE_CACHE" --no-audit --no-fund --no-save --no-package-lock "node@$NODE_VERSION"
+fi
+export PATH="$NODE_CACHE/node_modules/.bin:$PATH"
+export CARGO_TARGET_DIR="$CACHE/cargo" CARGO_BUILD_JOBS="$JOBS" OBJCACHE="$CACHE/obj"
+export PLAYWRIGHT_BROWSERS_PATH="$CACHE/playwright"
+# Never let a live-server setting or secret leak into the isolated tests.
+for name in "${!NFSU2_@}"; do unset "$name"; done
+export NFSU2_REPO="$SRC"
+unset WEB_LIFT LREGS FTOL2INL INLINE_LIST GEN_SHARED 2>/dev/null || true
+CPUS="$(python3 - "$JOBS" <<'PY'
+import os, sys
+available = sorted(os.sched_getaffinity(0))
+print(','.join(map(str, available[:min(int(sys.argv[1]), len(available))])))
+PY
+)"
+low() { nice -n 15 taskset -c "$CPUS" "$@"; }
+echo "Using Node $(node --version) and CPUs $CPUS; the LXC is not used for compilation."
+(cd "$SRC/web" && npm_config_cache="$CACHE/npm" low npm ci --no-audit --no-fund && low npm run check && low npm run build)
+(cd "$SRC/web/server-rs" && low cargo build --release --locked -p nfsu2-server)
+export NFSU2_SERVER_BIN="$CARGO_TARGET_DIR/release/nfsu2-server"
+(cd "$SRC/web" && low ./node_modules/.bin/playwright install chromium --only-shell)
+(cd "$SRC" && low node web/tools/unit-tests.mjs --fast "--test-concurrency=$JOBS")
+(cd "$SRC" && low node --test --test-timeout=120000 web/test/lan-wasm.test.mjs)
+(cd "$SRC/web/server-rs" && low cargo test --profile ci --locked --workspace --no-fail-fast)
+# Explicitly setting the upstream default skips its shared home-directory lift cache.
+(cd "$SRC" && JTSWITCH=1 low bash web/gen.sh "$WORK/game-input/SPEED2.EXE")
+(cd "$SRC" && J="$JOBS" low bash web/build.sh)
+test_port="$(python3 - <<'PY'
+import socket
+with socket.socket() as s:
+    s.bind(('127.0.0.1', 0))
+    print(s.getsockname()[1])
+PY
+)"
+mkdir "$WORK/test-state"
+NFSU2_COMPRESS_THREADS=0 nice -n 15 taskset -c "$CPUS" "$NFSU2_SERVER_BIN" --data "$GAME" --http-port "$test_port" \
+  --dev --state "$WORK/test-state" --dist "$SRC/web/dist" --wasm "$SRC/out/web/nfsu2.wasm" > "$WORK/test-server.log" 2>&1 &
+test_pid=$!
+stop_test() { kill "$test_pid" 2>/dev/null || true; wait "$test_pid" 2>/dev/null || true; }
+trap stop_test EXIT
+ready=0
+for attempt in $(seq 1 60); do
+  if curl -fsS --max-time 2 "http://127.0.0.1:$test_port/test/dev.json" >/dev/null 2>&1; then ready=1; break; fi
+  kill -0 "$test_pid" 2>/dev/null || break
+  sleep .5
+done
+if [ "$ready" != 1 ]; then tail -25 "$WORK/test-server.log" >&2; echo 'PC test server did not become ready.' >&2; exit 1; fi
+(cd "$SRC" && low timeout 180 node web/tools/app-test.mjs --base "http://127.0.0.1:$test_port" --out "$WORK/browser-smoke" --only start,settings)
+(cd "$SRC" && low timeout 700 node web/tools/run-suite.mjs --base "http://127.0.0.1:$test_port" --run lxc-build-quickrace --jobs 1 --timeout-scale 1.5 quickrace)
+stop_test
+trap - EXIT
+[ "$(sha256sum "$GAME/SPEED2.EXE" | cut -d' ' -f1)" = "$GAME_SHA" ] &&
+  [ "$(sha256sum "$GAME/server.dll" | cut -d' ' -f1)" = "$DLL_SHA" ] ||
+  { echo 'Game inputs changed during the build; release not assembled.' >&2; exit 1; }
+git -C "$SRC" diff --quiet || { echo 'Build source changed unexpectedly; release not assembled.' >&2; exit 1; }
+PACKAGE="$WORK/package"
+mkdir "$PACKAGE"
+cp "$NFSU2_SERVER_BIN" "$SRC/out/web/nfsu2.wasm" "$SRC/out/web/nfsu2.json" "$PACKAGE/"
+cp -a "$SRC/web/dist" "$PACKAGE/dist"
+printf '%s\n' "$REV" > "$PACKAGE/BUILD_REVISION"
+printf '%s\n' "$GAME_SHA" > "$PACKAGE/BUILD_GAME_SHA256"
+printf '%s\n' "$DLL_SHA" > "$PACKAGE/BUILD_SERVER_DLL_SHA256"
+printf '%s\n' 'web lan-wasm rust browser-settings quickrace' > "$PACKAGE/BUILD_TESTED"
+(cd "$PACKAGE" && find . -type f ! -name SHA256SUMS -print0 | LC_ALL=C sort -z | xargs -0 sha256sum > SHA256SUMS && sha256sum --quiet -c SHA256SUMS)
+mv -T "$PACKAGE" "$OUTPUT"
+echo "Built and tested revision $SHORT."
+echo "Release: $OUTPUT"
+echo "To copy it to the LXC without restarting: ./nfsu2-lxc-stage $OUTPUT"

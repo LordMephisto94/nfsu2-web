@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Build and test on the PC, stage on the LXC, then activate with rollback.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+if [ "${1:-}" = --help ]; then
+  echo 'Usage: ./nfsu2-lxc-deploy'
+  echo 'Builds and tests on this PC, stages the release on the LXC, then restarts the game server with rollback.'
+  exit 0
+fi
+[ "$#" -eq 0 ] || { echo 'Unknown argument; use --help.' >&2; exit 2; }
+mkdir -p "$ROOT/out/lxc-builds"
+exec 8>"$ROOT/out/lxc-builds/.deploy-lock"
+flock -n 8 || { echo 'Another LXC deployment is already running.' >&2; exit 1; }
+for cmd in ssh curl python3 git; do command -v "$cmd" >/dev/null || { echo "Missing required tool: $cmd" >&2; exit 1; }; done
+ssh -o BatchMode=yes -o ConnectTimeout=8 NFSU2-lxc 'systemctl is-active --quiet nfsu2.service && systemctl is-active --quiet nfsu2-tunnel.service' || { echo 'The LXC game server or tunnel is unavailable; deployment was not started.' >&2; exit 1; }
+curl -fsS --max-time 10 https://nfsu2.ironwingnetworks.com.au/game.json > /dev/null || { echo 'The public game site is unavailable; deployment was not started.' >&2; exit 1; }
+LOG="$(mktemp "$ROOT/out/lxc-builds/deploy.XXXXXXXX.log")"
+echo "Deployment log: $LOG"
+if ! python3 "$ROOT/nfsu2-lxc-activation-test.py" > "$LOG" 2>&1; then
+  cat "$LOG" >&2
+  echo 'Activation and rollback tests failed; deployment was not started.' >&2
+  exit 1
+fi
+echo 'Activation and rollback tests passed.'
+"$ROOT/nfsu2-lxc-build" 2>&1 | tee -a "$LOG"
+SRC="$(sed -n 's/^Release: //p' "$LOG" | tail -1)"
+case "$SRC" in "$ROOT"/out/lxc-builds/releases/*) ;; *) echo 'Build did not return a valid release path.' >&2; exit 1;; esac
+[ -d "$SRC" ] || { echo 'Built release directory is missing.' >&2; exit 1; }
+REV="$(cat "$SRC/BUILD_REVISION")"
+current_fork() { git ls-remote https://github.com/LordMephisto94/nfsu2-web.git refs/heads/main | awk '{print $1}'; }
+[ "$(current_fork)" = "$REV" ] || { echo 'Fork main changed during the build; the release was not staged.' >&2; exit 1; }
+"$ROOT/nfsu2-lxc-stage" "$SRC"
+[ "$(current_fork)" = "$REV" ] || { echo 'Fork main changed during staging; the live server was not restarted.' >&2; exit 1; }
+"$ROOT/nfsu2-lxc-activate" "$SRC"

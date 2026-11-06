@@ -1,0 +1,214 @@
+#!/usr/bin/env python3
+"""Start or stop the IronWing game server and its LAN forwarder."""
+
+import argparse
+import fcntl
+import json
+import os
+from pathlib import Path
+import shutil
+import signal
+import socket
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
+
+
+ROOT = Path(__file__).resolve().parent
+RELEASE = ROOT / 'out/releases/2026-11-05-ae2bfbe0'
+SERVER = RELEASE / 'nfsu2-server'
+STATE = ROOT / 'out/web/server'
+GAME = Path.home() / '.local/share/wineprefixes/nfsu2-ogd/drive_c/Program Files (x86)/NFS Underground 2'
+RUNDIR = ROOT / 'out/background-server'
+LXC_ACTIVE = ROOT / 'out/lxc-migration-20261106/LXC-ACTIVE'
+HOST = 'nfsu2.ironwingnetworks.com.au'
+PORT = 8080
+DEFAULT_LISTEN = '172.16.10.248'
+
+
+def release_revision():
+    return json.loads((RELEASE / 'nfsu2.json').read_text())['rev']
+
+
+def start_time(pid):
+    try:
+        stat = Path(f'/proc/{pid}/stat').read_text().split(') ', 1)[1].split()
+        return None if stat[0] == 'Z' else stat[19]
+    except (OSError, IndexError):
+        return None
+
+
+def record(name):
+    try:
+        data = json.loads((RUNDIR / f'{name}.json').read_text())
+        pid = int(data['pid'])
+        exe = Path(os.readlink(f'/proc/{pid}/exe')).resolve()
+        if start_time(pid) == data['start_time'] and exe == Path(data['exe']).resolve():
+            return data
+    except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
+        pass
+    return None
+
+
+def write_record(name, proc, exe, **extra):
+    started = start_time(proc.pid)
+    if started is None:
+        raise RuntimeError(f'{name} exited during startup; check {RUNDIR / (name + ".log")}')
+    data = {'pid': proc.pid, 'start_time': started, 'exe': str(exe), **extra}
+    path = RUNDIR / f'{name}.json'
+    temp = path.with_suffix('.tmp')
+    temp.write_text(json.dumps(data) + '\n')
+    os.chmod(temp, 0o600)
+    temp.replace(path)
+    return data
+
+
+def run_detached(name, args, env=None):
+    path = RUNDIR / f'{name}.log'
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    try:
+        return subprocess.Popen(args, cwd=ROOT, env=env, stdin=subprocess.DEVNULL,
+                                stdout=fd, stderr=fd, start_new_session=True, close_fds=True)
+    finally:
+        os.close(fd)
+
+
+def fetch(address):
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    req = urllib.request.Request(f'http://{address}:{PORT}/game.json', headers={'Host': HOST})
+    with opener.open(req, timeout=2) as response:
+        return json.load(response)
+
+
+def wait_for(proc, address):
+    last = None
+    for _ in range(40):
+        if proc.poll() is not None:
+            raise RuntimeError(f'process exited with status {proc.returncode}')
+        try:
+            value = fetch(address)
+            if value.get('rev') == release_revision() and value.get('module'):
+                return value
+            last = 'unexpected game module'
+        except (OSError, ValueError, urllib.error.URLError) as e:
+            last = str(e)
+        time.sleep(0.25)
+    raise RuntimeError(f'{address}:{PORT} did not become ready: {last}')
+
+
+def stop_one(name):
+    data = record(name)
+    if data is None:
+        return False
+    os.kill(data['pid'], signal.SIGTERM)
+    for _ in range(80):
+        if record(name) is None:
+            (RUNDIR / f'{name}.json').unlink(missing_ok=True)
+            return True
+        time.sleep(0.25)
+    raise RuntimeError(f'{name} did not stop; it was not forcibly killed')
+
+
+def start(listen):
+    server = record('server')
+    forwarder = record('socat')
+    if server and forwarder:
+        if forwarder.get('listen') != listen:
+            raise RuntimeError(f'already running on {forwarder.get("listen")}:{PORT}')
+        local, lan = fetch('127.0.0.1'), fetch(listen)
+        if local.get('rev') != release_revision() or local.get('module') != lan.get('module'):
+            raise RuntimeError('running processes did not return the expected matching game module')
+        print(f'Already running: server PID {server["pid"]}, socat PID {forwarder["pid"]}, {listen}:{PORT}')
+        return
+    if server or forwarder:
+        raise RuntimeError('only one managed process is running; use status, then stop before starting again')
+    socat = shutil.which('socat')
+    if not socat:
+        raise RuntimeError('socat is not installed')
+    if not SERVER.is_file() or not (RELEASE / 'nfsu2.wasm').is_file() or not (GAME / 'SPEED2.EXE').is_file():
+        raise RuntimeError('release or game files are missing')
+    # Check both addresses before starting either process. Do not disturb another server.
+    for addr in ('127.0.0.1', listen):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            try:
+                sock.bind((addr, PORT))
+            except OSError as e:
+                raise RuntimeError(f'cannot bind {addr}:{PORT}: {e}') from e
+
+    env = os.environ.copy()
+    env['NFSU2_REPO'] = str(ROOT)
+    args = [str(SERVER), '--data', str(GAME), '--http-port', str(PORT), '--behind-proxy',
+            '--host', HOST, '--real-ip-header', 'cf-connecting-ip', '--state', str(STATE),
+            '--dist', str(RELEASE / 'dist'), '--wasm', str(RELEASE / 'nfsu2.wasm')]
+    server_proc = run_detached('server', args, env)
+    try:
+        write_record('server', server_proc, SERVER)
+        local = wait_for(server_proc, '127.0.0.1')
+        socat_args = [socat, f'TCP-LISTEN:{PORT},bind={listen},reuseaddr,fork', f'TCP:127.0.0.1:{PORT}']
+        forward_proc = run_detached('socat', socat_args)
+        try:
+            write_record('socat', forward_proc, socat, listen=listen)
+            lan = wait_for(forward_proc, listen)
+            if lan.get('module') != local.get('module'):
+                raise RuntimeError('forwarder returned a different game module')
+        except Exception:
+            stop_one('socat')
+            raise
+    except Exception:
+        stop_one('server')
+        raise
+    print(f'Started server PID {server_proc.pid} and socat PID {forward_proc.pid}.')
+    print(f'Local: 127.0.0.1:{PORT}; network: {listen}:{PORT}; module: {local["rev"]}.')
+    print(f'Logs: {RUNDIR}/server.log and {RUNDIR}/socat.log')
+
+
+def status():
+    server, forwarder = record('server'), record('socat')
+    print('Server:', f'running (PID {server["pid"]})' if server else 'not running')
+    print('socat:', f'running (PID {forwarder["pid"]}, {forwarder["listen"]}:{PORT})' if forwarder else 'not running')
+    if server and forwarder:
+        try:
+            local, lan = fetch('127.0.0.1'), fetch(forwarder['listen'])
+            ok = bool(local.get('module')) and local.get('module') == lan.get('module')
+            print('Network forwarding:', 'responding' if ok else 'unexpected module')
+            return 0 if ok else 1
+        except (OSError, ValueError, urllib.error.URLError) as e:
+            print('Network forwarding: not responding:', e)
+    return 1
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('action', choices=('start', 'stop', 'status'), nargs='?', default='start')
+    parser.add_argument('--listen', default=os.environ.get('NFSU2_BG_LISTEN_IP', DEFAULT_LISTEN),
+                        help=f'network address for socat (default: {DEFAULT_LISTEN})')
+    args = parser.parse_args()
+    if LXC_ACTIVE.exists() and os.environ.get('NFSU2_PC_ROLLBACK') != '1':
+        if args.action == 'status':
+            print('The live server has moved to NFSU2-lxc; checking its services:')
+            return subprocess.run([str(ROOT / 'nfsu2-lxc-control'), 'status'], cwd=ROOT).returncode
+        raise RuntimeError('the live server has moved to NFSU2-lxc; use ./nfsu2-lxc-control. '
+                           'Only use NFSU2_PC_ROLLBACK=1 after stopping the LXC and planning state recovery')
+    os.umask(0o077)
+    RUNDIR.mkdir(parents=True, exist_ok=True, mode=0o700)
+    with (RUNDIR / 'lock').open('a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        if args.action == 'start':
+            start(args.listen)
+        elif args.action == 'stop':
+            stopped = [name for name in ('socat', 'server') if stop_one(name)]
+            print('Stopped: ' + ', '.join(stopped) if stopped else 'No managed processes were running.')
+        else:
+            return status()
+    return 0
+
+
+if __name__ == '__main__':
+    try:
+        sys.exit(main())
+    except (OSError, RuntimeError, ValueError, urllib.error.URLError) as e:
+        print(f'nfsu2-background: {e}', file=sys.stderr)
+        sys.exit(1)

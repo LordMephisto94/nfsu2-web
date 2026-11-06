@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Copy a previously built release from this PC to the LXC without activating it.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+if [ "${1:-}" = --help ] || [ "$#" -ne 1 ]; then
+  echo 'Usage: ./nfsu2-lxc-stage /absolute/path/to/a/built/release'
+  echo 'Copies and verifies a PC-built release on NFSU2-lxc; does not restart the game server.'
+  [ "${1:-}" = --help ] && exit 0 || exit 2
+fi
+SRC="$(cd "$1" && pwd)"
+[ -f "$SRC/BUILD_REVISION" ] && [ -f "$SRC/BUILD_GAME_SHA256" ] && [ -f "$SRC/BUILD_SERVER_DLL_SHA256" ] &&
+  [ -f "$SRC/BUILD_TESTED" ] && [ -f "$SRC/SHA256SUMS" ] || { echo 'Not a fully tested release created by the current nfsu2-lxc-build.' >&2; exit 1; }
+REV="$(cat "$SRC/BUILD_REVISION")"
+GAME_SHA="$(cat "$SRC/BUILD_GAME_SHA256")"
+DLL_SHA="$(cat "$SRC/BUILD_SERVER_DLL_SHA256")"
+[[ "$REV" =~ ^[0-9a-f]{40}$ ]] || { echo 'Invalid release revision.' >&2; exit 1; }
+[[ "$GAME_SHA" =~ ^[0-9a-f]{64}$ && "$DLL_SHA" =~ ^[0-9a-f]{64}$ ]] || { echo 'Invalid game input checksums.' >&2; exit 1; }
+[ "$(cat "$SRC/BUILD_TESTED")" = 'web lan-wasm rust browser-settings quickrace' ] || { echo 'Required tests are not recorded as passed.' >&2; exit 1; }
+(cd "$SRC" && sha256sum --quiet -c SHA256SUMS)
+ssh -o BatchMode=yes NFSU2-lxc "cd /srv/nfsu2/game && printf '%s  SPEED2.EXE\\n%s  server.dll\\n' '$GAME_SHA' '$DLL_SHA' | sha256sum --quiet -c -" || { echo 'The LXC game inputs differ from the PC build; release was not staged.' >&2; exit 1; }
+KEY="$REV-${GAME_SHA:0:12}-${DLL_SHA:0:12}"
+REMOTE="/srv/nfsu2/releases/$KEY"
+INCOMING="/srv/nfsu2/releases/.incoming-$KEY-$$"
+if ssh -o BatchMode=yes NFSU2-lxc "test -d '$REMOTE'"; then
+  LOCAL_MANIFEST="$(sha256sum "$SRC/SHA256SUMS" | cut -d' ' -f1)"
+  REMOTE_MANIFEST="$(ssh -o BatchMode=yes NFSU2-lxc "sha256sum '$REMOTE/SHA256SUMS'" | cut -d' ' -f1)"
+  [ "$LOCAL_MANIFEST" = "$REMOTE_MANIFEST" ] || { echo 'An existing staged release has different contents; refusing to overwrite it.' >&2; exit 1; }
+  ssh -o BatchMode=yes NFSU2-lxc "cd '$REMOTE' && sha256sum --quiet -c SHA256SUMS"
+  echo "Already staged and verified: $REMOTE"
+  exit 0
+fi
+ssh -o BatchMode=yes NFSU2-lxc "test ! -e '$REMOTE' && mkdir -m 0750 '$INCOMING' && chown root:nfsu2 '$INCOMING'" || { echo 'Remote release exists or staging directory could not be created.' >&2; exit 1; }
+rsync -a --chown=root:nfsu2 --chmod='Du=rwx,Dg=rx,Do=,Fu=rwX,Fg=rX,Fo=' "$SRC/" "NFSU2-lxc:$INCOMING/"
+ssh -o BatchMode=yes NFSU2-lxc "cd '$INCOMING' && sha256sum --quiet -c SHA256SUMS && libs=\$(ldd ./nfsu2-server 2>&1) && ! printf '%s\\n' \"\$libs\" | grep -E 'not found|version .* not found' && mv -T '$INCOMING' '$REMOTE'"
+echo "Verified and staged $REV on the LXC at $REMOTE."
+echo 'The live server has not been restarted.'
+echo "To preflight only: ./nfsu2-lxc-activate $SRC --check"
+echo "To activate with backup and rollback: ./nfsu2-lxc-activate $SRC"

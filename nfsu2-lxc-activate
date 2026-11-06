@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# Activate a verified staged release with LXC-local preflight and rollback.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+if [ "${1:-}" = --help ] || [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
+  echo 'Usage: ./nfsu2-lxc-activate /absolute/path/to/built/release [--check]'
+  echo 'Without --check, restarts the LXC game server after an isolated preflight and state backup.'
+  [ "${1:-}" = --help ] && exit 0 || exit 2
+fi
+SRC="$(cd "$1" && pwd)"
+MODE="${2:-}"
+[ -z "$MODE" ] || [ "$MODE" = --check ] || { echo 'Unknown option.' >&2; exit 2; }
+for cmd in ssh python3 curl timeout node sha256sum; do
+  command -v "$cmd" >/dev/null || { echo "Missing required tool: $cmd" >&2; exit 1; }
+done
+if [ "$MODE" != --check ]; then
+  (cd "$ROOT/web" && node --input-type=module -e "import 'ws'") || { echo 'The PC needs the project ws package for the public WebSocket check.' >&2; exit 1; }
+  curl -fsS --max-time 10 https://nfsu2.ironwingnetworks.com.au/game.json > /dev/null || { echo 'The current public server is not reachable; activation was not started.' >&2; exit 1; }
+fi
+for f in BUILD_REVISION BUILD_GAME_SHA256 BUILD_SERVER_DLL_SHA256 BUILD_TESTED SHA256SUMS nfsu2.json; do
+  [ -f "$SRC/$f" ] || { echo "Missing release metadata: $f" >&2; exit 1; }
+done
+(cd "$SRC" && sha256sum --quiet -c SHA256SUMS)
+REV="$(cat "$SRC/BUILD_REVISION")"
+GAME_SHA="$(cat "$SRC/BUILD_GAME_SHA256")"
+DLL_SHA="$(cat "$SRC/BUILD_SERVER_DLL_SHA256")"
+[[ "$REV" =~ ^[0-9a-f]{40}$ && "$GAME_SHA" =~ ^[0-9a-f]{64}$ && "$DLL_SHA" =~ ^[0-9a-f]{64}$ ]] || { echo 'Invalid release metadata.' >&2; exit 1; }
+[ "$(cat "$SRC/BUILD_TESTED")" = 'web lan-wasm rust browser-settings quickrace' ] || { echo 'Required tests are not recorded as passed.' >&2; exit 1; }
+KEY="$REV-${GAME_SHA:0:12}-${DLL_SHA:0:12}"
+EXPECTED="$(python3 - "$SRC/nfsu2.json" "$REV" <<'PY'
+import json, sys
+j = json.load(open(sys.argv[1], encoding='utf-8'))
+r = j.get('rev', '')
+if not r or not sys.argv[2].startswith(r): raise SystemExit('Invalid module revision')
+print(r)
+PY
+)"
+if [ "$MODE" = --check ]; then
+  ssh -o BatchMode=yes -o ConnectTimeout=8 NFSU2-lxc python3 - "$KEY" --check-only < "$ROOT/nfsu2-lxc-activate-remote.py"
+  exit 0
+fi
+ssh -o BatchMode=yes -o ConnectTimeout=8 NFSU2-lxc python3 - "$KEY" < "$ROOT/nfsu2-lxc-activate-remote.py"
+
+# Local rollback is automatic. A public-route issue may be unrelated to the new
+# release, so do not overwrite potentially newer live state automatically here.
+PUBLIC_DIR="$(mktemp -d "${TMPDIR:-/tmp}/nfsu2-public-check.XXXXXXXX")"
+trap 'rm -rf "$PUBLIC_DIR"' EXIT
+ready=0
+for attempt in $(seq 1 30); do
+  if curl -fsS --max-time 5 -H 'Cache-Control: no-cache' https://nfsu2.ironwingnetworks.com.au/game.json -o "$PUBLIC_DIR/game.json" 2>/dev/null &&
+     python3 - "$PUBLIC_DIR/game.json" "$EXPECTED" <<'PY'
+import json, re, sys
+j=json.load(open(sys.argv[1], encoding='utf-8'))
+assert j.get('rev')==sys.argv[2] and re.fullmatch(r'[A-Za-z0-9_-]+', j.get('module',''))
+PY
+  then ready=1; break; fi
+  sleep 2
+done
+if [ "$ready" != 1 ]; then
+  echo 'The LXC is locally healthy, but the public module did not verify; no automatic public-route rollback was attempted.' >&2
+  exit 1
+fi
+MODULE="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["module"])' "$PUBLIC_DIR/game.json")"
+if ! curl -fsS --max-time 15 https://nfsu2.ironwingnetworks.com.au/ -o "$PUBLIC_DIR/index.html" || ! grep -q IronWing "$PUBLIC_DIR/index.html"; then
+  echo 'The public homepage did not verify; the LXC was left running for investigation.' >&2
+  exit 1
+fi
+curl -fsSI --max-time 15 "https://nfsu2.ironwingnetworks.com.au/game.wasm?v=$MODULE" > /dev/null || { echo 'Public game module request failed; the LXC was left running.' >&2; exit 1; }
+(cd "$ROOT/web" && timeout 20 node --input-type=module <<'JS'
+import WebSocket from 'ws';
+const ws = new WebSocket('wss://nfsu2.ironwingnetworks.com.au/lan', {origin:'https://nfsu2.ironwingnetworks.com.au', handshakeTimeout:12000});
+const timer = setTimeout(() => { console.error('Public WebSocket timed out'); ws.terminate(); process.exitCode=1; }, 15000);
+ws.on('message', (data, binary) => { if (binary) return; const m=JSON.parse(String(data)); if (m.t==='welcome') { ws.send(JSON.stringify({t:'hello',name:'DeployCheck'})); ws.send(JSON.stringify({t:'ping',id:73})); } if (m.t==='pong' && m.id===73) { console.log('Public multiplayer WebSocket: passed'); clearTimeout(timer); ws.close(); } });
+ws.on('error', e => { console.error('Public WebSocket failed:', e.message); clearTimeout(timer); process.exitCode=1; });
+JS
+) || { echo 'The public WebSocket did not verify; the LXC was left running for investigation.' >&2; exit 1; }
+echo "Public homepage, game module and multiplayer connection verified: $EXPECTED."

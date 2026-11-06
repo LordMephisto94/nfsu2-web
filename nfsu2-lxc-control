@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Control the migrated game server and its dedicated tunnel over SSH.
+set -euo pipefail
+action="${1:-status}"
+[ "$#" -le 1 ] || { echo 'Usage: ./nfsu2-lxc-control [status|start|stop|restart]' >&2; exit 2; }
+case "$action" in
+  status)
+    ssh -o BatchMode=yes -o ConnectTimeout=8 NFSU2-lxc 's=$(systemctl is-active nfsu2.service || true); t=$(systemctl is-active nfsu2-tunnel.service || true); printf "Game server: %s\nTunnel: %s\n" "$s" "$t"; [ "$s" = active ] && [ "$t" = active ]'
+    ;;
+  start)
+    ssh -o BatchMode=yes -o ConnectTimeout=8 NFSU2-lxc 'set -e; systemctl start nfsu2.service; systemctl start nfsu2-tunnel.service; systemctl is-active nfsu2.service nfsu2-tunnel.service'
+    ;;
+  stop)
+    ssh -o BatchMode=yes -o ConnectTimeout=8 NFSU2-lxc 'set -e; systemctl stop nfsu2-tunnel.service; systemctl stop nfsu2.service; echo "Game server and tunnel stopped."'
+    ;;
+  restart)
+    echo 'Restarting the game server; connected players may be disconnected.'
+    ssh -o BatchMode=yes -o ConnectTimeout=8 NFSU2-lxc 'set -e; systemctl restart nfsu2.service; systemctl is-active nfsu2.service nfsu2-tunnel.service'
+    ;;
+  -h|--help)
+    echo 'Usage: ./nfsu2-lxc-control [status|start|stop|restart]'
+    ;;
+  *) echo 'Usage: ./nfsu2-lxc-control [status|start|stop|restart]' >&2; exit 2;;
+esac
