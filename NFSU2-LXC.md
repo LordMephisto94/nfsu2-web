@@ -32,7 +32,7 @@ cd ~/Documents/nfsu2-web
 ./nfsu2-lxc-deploy
 ```
 
-The command clones `main` from `LordMephisto94/nfsu2-web` into an isolated PC directory, copies the PC's game executable and `server.dll` as build inputs, and builds the page, Rust server and game module on the PC. It runs frontend checks, fast web tests, the LAN/WASM test, Rust workspace tests, browser startup/settings checks and a null-renderer quick-race test. It uses two CPU threads at low priority by default; set `NFSU2_BUILD_JOBS` to change that. Build tools and caches are kept under `out/lxc-builds` and `out/lxc-build-cache` on the PC.
+The command clones `main` from `LordMephisto94/nfsu2-web` into an isolated PC directory, copies the PC's game executable and `server.dll` as build inputs, and builds the page, Rust server and game module on the PC. It runs frontend checks, fast web tests, the LAN/WASM test, Rust workspace tests, browser startup/settings checks and a null-renderer quick-race test. It uses half of the PC's CPU threads (at least 4) at low priority by default; set `NFSU2_BUILD_JOBS` to change that. Build tools and caches are kept under `out/lxc-builds` and `out/lxc-build-cache` on the PC.
 
 If a release for the same fork commit and exact game executable and `server.dll` has already passed those checks, the command verifies its checksums and reuses it. A changed commit or game input causes a new build and test run. Other game assets are not automatically copied by an update.
 

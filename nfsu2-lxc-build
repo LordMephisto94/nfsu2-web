@@ -6,17 +6,22 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 BUILDS="$ROOT/out/lxc-builds"
 CACHE="$ROOT/out/lxc-build-cache"
 GAME="${NFSU2_GAME_DIR:-$HOME/.local/share/wineprefixes/nfsu2-ogd/drive_c/Program Files (x86)/NFS Underground 2}"
-JOBS="${NFSU2_BUILD_JOBS:-2}"
+AVAILABLE_CPUS="$(python3 -c 'import os; print(len(os.sched_getaffinity(0)))')"
+# Default: half of this PC's CPUs, at least 4 (or all of them if there are fewer than 4).
+DEFAULT_JOBS=$(( AVAILABLE_CPUS / 2 < 4 ? 4 : AVAILABLE_CPUS / 2 ))
+if (( DEFAULT_JOBS > AVAILABLE_CPUS )); then DEFAULT_JOBS=$AVAILABLE_CPUS; fi
+JOBS="${NFSU2_BUILD_JOBS:-$DEFAULT_JOBS}"
 
 if [ "${1:-}" = --help ]; then
   printf '%s\n' 'Usage: ./nfsu2-lxc-build' \
     'Builds and tests the current main branch of the IronWing fork on this PC.' \
     'The completed release is placed under out/lxc-builds/releases/; it does not restart the LXC.' \
-    'Optional: NFSU2_GAME_DIR and NFSU2_BUILD_JOBS (default 2).'
+    "Optional: NFSU2_GAME_DIR and NFSU2_BUILD_JOBS (default $DEFAULT_JOBS: half the CPUs, at least 4)."
   exit 0
 fi
 [ "$#" -eq 0 ] || { echo 'Unknown argument; use --help.' >&2; exit 2; }
 case "$JOBS" in ''|*[!0-9]*|0) echo 'NFSU2_BUILD_JOBS must be a positive integer.' >&2; exit 2;; esac
+if (( JOBS > AVAILABLE_CPUS )); then JOBS=$AVAILABLE_CPUS; fi
 for cmd in git node npm cargo rustc python3 taskset nice rsync sha256sum flock curl timeout; do
   command -v "$cmd" >/dev/null || { echo "Missing required tool: $cmd" >&2; exit 1; }
 done
