@@ -73,9 +73,16 @@ export const MOD_CONTROLS: Record<string, Control> = {
   ui_textures: { t: 'seg', opts: [['original', N('Original')], ['map', N('Map only')], ['uhud', N('Upscaled')]] },
   subtitles: { t: 'switch' },
   songs: { t: 'seg', opts: [['uncensored', N('Uncensored')], ['original', N('Original')]] },
+  gps_distance: { t: 'switch' },
   show_hidden_races: { t: 'switch' },
   visual_rep_remover: { t: 'switch' },
+  // mod_rims: { t: 'switch' },   (the rims: out for now, mods.ts)
 };
+/** the Mods tab's one row that is no mod's: how other players' cars show the mods' parts (mods-ui.ts: first in "Seen by
+ *  others").  Out for now with the rims (mods.ts): */
+// const OTHERS_ITEM: Item = { key: 'others_mod_parts', label: N('Mod parts on other cars'),
+//   help: N('Original: other players\' cars with the game\'s own parts instead.'),
+//   c: { t: 'seg', opts: [['shown', N('Shown')], ['original', N('Original')]] } };
 /** the Mods tab's rows with a setting, in the catalogue's order (a shared row once: its first entry's) */
 const MOD_ITEMS: Item[] = MODS.flatMap(m => 'setting' in m.control && !m.row
   ? [{ key: m.control.setting, label: m.name, help: m.line, c: MOD_CONTROLS[m.control.setting] ?? { t: 'switch' }, mod: m.id }] : []);
@@ -101,7 +108,7 @@ const GROUPS: Group[] = [
     { key: 'online', label: N('Online mode'), help: N('The game\'s Online menu skips the EA login: lobby, chat and races with everyone on this server.'), c: { t: 'switch' }, more: true },
   ] },
   { title: N('Crews'), more: '', own: true, at: 'crews-body', items: [
-    { key: 'roam_crew', label: N('Crews'), help: N('Players with the same crew name always see each other in free roam, with names and map arrows in the crew\'s colour. Anyone who types the name joins. Up to 4 crews.'), c: { t: 'crews', placeholder: N('Crew name') } },
+    { key: 'roam_crew', label: N('Crews'), help: N('Players with the same crew name always see each other in free roam, in the crew\'s colour. Type a name to start or join a crew (up to 4).'), c: { t: 'crews', placeholder: N('Crew name') } },
   ] },
   { title: N('Game'), more: N('More game settings'), items: [
     { key: 'language', label: N('Language'), help: N('Menus, subtitles, dubbed voices and this page.'), c: { t: 'select', opts: LANGUAGE_OPTS } },
@@ -136,7 +143,7 @@ const GROUPS: Group[] = [
     { key: 'gamepad_trigger_deadzone', label: N('Trigger dead zone'), help: N('Fraction of full travel, 0 to 0.9.'), c: { t: 'num', min: 0, max: 0.9, step: 0.01 }, more: true },
     { key: 'gamepad_trigger_click', label: N('Trigger full press'), help: N('How far a trigger travels before it counts as fully pressed.'), c: { t: 'num', min: 0, max: 1, step: 0.01 }, more: true },
   ] },
-  { title: N('Mods'), more: '', own: true, at: 'mods-body', mods: true, items: MOD_ITEMS },
+  { title: N('Mods'), more: '', own: true, at: 'mods-body', mods: true, items: [/* OTHERS_ITEM, */ ...MOD_ITEMS] },
 ];
 
 /** a row's second key, which its control writes with its own and its Reset resets too (not listed under "Other
@@ -182,8 +189,6 @@ export async function copyLink(link: string, at: HTMLElement): Promise<string | 
   return t('Copy this invite link: {link}', { link });
 }
 
-/** the note under the crews' box while the player has no crew (a player's question on Discord: "how i use crew feature?") */
-const NO_CREW = N('No crew yet? Agree on a name with your friends and each type it here, or open a crew\'s invite link.');
 
 /** What a crews control shows and does: the Crews row's, and the page menu's while a game is in free roam */
 export interface CrewControl {
@@ -210,7 +215,7 @@ export interface CrewControl {
  * game, a button that opens the palette under the line; its name, how many are in free roam in it when the server
  * says, a button that copies an invite link to it, and Leave), then a value box with Join in it (or Enter).  Join
  * waits for a name that can join (crews.ts checkCrew), and the note under the box says why one cannot (and what a
- * link's copy did, without o.said), or with no crew yet how to get one; with 4 crews the box waits for one to be
+ * link's copy did, without o.said); with 4 crews the box waits for one to be
  * left.  A Leave keeps the others' colours; a Join takes the first colour no crew has.  A line under the chips names a crew counted with more than
  * CREW_BIG players (showCrewCounts).  Returns the box's field.
  */
@@ -292,7 +297,7 @@ export function crewControl(o: CrewControl, ctl: HTMLElement): HTMLInputElement 
     const r = checkCrew(inp.value, list.map(c => c.name)), full = list.length >= CREW_MAX;
     inp.disabled = full; join.disabled = !r.ok;
     const why = r.ok || !r.why ? '' : t(r.why, { name: r.name ?? '' });
-    note.textContent = why || (list.length ? '' : t(NO_CREW));
+    note.textContent = why;
     note.classList.toggle('warn', !!why && !full);
     return r;
   };

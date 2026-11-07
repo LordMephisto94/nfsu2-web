@@ -17,8 +17,9 @@ export type Place = 'display' | 'mainMenu';
 /** what changes for other players: mine, on your screen; you, sounds and menus only you get */
 export type Online = 'mine' | 'you' | 'seen' | 'career' | 'offline';
 /** what this port takes from the mod: its files, packed for the browser (data); its code, ported (code); or what it
- *  found out about the game (addresses, values), written anew (findings) */
-export type Uses = 'data' | 'code' | 'findings';
+ *  found out about the game (addresses, values), written anew (findings); or nothing, a mod made for this port in its
+ *  own source (original: no link) */
+export type Uses = 'original' | 'data' | 'code' | 'findings';
 
 /** setting: a settings.ini key (settings.ts KEYS) and the values that turn the mod on (none: a switch, on); always: no
  *  setting on the page; elsewhere: settings of its own elsewhere on the page (keys); menu: in the game's own menus */
@@ -92,6 +93,7 @@ export const ONLINE: Readonly<Record<Online, string>> = {
 };
 
 export const USES: Readonly<Record<Uses, string>> = {
+  original: N('Built for this project'),
   data: N('Its files, packed for the browser'),
   code: N('Its code, ported'),
   findings: N('Its findings, written anew'),
@@ -171,6 +173,13 @@ export const MODS: readonly Mod[] = [
     details: 'The game updates its sounds at most every 15 ms, and then by one frame\'s time only: above 60 fps the engine\'s pitch and the gear shifts ran slow, at 120 fps at half speed. Here an update also gets the time of the frames it skipped. At 60 fps and below nothing changes.',
     online: 'you', files: ['runtime/framerate.c'],
   },
+  {
+    id: 'gps-distance', name: 'GPS Distance', authors: [{ name: 'roman01la', url: 'https://github.com/roman01la' }], links: {},
+    kind: 'screen', uses: 'original', control: { setting: 'gps_distance' },
+    line: N('Distance to your destination beneath the GPS arrow.'),
+    details: 'While the GPS arrow shows the way, the distance to its destination in a straight line, not by road, in metres or feet as Speedometer Units has it. None in races, or while the GPS finds no route.',
+    online: 'mine', files: ['runtime/gpsdistance.c', 'runtime/gpsdistance_format.h'],
+  },
 
   // ---- Seen by others
   {
@@ -193,14 +202,16 @@ export const MODS: readonly Mod[] = [
     ],
     online: 'seen', files: ['runtime/cameras.c', 'runtime/lightkey.c', 'runtime/regional.c', 'runtime/vinylcat.c', 'runtime/quickrace.c'],
   },
-  {
-    id: 'art-factory', name: 'Art Factory 28 to 34', authors: [{ name: 'underground2.net Team & Contributors', port: true }],
-    links: { page: 'https://nfsmods.xyz/mod/2004' },
-    kind: 'shared', uses: 'data', control: { always: true },
-    line: N('Seven vinyls from the Japanese release.'),
-    details: 'Designs only the Japanese release (Sha_Do) had, after Art Factory 27 on every car. The game\'s own vinyls stay as they are.',
-    online: 'seen', files: ['runtime/vinylpacks.c', 'tools/vinylpacks.py'],
-  },
+  // The rims are out for now (with settings.ts's mod_rims and others_mod_parts, settings-ui.ts's rows and
+  // runtime/modpacks.c's shop switch); back with their makers' names and link:
+  // {
+  //   id: 'mod-rims', name: 'Blitz Rims', authors: [],
+  //   links: {},
+  //   kind: 'shared', uses: 'data', control: { setting: 'mod_rims' },
+  //   line: N('New rim brands in the rim shop.'),
+  //   details: 'Blitz, a brand of 24 rims, in the rim shop. Everyone\'s game has them, so a friend\'s car with them looks the same with this off. Off, the shop offers only the game\'s own brands; rims already on your car stay. Your saves still work in the original game: there the car has a similar rim of the game\'s in the same size.',
+  //   online: 'seen', sizeMB: 1, files: ['runtime/modpacks.c', 'tools/modpacks.py'],
+  // },
 
   // ---- Game rules
   {
@@ -284,6 +295,7 @@ export const ADDED: readonly { id: string; title: string; items: readonly Change
     { name: 'Power Units', key: '', line: 'Options, Gameplay: engine power in bhp or kW' },
     { name: 'Turn the car in the garage', key: 'right stick', line: 'The right stick or two fingers turn it' },
     { name: 'Tuning graphs', key: '', line: 'Drag the ECU and Turbo graphs\' dots' },
+    { name: 'Art Factory 28 to 34', key: '', line: 'The Japanese release\'s 7 vinyls, on every car' },
   ] },
   { id: 'controls', title: N('Controls'), items: [
     { name: 'Site keys', key: '', line: 'Set or turn off this site\'s keys and buttons' },

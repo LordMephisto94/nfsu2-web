@@ -180,12 +180,35 @@ export const KEYS: readonly KeyDef[] = [
   // the players this one blocks in free roam, by name (the page's hello to the server: net/index.ts).  Not in bundle.m's
   // table: the Mac's free roam has no hub
   { key: 'roam_block', env: 'NFSU2_ROAM_BLOCK', kind: 'names', ic: true, scope: 'web' },
+  // the distance to the GPS destination under its arrow (runtime/gpsdistance.c).  Not in bundle.m's table: there a
+  // lower-case key, so it reaches the runtime as NFSU2_GPS_DISTANCE all the same
+  { key: 'gps_distance', env: 'NFSU2_GPS_DISTANCE', kind: 'bool', scope: 'web' },
   // the career's hidden races on the map like the others (runtime/hiddenraces.c).  Not in bundle.m's table: there a
   // lower-case key, so it reaches the runtime as NFSU2_SHOW_HIDDEN_RACES all the same
   { key: 'show_hidden_races', env: 'NFSU2_SHOW_HIDDEN_RACES', kind: 'bool', scope: 'web' },
   // the career's visual rating set by the stage, not by the car's parts (runtime/visualrep.c).  Not in bundle.m's
   // table: there a lower-case key, so it reaches the runtime as NFSU2_VISUAL_REP_REMOVER all the same
   { key: 'visual_rep_remover', env: 'NFSU2_VISUAL_REP_REMOVER', kind: 'bool', scope: 'web' },
+  // The rims are out for now (mods.ts): these two keys come back with their lines in TEMPLATE, after
+  // visual_rep_remover's:
+  //   # New rim brands in the rim shop: Blitz.  Everyone's game has their rims,
+  //   # so a friend's car with them looks the same either way, and rims already
+  //   # on your car stay.  off = the shops offer only the original game's.
+  //   # [NFSU2_MOD_RIMS]
+  //   #mod_rims = off
+  //
+  //   # Other players' cars: shown = with the mods' parts they have (rims of a
+  //   # mod's on above), as they see them; original = with parts of the original
+  //   # game in their place (a look-alike rim of the same size, else the stock
+  //   # part).  Your own car keeps its own either way.  [NFSU2_OTHERS_MOD_PARTS]
+  //   #others_mod_parts = shown
+  // the new rim brands in the rim shop (runtime/modpacks.c; everyone's game has them, so a friend's car shows them either
+  // way).  Not in bundle.m's table: there a lower-case key, so it reaches the runtime as NFSU2_MOD_RIMS all the same
+  // { key: 'mod_rims', env: 'NFSU2_MOD_RIMS', kind: 'bool', scope: 'web' },
+  // other players' cars with the mods' parts or with the game's in their place (runtime/modpacks.c: the parts'
+  // look-alikes, else the stock ones; free roam's cars and the race's).  Not in bundle.m's table: there a lower-case
+  // key, so it reaches the runtime as NFSU2_OTHERS_MOD_PARTS all the same
+  // { key: 'others_mod_parts', env: 'NFSU2_OTHERS_MOD_PARTS', kind: 'enum', vals: 'shown|original', scope: 'web' },
   // the game's own textures without smoothing (only the page's renderer reads it: subsystems.ts, gpu/encoder.ts
   // pointTex).  Not in bundle.m's table
   { key: 'pixelated_textures', env: 'NFSU2_PIXELATED_TEXTURES', kind: 'bool', scope: 'web' },
@@ -303,6 +326,11 @@ export const TEMPLATE = `# NFSU2 settings, read at every launch.
 # original game: a hidden race shows only when you drive near it.
 # [NFSU2_SHOW_HIDDEN_RACES]
 #show_hidden_races = off
+
+# The distance to the GPS destination under its arrow, in metres or feet as
+# Speedometer Units has it (Mods: GPS Distance).
+# [NFSU2_GPS_DISTANCE]
+#gps_distance = off
 
 # The car's visual rating set by the career's stage, not by its parts, as
 # thelink2012's Visual Reputation Remover (github.com/thelink2012/novisualrep)
