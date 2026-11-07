@@ -1273,9 +1273,6 @@
   "Joined in the other tab.": "Вы присоединились в другой вкладке.",
   "The other tab did not answer. Close it: this tab joins when it takes over.": "Другая вкладка не ответила. Закройте её: присоединение произойдёт, когда эта вкладка возьмёт управление.",
   "Donate": "Поддержать",
-  "Support the project": "Поддержать проект",
-  "To help with hosting and development costs, you can buy me a coffee on Ko-fi. Everyone gets the same game, with no microtransactions or paid perks. Supporters just get a Discord role.": "Чтобы помочь с расходами на хостинг и разработку, можно угостить меня кофе на Ko-fi. У всех одна и та же игра, без микротранзакций и платных бонусов. Поддержавшие получают только роль в Discord.",
-  "Donate on Ko-fi": "Поддержать на Ko-fi",
   "Your browser may also offer to save it with your passwords: choose Save.": "Браузер может также предложить сохранить её вместе с вашими паролями: выберите «Сохранить».",
   "{n} hours played": {
     "one": "{n} час игры",

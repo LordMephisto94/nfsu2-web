@@ -2359,7 +2359,7 @@ export async function boot() {
   const pick = $<HTMLSelectElement>('#lang-pick');
   pick.replaceChildren(...LANGUAGES.map(l => Object.assign(document.createElement('option'), { value: l, textContent: NATIVE[l], lang: LOCALE[l] })));
   pick.onchange = () => void settings.set('language', pick.value);
-  // Donate at the top: a popup with the Ko-fi link, closed as Ko-fi opens in its own tab
+  // Donate at the top: a popup with the IronWing PayPal link, closed as PayPal opens in its own tab
   $('#donate-btn').onclick = () => $<HTMLDialogElement>('#donate').showModal();
   $('#donate-go').onclick = () => $<HTMLDialogElement>('#donate').close();
   // Changelog at the top: CHANGELOG.md's releases in a popup
