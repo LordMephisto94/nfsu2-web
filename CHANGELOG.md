@@ -11,6 +11,18 @@ first, smaller fixes last. Left out: the server's insides, the forum
 bot, logs, tests, docs and cheat checks. A change that may or may not belong here is asked about before the release,
 not guessed.
 
+## 2026-11-07 (b58448b)
+
+- **Free roam:** pick a world in F9 or on the start page, with each one's player count: the main world with everyone, World 1 to 4, or your own by name. Ghost mode stays off in World 4.
+- **Page menu:** Controls open inside the F9 menu, as Crews and Friends.
+- **iPhone:** performance and stability improvements.
+- **Free roam:** a "memory access out of bounds" crash as other players' cars with Art Factory vinyls came in is fixed.
+- **Free roam:** other players' engines show under an open hood.
+- **Free roam:** when other players can't be reached, the game says why: a blocked connection, one that keeps dropping, or too many players on your network.
+- **Controllers:** the Xbox One S pad with its 2016 firmware works in Chrome on Android.
+- **Car Specialties:** Stock gauges can be picked again, and the gauge list opens on the ones fitted.
+- **Car Specialties:** leaving Trunk Audio keeps your place in the list.
+
 ## 2026-11-06 (b3be4d1)
 
 - **Mods:** GPS Distance: the distance to your destination under the GPS arrow, in your Speedometer Units (off by default).
