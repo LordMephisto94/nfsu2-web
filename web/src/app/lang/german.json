@@ -165,9 +165,9 @@
     "one": "{names} wurde mit einem Spielstand-Editor geändert: Werte, die das Spiel nicht erzeugen würde, können es abstürzen lassen oder die Karriere kaputt machen.",
     "other": "{names} wurden mit einem Spielstand-Editor geändert: Werte, die das Spiel nicht erzeugen würde, können es abstürzen lassen oder die Karriere kaputt machen."
   },
-  "{names} have modded cars this game lacks: it may crash or show them wrong.": {
-    "one": "{names} hat Wagen aus Mods, die es in diesem Spiel nicht gibt: Das Spiel kann abstürzen oder sie falsch anzeigen.",
-    "other": "{names} haben Wagen aus Mods, die es in diesem Spiel nicht gibt: Das Spiel kann abstürzen oder sie falsch anzeigen."
+  "{names} have cars from a modded game: here they show as stock cars, and your save keeps them as they are unless you change them here.": {
+    "one": "{names} hat Wagen aus einem gemoddeten Spiel: Hier erscheinen sie als Serienwagen, und dein Spielstand behält sie, wie sie sind, solange du sie hier nicht änderst.",
+    "other": "{names} haben Wagen aus einem gemoddeten Spiel: Hier erscheinen sie als Serienwagen, und dein Spielstand behält sie, wie sie sind, solange du sie hier nicht änderst."
   },
   "Left out, as the game would not load them: {list}.": {
     "one": "Weggelassen, da das Spiel es nicht laden würde: {list}.",
@@ -363,6 +363,7 @@
   "Next song": "Nächster Song",
   "Autosave": "Automatisch speichern",
   "Sets each profile's Save option to Autosave once. A later change in the game's Options stays.": "Stellt die Speichern-Option jedes Profils einmalig auf „Automatisch speichern“. Eine spätere Änderung in den Optionen des Spiels bleibt.",
+  "No boost": "Kein Boost",
   "Startup movies": "Startfilme",
   "Logos, PSA and intro. Skippable: Enter, Esc, Space, a click, A, B or Start skips each. Original: only the intro can be skipped.": "Logos, PSA und Intro. Überspringbar: Enter, Esc, Leertaste, ein Klick, A, B oder Start überspringt jeden davon. Original: Nur das Intro lässt sich überspringen.",
   "Skippable": "Überspringbar",
@@ -1511,13 +1512,16 @@
   "Complete English subtitles in the movies.": "Die englischen Untertitel der Filme vollständig.",
   "The EA Trax songs unedited.": "Die EA-Trax-Songs unbearbeitet.",
   "Engine sounds right above 60 fps.": "Motorgeräusche über 60 fps im richtigen Tempo.",
+  "NFS Carbon's gearbox whine on your car.": "Das Getriebeheulen aus NFS Carbon an deinem Wagen.",
   "Drift camera, high beam, EU cars and more.": "Drift-Kamera, Fernlicht, europäische Wagen und mehr.",
+  "Dents, loose parts and scratches.": "Beulen, lose Teile und Kratzer.",
   "New rim brands in the rim shop.": "Neue Felgenmarken im Felgenshop.",
   "Mod parts on other cars": "Mod-Teile an anderen Wagen",
   "Original: other players' cars with the game's own parts instead.": "Original: die Wagen anderer Spieler stattdessen mit den Teilen des Spiels.",
   "Shown": "Angezeigt",
   "The 33 hidden races on the map.": "Die 33 versteckten Rennen auf der Karte.",
   "DVD covers by stage, not by your car's parts.": "DVD-Cover nach Stufe, nicht nach den Teilen deines Wagens.",
+  "Career rivals that wait and catch up.": "Karrieregegner, die warten und aufholen.",
   "Mods": "Mods",
   "The core gameplay is the original's, with a few improvements, fixes and multiplayer on top.": "Das Gameplay ist das des Originals, mit ein paar Verbesserungen, Korrekturen und Multiplayer obendrauf.",
   "The game's files didn't load properly. On this page: Game, Delete game data, then Play (your saves stay). If it happens again, your network may be blocking the game: try another network.": "Die Dateien des Spiels wurden nicht richtig geladen. Auf dieser Seite: „Spiel“, „Spieldaten löschen“, dann „Spielen“ (deine Spielstände bleiben). Passiert das wieder, blockiert dein Netzwerk vielleicht das Spiel: Versuche ein anderes Netzwerk.",
@@ -1583,5 +1587,10 @@
   "Own name…": "Eigener Name…",
   "Own name": "Eigener Name",
   "\"{name}\"": "„{name}“",
-  "Nobody else is in {world} now. Main world is in the menu.": "Niemand sonst ist gerade in {world}. Die Hauptwelt findest du im Menü."
+  "Nobody else is in {world} now. Main world is in the menu.": "Niemand sonst ist gerade in {world}. Die Hauptwelt findest du im Menü.",
+  "License plate": "Kennzeichen",
+  "On your car, also for other players in free roam: up to 8 letters and digits.": "An deinem Wagen, in der freien Fahrt auch für andere Spieler: bis zu 8 Buchstaben und Ziffern.",
+  "Original plate": "Originalkennzeichen",
+  "\"{value}\" is not a license plate (letters A to Z and digits, at most 8)": "„{value}“ ist kein Kennzeichen (Buchstaben A bis Z und Ziffern, höchstens 8)",
+  "\"{value}\" is not a license plate (it reads as a slur)": "„{value}“ ist kein Kennzeichen (es liest sich wie eine Beleidigung)"
 }

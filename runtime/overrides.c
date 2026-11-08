@@ -322,14 +322,15 @@ void overrides_install(void){
     d3dx_hle_install();
 }
 
-static uint64_t g_jdlz_n, g_jdlz_bytes, g_jdlz_lifted, g_pm_hits, g_pm_calls, g_pm_clears;
+static uint64_t g_jdlz_n, g_jdlz_bytes, g_jdlz_lifted, g_jdlz_refused, g_pm_hits, g_pm_calls, g_pm_clears;
 void overrides_report(void){
     if (g_pm_calls)
         fprintf(stderr,"  NewGetCarPart: %llu of %llu answers kept from before (all forgotten %llu times)\n", (unsigned long long)g_pm_hits,
                 (unsigned long long)g_pm_calls, (unsigned long long)g_pm_clears);
-    if (g_jdlz_n || g_jdlz_lifted)
-        fprintf(stderr,"  JDLZ: %llu blocks unpacked natively (%.1f MB), %llu by the game's code\n",
-                (unsigned long long)g_jdlz_n, g_jdlz_bytes / 1048576.0, (unsigned long long)g_jdlz_lifted);
+    if (g_jdlz_n || g_jdlz_lifted || g_jdlz_refused)
+        fprintf(stderr,"  JDLZ: %llu blocks unpacked natively (%.1f MB), %llu by the game's code, %llu blocks refused\n",
+                (unsigned long long)g_jdlz_n, g_jdlz_bytes / 1048576.0, (unsigned long long)g_jdlz_lifted,
+                (unsigned long long)g_jdlz_refused);
     if (g_e2be0_calls)
         fprintf(stderr,"  sub_006e2be0: %llu calls, %llu NULL lists skipped\n",
                 (unsigned long long)g_e2be0_calls,(unsigned long long)g_null_list);
@@ -880,7 +881,9 @@ static int pc_inside(uint32_t th, uint32_t M, const float lo[3], const float hi[
     }
     return 1;
 }
-void sub_005c5930(CPU *c){
+int g_carpaint_watch;                            /* carpaint.c's test aid ("roam mp paint on"): each model drawn checked */
+__attribute__((weak)) void carpaint_model(uint32_t mdl);
+static void partcull_draw(CPU *c){
     if (g_pc_on < 0){ const char *e = getenv("PARTCULL"); g_pc_on = e ? atoi(e) : 1; }
     uint32_t e = c->esp, item = MR32(e + 4u), fl = MR32(e + 16u);
     uint32_t W = g_pc_on && item && !(fl & 4u) ? MR32(item + 0xcu) : 0;
@@ -915,6 +918,16 @@ void sub_005c5930(CPU *c){
     }
     MR32(e + 16u) = fl | 4u;
     sub_005c5930_orig(c);
+}
+/* A car with a license plate of its own (plates.c) puts that plate's texture in the model's texture table for as long
+ * as the model goes into the render lists, which keep it; the table has the game's back after, for the next car */
+void plates_model(uint32_t item, uint32_t keep[2]);
+void sub_005c5930(CPU *c){
+    uint32_t keep[2];
+    if (g_carpaint_watch && carpaint_model) carpaint_model(MR32(c->esp + 4u));
+    plates_model(MR32(c->esp + 4u), keep);
+    partcull_draw(c);
+    if (keep[0]) MR32(keep[0]) = keep[1];
 }
 
 /* --- sub_0068ce7c: D3DXMatrixMultiply, the SSE version ---------------------
@@ -1200,30 +1213,39 @@ void sub_0050c2c0(CPU *c){
 #define CARTYPES_N      46u           /* the builder walks 0x189E0 bytes of CarTypeInfo */
 void sub_004df9c0_orig(CPU *c);
 void sub_00516500(CPU *c);
-void sub_004df9c0(CPU *c){
-    uint32_t who = MR32(c->ecx + 0xecu);
-    if (who < 2u){
-        uint32_t db = FECARS + who * FECARS_PLAYER, bad = STOCK_N;
-        for (uint32_t i = 0; i < STOCK_N && bad == STOCK_N; i++){
-            uint32_t r = db + i * STOCK_SZ;
-            if (MR32(r + 0x10u) && MR32(r + 0x18u) >= CARTYPES_N) bad = i;
-        }
-        if (bad < STOCK_N){
-            uint32_t r = db + bad * STOCK_SZ;
-            fprintf(stderr, "[cars] player %u's stock car %u (handle 0x%08x) has car type %u, none of the game's %u: "
-                    "the stock cars made again, as for a new profile\n", who, bad, MR32(r + 8u), MR32(r + 0x18u), CARTYPES_N);
-            CPU save = *c;
-            c->esp = (c->esp - 256u) & ~15u;
-            PUSH32(0u);                           /* its argument, not read */
-            c->ecx = db;
-            PUSH32(0x004df9c0u);                  /* the ret pops it into eip; the state is put back below */
-            sub_00516500(c);
-            *c = save;
-            for (uint32_t i = 0; i < STOCK_N; i++)
-                if (!MR32(db + i * STOCK_SZ + 0x10u)) MR32(db + i * STOCK_SZ + 0x18u) = 0xffffffffu;
-            fprintf(stderr, "[cars] %u stock cars\n", MR32(db + 0x540u));
-        }
+/* db's stock cars made again (as for a new profile) when one in use has a car type past the game's; lost: the handles
+ * of those (at most max), returns how many there were (0: none, nothing changed).  Here before a car list is made,
+ * and in garage.c as a profile's cars load (a Quick Race with such a car as its car, or any list of them, read past
+ * CarTypeInfo too, and the original game's car lot ends the same way: the profile has the game's own list again) */
+int cars_stock_fix(CPU *c, uint32_t db, uint32_t *lost, int max){
+    uint32_t bad = STOCK_N; int n = 0;
+    for (uint32_t i = 0; i < STOCK_N; i++){
+        uint32_t r = db + i * STOCK_SZ;
+        if (!MR32(r + 0x10u) || MR32(r + 0x18u) < CARTYPES_N) continue;
+        if (bad == STOCK_N) bad = i;
+        if (n < max) lost[n] = MR32(r + 8u);
+        n++;
     }
+    if (bad == STOCK_N) return 0;
+    uint32_t r = db + bad * STOCK_SZ;
+    fprintf(stderr, "[cars] %s's stock car %u (handle 0x%08x) has car type %u, none of the game's %u (%d such): "
+            "the stock cars made again, as for a new profile\n", db == FECARS ? "player 1" : "player 2", bad, MR32(r + 8u),
+            MR32(r + 0x18u), CARTYPES_N, n);
+    CPU save = *c;
+    c->esp = (c->esp - 256u) & ~15u;
+    PUSH32(0u);                           /* its argument, not read */
+    c->ecx = db;
+    PUSH32(0x004df9c0u);                  /* the ret pops it into eip; the state is put back below */
+    sub_00516500(c);
+    *c = save;
+    for (uint32_t i = 0; i < STOCK_N; i++)
+        if (!MR32(db + i * STOCK_SZ + 0x10u)) MR32(db + i * STOCK_SZ + 0x18u) = 0xffffffffu;
+    fprintf(stderr, "[cars] %u stock cars\n", MR32(db + 0x540u));
+    return n;
+}
+void sub_004df9c0(CPU *c){
+    uint32_t who = MR32(c->ecx + 0xecu), lost[1];
+    if (who < 2u) cars_stock_fix(c, FECARS + who * FECARS_PLAYER, lost, 0);
     sub_004df9c0_orig(c);
 }
 
@@ -1495,6 +1517,8 @@ void reads_frame(CPU *c){
  * whole TEXTURES.BIN in from the front end.  roam_game.c sets this around that car's Load (0x63BC70),
  * which makes the list (0x63AE70 -> 0x6335D0 -> here); the Windows plugin has no overrides.c. */
 __attribute__((weak)) int roam_texlist_engine;
+/* damage.c: a racer's engine texture on its lists too, while the crash damage is on (a lost hood shows the engine) */
+__attribute__((weak)) int damage_texlist_engine(uint32_t ride);
 #define G_CARTYPES_TL   0x008a1cccu   /* CarTypeInfo[], 0x890 bytes: +0x20 the name its textures go by (0x631E20's %s) */
 static void texlist_add(uint32_t list, uint32_t at, uint32_t cnt, uint32_t h){
     uint32_t n = MR32(list + cnt);
@@ -1513,13 +1537,14 @@ static void texlist_engine(uint32_t list, uint32_t ride){
     for (const char *p = nm; *p; p++) h = h * 33u + (uint8_t)*p;
     texlist_add(list, 0u, 0x228u, h); texlist_add(list, 0x114u, 0x22cu, h);
     static uint8_t told[256];
-    if (!told[t]){ told[t] = 1; fprintf(stderr, "[textures] f=%ld %s on the texture lists of other players' cars of its type\n", autotest_frame(), nm); }
+    if (!told[t]){ told[t] = 1; fprintf(stderr, "[textures] f=%ld %s on the texture lists of its type's cars (other players', crash damage's racers)\n", autotest_frame(), nm); }
 }
 void sub_00631e20_orig(CPU *c);
 void sub_00631e20(CPU *c){
     static int full = -1;
     if (full < 0){ const char *e = getenv("NFSU2_TEST_TEXLIST_FULL"); full = e && *e == '1'; }
-    uint32_t esp0 = c->esp, list = MR32(esp0 + 4u), ride = MR32(esp0 + 8u), eng = roam_texlist_engine ? 1u : 0u;
+    uint32_t esp0 = c->esp, list = MR32(esp0 + 4u), ride = MR32(esp0 + 8u);
+    uint32_t eng = roam_texlist_engine || (damage_texlist_engine && damage_texlist_engine(ride)) ? 1u : 0u;
     uint32_t seen[56], off[56], offp[56]; int nd = 0, noff = 0;
     for (uint32_t z = 0; z < 7u; z++){
         if (!MR32(ride + RIDE_DECALZONES + 4u * z)) continue;
@@ -1627,7 +1652,30 @@ void sub_00639f20(CPU *c){
  * memory, which overlaps the output, or would read or write past the
  * output's ends goes to the game's code from the start (each byte it writes
  * again is the same).  The other kinds: the game's.  NFSU2_JDLZ_VERIFY=1
- * (test aid): each block unpacked both ways, compared ("[jdlz] DIFFERS"). */
+ * (test aid): each block unpacked both ways, compared ("[jdlz] DIFFERS").
+ * A block of one of the packs (VINYLPACKS, MODPACKS, LANGPACKS: fileio.c
+ * keeps where their bytes went) never goes to the game's code: one the native
+ * unpacker refuses is logged ("[packs]": the pack file, where in it) and
+ * left out, its output zeroed and 0 returned, as the game does for a kind it
+ * does not know; a texture block of zeros has a TextureInfo of none (hash 0,
+ * an empty place: 0x494C10 finds and makes nothing), so the texture is
+ * missing.  The output's size is the caller's: the streamer's (0x48D090) its
+ * entry's (esi, +0xC: it allocates that and its alignment), the FE packs' and
+ * the bundles' (0x51BC81, 0x577E46) the block's own (+8).  The game's own
+ * blocks keep the game's code where the native unpacker does not take them:
+ * all of its texture packs' 2623 JDLZ blocks and its 3 JDLZ bundles unpack
+ * natively by these rules (tools/packcheck.py's copy of them), so only a
+ * block in memory that overlaps its output or is not all there goes to it.
+ * The native unpacker takes a JDLZ block only when its output comes out
+ * whole (all of the game's do).
+ * Every unpacker writes the size the block says (+8: JDLZ, RAWW, HUFF), and
+ * only the FE packs and the bundles (and split screen's copy) allocate that;
+ * the streamer allocates its entry's.  So a block from the streamer that says
+ * more than its entry is refused before any unpacker sees it, the same way,
+ * a pack's or the game's (the game's never do: its texture packs' 58637
+ * blocks all say their entry's size).  And a pack's block of a kind or
+ * version the game's dispatcher unpacks nothing of (its output left as the
+ * memory had it) is refused the same way. */
 #define JDLZ_TAG        0x5a4c444au
 void sub_00574670_orig(CPU *c);
 static int range_committed(uint32_t a, uint32_t n){
@@ -1637,7 +1685,7 @@ static int range_committed(uint32_t a, uint32_t n){
         if (!((g_cbits[pg >> 3] >> (pg & 7)) & 1)) return 0;
     return 1;
 }
-/* 1: unpacked into out; 0: not done (out may hold some of it) */
+/* 1: unpacked into out, all of it; 0: not done (out may hold some of it) */
 static int jdlz_native(uint32_t blk, uint32_t out){
     uint32_t size = MR32(blk + 8u), csize = MR32(blk + 0xcu);
     if (csize < 0x12u || !range_committed(blk, csize) || !range_committed(out, size)) return 0;
@@ -1664,20 +1712,68 @@ static int jdlz_native(uint32_t blk, uint32_t out){
         if (f1 == 1u){ if (!left || s >= s_end) return 0; f1 = (uint32_t)*s++ | 0x100u; left--; }
         if (f2 == 1u){ if (!left || s >= s_end) return 0; f2 = (uint32_t)*s++ | 0x100u; left--; }
     }
+    return o == end;                                    /* (all of it written) */
+}
+int fileio_pack_bytes(uint32_t a, uint32_t n, const char **pk, int64_t *off);
+#define RET_STREAMER    0x0048d095u   /* the streamer's call (0x48D090) */
+#define RAWW_TAG        0x57574152u
+#define HUFF_TAG        0x46465548u
+#define COMP_TAG        0x504d4f43u
+/* the caller's output's size: the streamer's entry's (esi +0xC), else the block's own (+8) */
+static uint32_t out_room(CPU *c, uint32_t blk){
+    return MR32(c->esp) == RET_STREAMER && mem_is_committed(c->esi + 0xcu) ? MR32(c->esi + 0xcu) : MR32(blk + 8u);
+}
+/* the block left out: logged (why, the pack file and where in it, or the game's), the caller's output zeroed, 0
+ * returned to the caller */
+static void refuse(CPU *c, uint32_t blk, uint32_t out, int pack, const char *pk, int64_t off, const char *why){
+    uint32_t n = out_room(c, blk);
+    if (range_committed(out, n)) memset(&MR8(out), 0, n);
+    if (g_jdlz_refused++ < 16){
+        if (pack) fprintf(stderr, "[packs] %s: the block at %lld (%u bytes, %u unpacked) %s: left out, never given to the "
+                          "game's own unpacker (tools/packcheck.py says what is wrong)\n", pk ? pk : "?", (long long)off,
+                          MR32(blk + 0xcu), MR32(blk + 8u), why);
+        else fprintf(stderr, "[jdlz] f=%ld the game's block at 0x%08x (%u unpacked) %s: left out\n", autotest_frame(), blk,
+                     MR32(blk + 8u), why);
+    }
+    c->eax = 0; POP32(c->eip);
+}
+/* 1: blk is a pack's block (fileio.c's kept reads; one it cannot read again counts as a pack's), refused; 0: the game's */
+static int pack_refused(CPU *c, uint32_t blk, uint32_t out, const char *why){
+    const char *pk = 0; int64_t off = -1;
+    if (!fileio_pack_bytes(blk, 16u, &pk, &off)) return 0;
+    refuse(c, blk, out, 1, pk, off, why);
     return 1;
 }
 void sub_00574670(CPU *restrict c){
     static int verify = -1;
     if (verify < 0){ const char *e = getenv("NFSU2_JDLZ_VERIFY"); verify = e && *e == '1'; }
     uint32_t e = c->esp, blk = MR32(e + 4u), out = MR32(e + 8u);
+    /* the streamer's block that says it unpacks to more than its entry, which sized the output */
+    if (blk && out && MR32(e) == RET_STREAMER && mem_is_committed(blk) && mem_is_committed(blk + 15u) &&
+        mem_is_committed(c->esi + 0xcu) && (MR32(blk) == JDLZ_TAG || MR32(blk) == RAWW_TAG || MR32(blk) == HUFF_TAG) &&
+        MR32(blk + 8u) > MR32(c->esi + 0xcu)){
+        const char *pk = 0; int64_t off = -1;
+        int pack = fileio_pack_bytes(blk, 16u, &pk, &off) != 0;
+        refuse(c, blk, out, pack, pk, off, "says it unpacks to more than its entry");
+        return;
+    }
+    /* a pack's block of a kind or version the game's dispatcher leaves the output unwritten for (the packs' are JDLZ 2
+     * or RAWW 1; the game's are JDLZ 2 and HUFF) */
+    if (blk && out && mem_is_committed(blk) && mem_is_committed(blk + 15u)){
+        uint32_t tag = MR32(blk), ver = MR8(blk + 4u);
+        if (!((tag == JDLZ_TAG && ver == 2) || (tag == RAWW_TAG && ver == 1) || tag == HUFF_TAG || tag == COMP_TAG) &&
+            pack_refused(c, blk, out, "is of a kind or version the game unpacks nothing of")) return;
+    }
     if (blk && out && mem_is_committed(blk) && mem_is_committed(blk + 15u) && MR32(blk) == JDLZ_TAG && MR8(blk + 4u) == 2){
         uint32_t size = MR32(blk + 8u);
         if (!verify){
             if (jdlz_native(blk, out)){ g_jdlz_n++; g_jdlz_bytes += size; c->eax = size; POP32(c->eip); return; }
+            if (pack_refused(c, blk, out, "is JDLZ the native unpacker does not take")) return;
             g_jdlz_lifted++;
         } else if (range_committed(out, size)){
             uint8_t *mine = malloc(size ? size : 1);
             int done = mine && jdlz_native(blk, out);
+            if (!done && pack_refused(c, blk, out, "is JDLZ the native unpacker does not take")){ free(mine); return; }
             if (done) memcpy(mine, &MR8(out), size);
             sub_00574670_orig(c);
             if (done && memcmp(mine, &MR8(out), size)){

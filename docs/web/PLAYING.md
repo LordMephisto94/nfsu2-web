@@ -296,7 +296,7 @@ World row's list says how many are in each world.
 | Friends & crews | crews (with their colours), and your friends (once your name is claimed) |
 | Game, Game | language, movies, music in drag and drift races, autosave; more: startup movies (skippable, original or off), sound, pause or keep running in the background, sound output latency, highest graphics for a new save |
 | Game, Display | full screen on Play (off: the game plays in the browser window; on by default on phones), resolution scale (phones start at 75%, 100% once one shows it has the room), frame rate (auto picks 30, 60, 120 or 240 from the screen: 120 from 119 Hz, 240 from 239 Hz, otherwise 60, so a 75 Hz or 144 Hz screen gets 60 or 120; or 30, 60, 120 or 240, where 30 keeps a phone that cannot hold 60 steady; Online and LAN races at most 120); more: HUD layout (wide, or 4:3 as phones start), movie framing, cutscene bars, 3D proportions (original, as the game drew them about 10 % too wide, or corrected: round wheels, a little more at the sides), other cars' headlights (players, all cars, off), frame-rate counter, fixed render size, pixel limit |
-| Mods | the mods built in, with their makers (the (i) after a row's name says what it does, who sees it, where it is set and its pages), and the settings of those that have one: Upscaled HUD and Detailed Map (original, map only or upscaled), English Subtitles Fixed (the subtitles), Uncensored & Restored Soundtrack (the songs: uncensored or original), Show Hidden Races Mod, Visual Reputation Remover; and our changes from the original game, a row per group (Driving, Free roam, Photos and screen, Career and garage, Controls, Saves), whose (i) lists them all |
+| Mods | the mods built in, with their makers (the (i) after a row's name says what it does, who sees it, where it is set and its pages), and the settings of those that have one: Upscaled HUD and Detailed Map (original, map only or upscaled), English Subtitles Fixed (the subtitles), Uncensored & Restored Soundtrack (the songs: uncensored or original), Show Hidden Races Mod, Visual Reputation Remover, Crash Damage, Rubberbanding (original, no boost or off), Transmission Whine; and our changes from the original game, a row per group (Driving, Free roam, Photos and screen, Career and garage, Controls, Saves), whose (i) lists them all |
 | Controls, Controller | rumble; more: controller (on, hotplug or off), menu buttons, dead zones, trigger full press |
 
 - **Language:** English, French, German, Italian, Spanish, Dutch, Swedish, Danish, Korean, Chinese, Japanese, Russian,
@@ -343,6 +343,23 @@ World row's list says how many are in each world.
   and 8 stars in stages 1 to 4, 10 from stage 5), so every cover shoot of the stage is offered the next time free roam
   loads, and pays by that rating. The shops show no Visual Rating box. Turned off again, the next free-roam load
   offers the shoots by your car's own rating; the ones shot and paid stay.
+- **Crash Damage** (Mods): off by default. Chrystian Farias's Crashing Foreign Cars: the racers' cars, yours and the
+  AI's, dent where they are hit, scratch, break their lights and lose loose parts, which lie on the road for a while.
+  Looks only: the cars drive as in the original game. In free roam, players who have it on see each other's damage;
+  with it off you see every car undamaged and yours is shown undamaged to everyone. The game's own repair (a race's
+  start, the garage) takes it away. Its scratches are a download of about 1 MB, fetched only when it is on.
+- **Rubberbanding** (Mods): Original by default. In a career race the game slows the opponents who are ahead of you
+  and gives the ones behind you more power, grip and top speed, more the farther back they are: up to 22% to 37%
+  (more for a better driver) at 320 m behind, while one 320 m ahead of you drives 10% to 15% slower. No boost keeps
+  the waiting but never lets an opponent behind beat its own pace; Off drops both, as a Quick Race with Catch Up off.
+  Only your own career races: Quick Race keeps its own Catch Up option, and LAN and online races have no computer
+  opponents.
+- **Transmission Whine** (Mods): off by default. On, as ropi's
+  [Underground 2 Transmission Whine](https://nfsmods.xyz/mod/5927) has it, your car gets NFS Carbon's gearbox whine
+  (the BMW M3 GTR's, the mod's sounds) over the game's sound: a whine rising with your speed and gear, a second layer
+  louder the faster you go, a short pause at each upshift and a whine of its own in reverse. Every car has it (in split
+  screen and co-op each player's), as loud as the game's Engine Volume (times Master) makes it; the world paused, it
+  is silent. Its sounds (half a megabyte) download once it is on.
 - **Upscaled HUD and Detailed Map** (Mods): Original (the default) is the game's own. Upscaled shows LunicAura106's
   [Upscaled HUD](https://nfsmods.xyz/mod/4319) and JeansBig's [Detailed Map](https://nfsmods.xyz/mod/4485) where the
   server has their texture packs: the menus, the race HUD, the fonts and the car and brand logos redrawn at four times
@@ -499,8 +516,10 @@ World row's list says how many are in each world.
   are added beside the profiles in this browser, with their DVD and magazine covers; one of the same name is
   replaced, after asking. A profile saved by another version is left out, as the game would not load it. One
   changed by a save editor is restored with a warning: a value the game would not make itself may crash it or break
-  the career. One with cars a mod added is restored with a warning too: this game does not have those cars, and may
-  crash or show them wrong.
+  the career. One with cars a mod added is restored with a warning too: this game does not have those cars, so each
+  one shows here as a stock car (a Peugeot 206 with stock parts), and the save keeps the car as it is, for the modded
+  game, unless you change it here (parts, tuning, a trade). A profile folder's GARAGE.DAT and MODPARTS.DAT (slots 6-10,
+  the parts this game keeps beside a profile) come along from a zip of the folder.
 - **Backups are your safety net.** When the disk is nearly full, the browser may clear a site's storage unless it
   promised to keep it. Chrome decides that by itself, and the page cannot see how full the disk is, so it does not warn.
   Firefox asks by the address bar (the Saves section says so while it asks): allow it. Make a backup now and then,

@@ -62,6 +62,17 @@ uint64_t    roam_win_ns(void);
 /* no light key here either: the companion's lights are the game's, and friends' cars show theirs */
 #define rh_lights_mine() 0
 #define rh_lights_car(k, car, st) ((void)(k), (void)(car), (void)(st))
+/* no crash damage here: the companion sends none, asks for none (no RC_HF_DENTS) and shows friends' cars undamaged */
+#define rh_damage_on()   0
+#define rh_damage_rev()  0u
+#define rh_damage_mine(e, f, d, m) ((void)(e), (void)(f), (void)(d), (void)(m), 0)
+#define rh_damage_car(c, k, car, peer, e, f, n, d) \
+    ((void)(c), (void)(k), (void)(car), (void)(peer), (void)(e), (void)(f), (void)(n), (void)(d))
+/* no license plates of our own here: the companion sends none, and friends' cars wear the game's (plates.c needs the
+ * port's overrides of the cars' drawing) */
+#define rh_plate_mine()  ""
+#define rh_plate_car(k, car, text) ((void)(k), (void)(car), (void)(text))
+#define rh_plates_forget() ((void)0)
 /* the game's "No Profile" in English only (the port also knows the other
  * languages' names from the game's text, language.c) */
 #define rh_no_profile(name) (!strcasecmp((name), "No Profile"))

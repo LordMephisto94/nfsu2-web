@@ -165,9 +165,9 @@
     "one": "{names} er blevet ændret med en save-editor: værdier, som spillet ikke ville lave, kan få det til at gå ned eller ødelægge karrieren.",
     "other": "{names} er blevet ændret med en save-editor: værdier, som spillet ikke ville lave, kan få det til at gå ned eller ødelægge karrieren."
   },
-  "{names} have modded cars this game lacks: it may crash or show them wrong.": {
-    "one": "{names} har moddede biler, som dette spil ikke har: det kan gå ned eller vise dem forkert.",
-    "other": "{names} har moddede biler, som dette spil ikke har: det kan gå ned eller vise dem forkert."
+  "{names} have cars from a modded game: here they show as stock cars, and your save keeps them as they are unless you change them here.": {
+    "one": "{names} har biler fra et modificeret spil: her vises de som standardbiler, og dit gem beholder dem, som de er, medmindre du ændrer dem her.",
+    "other": "{names} har biler fra et modificeret spil: her vises de som standardbiler, og dit gem beholder dem, som de er, medmindre du ændrer dem her."
   },
   "Left out, as the game would not load them: {list}.": {
     "one": "Udeladt, da spillet ikke ville indlæse den: {list}.",
@@ -363,6 +363,7 @@
   "Next song": "Næste sang",
   "Autosave": "Autosave",
   "Sets each profile's Save option to Autosave once. A later change in the game's Options stays.": "Sætter én gang hver profils Gemmefunktion til Autosave. En senere ændring under spillets Indstillinger bevares.",
+  "No boost": "Intet boost",
   "Startup movies": "Startfilm",
   "Logos, PSA and intro. Skippable: Enter, Esc, Space, a click, A, B or Start skips each. Original: only the intro can be skipped.": "Logoer, PSA og intro. Afbrydelige: Enter, Esc, Mellemrum, et klik, A, B eller Start springer hver af dem over. Original: kun introen kan springes over.",
   "Skippable": "Afbrydelige",
@@ -1511,13 +1512,16 @@
   "Complete English subtitles in the movies.": "Filmenes engelske undertekster i fuld længde.",
   "The EA Trax songs unedited.": "EA Trax-sangene uredigerede.",
   "Engine sounds right above 60 fps.": "Motorlyde i deres rette tempo over 60 fps.",
+  "NFS Carbon's gearbox whine on your car.": "NFS Carbons gearkassehyl på din bil.",
   "Drift camera, high beam, EU cars and more.": "Driftkamera, fjernlys, europæiske biler og mere.",
+  "Dents, loose parts and scratches.": "Buler, løse dele og ridser.",
   "New rim brands in the rim shop.": "Nye fælgmærker i fælgbutikken.",
   "Mod parts on other cars": "Moddele på andres biler",
   "Original: other players' cars with the game's own parts instead.": "Original: andre spilleres biler med spillets egne dele i stedet.",
   "Shown": "Vist",
   "The 33 hidden races on the map.": "De 33 skjulte løb på kortet.",
   "DVD covers by stage, not by your car's parts.": "DVD-covers efter niveau, ikke efter din bils dele.",
+  "Career rivals that wait and catch up.": "Karrierens modstandere, der venter og indhenter.",
   "Mods": "Mods",
   "The core gameplay is the original's, with a few improvements, fixes and multiplayer on top.": "Selve spillet er som originalen, med et par forbedringer, rettelser og flerspiller oveni.",
   "The game's files didn't load properly. On this page: Game, Delete game data, then Play (your saves stay). If it happens again, your network may be blocking the game: try another network.": "Spillets filer blev ikke indlæst korrekt. På denne side: Spil, Slet spildata og derefter Spil (dine gemte spil bliver). Sker det igen, blokerer dit netværk måske spillet: prøv et andet netværk.",
@@ -1583,5 +1587,10 @@
   "Own name…": "Eget navn…",
   "Own name": "Eget navn",
   "\"{name}\"": "\"{name}\"",
-  "Nobody else is in {world} now. Main world is in the menu.": "Der er ingen andre i {world} lige nu. Hovedverdenen finder du i menuen."
+  "Nobody else is in {world} now. Main world is in the menu.": "Der er ingen andre i {world} lige nu. Hovedverdenen finder du i menuen.",
+  "License plate": "Nummerplade",
+  "On your car, also for other players in free roam: up to 8 letters and digits.": "På din bil, også for andre spillere i udforsknings-mode: op til 8 bogstaver og tal.",
+  "Original plate": "Original nummerplade",
+  "\"{value}\" is not a license plate (letters A to Z and digits, at most 8)": "\"{value}\" er ikke en nummerplade (bogstaverne A til Z og tal, højst 8)",
+  "\"{value}\" is not a license plate (it reads as a slur)": "\"{value}\" er ikke en nummerplade (det kan læses som et skældsord)"
 }

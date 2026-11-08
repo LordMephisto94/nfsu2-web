@@ -594,11 +594,11 @@
     "many": "Profily {names} byly upraveny editorem uložených her: hodnoty, které by hra sama nevytvořila, ji mohou shodit nebo rozbít kariéru.",
     "other": "Profily {names} byly upraveny editorem uložených her: hodnoty, které by hra sama nevytvořila, ji mohou shodit nebo rozbít kariéru."
   },
-  "{names} have modded cars this game lacks: it may crash or show them wrong.": {
-    "one": "Profil {names} má auta z modů, která tato hra nemá: může spadnout nebo je zobrazit špatně.",
-    "few": "Profily {names} mají auta z modů, která tato hra nemá: může spadnout nebo je zobrazit špatně.",
-    "many": "Profily {names} mají auta z modů, která tato hra nemá: může spadnout nebo je zobrazit špatně.",
-    "other": "Profily {names} mají auta z modů, která tato hra nemá: může spadnout nebo je zobrazit špatně."
+  "{names} have cars from a modded game: here they show as stock cars, and your save keeps them as they are unless you change them here.": {
+    "one": "Profil {names} má auta z upravené hry: tady se zobrazí jako sériová a uložená hra si je ponechá, jak jsou, pokud je tady nezměníš.",
+    "few": "Profily {names} mají auta z upravené hry: tady se zobrazí jako sériová a uložená hra si je ponechá, jak jsou, pokud je tady nezměníš.",
+    "many": "Profily {names} mají auta z upravené hry: tady se zobrazí jako sériová a uložená hra si je ponechá, jak jsou, pokud je tady nezměníš.",
+    "other": "Profily {names} mají auta z upravené hry: tady se zobrazí jako sériová a uložená hra si je ponechá, jak jsou, pokud je tady nezměníš."
   },
   "Left out, as the game would not load them: {list}.": {
     "one": "Vynecháno, protože by ho hra nenačetla: {list}.",
@@ -1569,13 +1569,17 @@
   "Complete English subtitles in the movies.": "Celé anglické titulky k videím.",
   "The EA Trax songs unedited.": "Skladby EA Trax bez úprav.",
   "Engine sounds right above 60 fps.": "Zvuky motoru správnou rychlostí i nad 60 fps.",
+  "NFS Carbon's gearbox whine on your car.": "Kvílení převodovky z NFS Carbon na tvém autě.",
   "Drift camera, high beam, EU cars and more.": "Driftovací kamera, dálková světla, evropská auta a další.",
+  "Dents, loose parts and scratches.": "Promáčkliny, uvolněné díly a škrábance.",
   "New rim brands in the rim shop.": "Nové značky kol v obchodě s koly.",
   "Mod parts on other cars": "Díly z modů na cizích autech",
   "Original: other players' cars with the game's own parts instead.": "Původní: auta ostatních hráčů místo nich s díly ze hry.",
   "Shown": "Zobrazené",
   "The 33 hidden races on the map.": "33 skrytých závodů na mapě.",
   "DVD covers by stage, not by your car's parts.": "Obaly DVD podle etapy, ne podle dílů tvého auta.",
+  "Career rivals that wait and catch up.": "Soupeři v kariéře, kteří čekají a dotahují.",
+  "No boost": "Bez zrychlení",
   "Mods": "Mody",
   "The core gameplay is the original's, with a few improvements, fixes and multiplayer on top.": "Hratelnost je původní, s několika vylepšeními, opravami a hrou více hráčů navíc.",
   "The game's files didn't load properly. On this page: Game, Delete game data, then Play (your saves stay). If it happens again, your network may be blocking the game: try another network.": "Soubory hry se nenačetly správně. Na této stránce: „Hra“, „Smazat data hry“, pak „Hrát“ (tvoje uložené hry zůstanou). Pokud se to stane znovu, možná hru blokuje tvoje síť: zkus jinou síť.",
@@ -1641,5 +1645,10 @@
   "Own name…": "Vlastní název…",
   "Own name": "Vlastní název",
   "\"{name}\"": "„{name}“",
-  "Nobody else is in {world} now. Main world is in the menu.": "{world}: teď tu kromě tebe nikdo není. Hlavní svět najdeš v menu."
+  "Nobody else is in {world} now. Main world is in the menu.": "{world}: teď tu kromě tebe nikdo není. Hlavní svět najdeš v menu.",
+  "License plate": "Poznávací značka",
+  "On your car, also for other players in free roam: up to 8 letters and digits.": "Na tvém autě, ve volné jízdě i pro ostatní hráče: až 8 písmen a číslic.",
+  "Original plate": "Původní značka",
+  "\"{value}\" is not a license plate (letters A to Z and digits, at most 8)": "„{value}“ není poznávací značka (písmena A až Z a číslice, nejvýš 8)",
+  "\"{value}\" is not a license plate (it reads as a slur)": "„{value}“ není poznávací značka (vyznívá jako urážka)"
 }

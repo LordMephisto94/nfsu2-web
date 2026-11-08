@@ -166,11 +166,11 @@
     "many": "Профілі {names} змінено редактором збережень: значення, яких гра сама не створила б, можуть призвести до вильоту гри або зіпсувати кар'єру.",
     "other": "Профілі {names} змінено редактором збережень: значення, яких гра сама не створила б, можуть призвести до вильоту гри або зіпсувати кар'єру."
   },
-  "{names} have modded cars this game lacks: it may crash or show them wrong.": {
-    "one": "У профілі {names} є машини з модів, яких немає в цій грі: гра може вилетіти або показати їх неправильно.",
-    "few": "У профілях {names} є машини з модів, яких немає в цій грі: гра може вилетіти або показати їх неправильно.",
-    "many": "У профілях {names} є машини з модів, яких немає в цій грі: гра може вилетіти або показати їх неправильно.",
-    "other": "У профілях {names} є машини з модів, яких немає в цій грі: гра може вилетіти або показати їх неправильно."
+  "{names} have cars from a modded game: here they show as stock cars, and your save keeps them as they are unless you change them here.": {
+    "one": "У профілі {names} є машини з гри з модами: тут вони показані як стокові, а збереження зберігає їх як є, якщо ви не зміните їх тут.",
+    "few": "У профілях {names} є машини з гри з модами: тут вони показані як стокові, а збереження зберігає їх як є, якщо ви не зміните їх тут.",
+    "many": "У профілях {names} є машини з гри з модами: тут вони показані як стокові, а збереження зберігає їх як є, якщо ви не зміните їх тут.",
+    "other": "У профілях {names} є машини з гри з модами: тут вони показані як стокові, а збереження зберігає їх як є, якщо ви не зміните їх тут."
   },
   "Left out, as the game would not load them: {list}.": {
     "one": "Пропущено, бо гра не завантажила б його: {list}.",
@@ -382,6 +382,7 @@
   "Next song": "Наступна пісня",
   "Autosave": "Автозбереження",
   "Sets each profile's Save option to Autosave once. A later change in the game's Options stays.": "Один раз встановлює для кожного профілю параметр «Збереження» на «Авто». Пізніша зміна в меню «Налаштування» гри збережеться.",
+  "No boost": "Без прискорення",
   "Startup movies": "Стартові ролики",
   "Logos, PSA and intro. Skippable: Enter, Esc, Space, a click, A, B or Start skips each. Original: only the intro can be skipped.": "Логотипи, PSA і вступ. «З пропуском»: Enter, Esc, Пробіл, клацання, A, B або Start пропускає кожен ролик. «Оригінал»: пропустити можна лише вступ.",
   "Skippable": "З пропуском",
@@ -1569,13 +1570,16 @@
   "Complete English subtitles in the movies.": "Повні англійські субтитри до відеороликів.",
   "The EA Trax songs unedited.": "Пісні EA Trax без змін.",
   "Engine sounds right above 60 fps.": "Правильні звуки двигуна понад 60 FPS.",
+  "NFS Carbon's gearbox whine on your car.": "Виття коробки передач з NFS Carbon на твоїй машині.",
   "Drift camera, high beam, EU cars and more.": "Камера дрифту, дальнє світло, європейські машини й не тільки.",
+  "Dents, loose parts and scratches.": "Вм'ятини, деталі, що відпадають, і подряпини.",
   "New rim brands in the rim shop.": "Нові марки дисків у магазині дисків.",
   "Mod parts on other cars": "Деталі модів на чужих авто",
   "Original: other players' cars with the game's own parts instead.": "Оригінал: авто інших гравців із деталями самої гри замість них.",
   "Shown": "Показувати",
   "The 33 hidden races on the map.": "33 приховані гонки на мапі.",
   "DVD covers by stage, not by your car's parts.": "Обкладинки DVD залежать від етапу, а не від деталей вашої машини.",
+  "Career rivals that wait and catch up.": "Суперники в кар'єрі, які чекають і наздоганяють.",
   "Mods": "Моди",
   "The core gameplay is the original's, with a few improvements, fixes and multiplayer on top.": "Основний ігровий процес — як в оригіналі, з кількома покращеннями, виправленнями та мережевою грою.",
   "The game's files didn't load properly. On this page: Game, Delete game data, then Play (your saves stay). If it happens again, your network may be blocking the game: try another network.": "Файли гри завантажилися неправильно. На цій сторінці: «Гра», «Видалити дані гри», потім «Грати» (ваші збереження залишаться). Якщо це повториться, можливо, гру блокує ваша мережа: спробуйте іншу мережу.",
@@ -1641,5 +1645,10 @@
   "Own name…": "Своя назва…",
   "Own name": "Своя назва",
   "\"{name}\"": "«{name}»",
-  "Nobody else is in {world} now. Main world is in the menu.": "{world}: зараз тут більше нікого. Головний світ — у меню."
+  "Nobody else is in {world} now. Main world is in the menu.": "{world}: зараз тут більше нікого. Головний світ — у меню.",
+  "License plate": "Номерний знак",
+  "On your car, also for other players in free roam: up to 8 letters and digits.": "На вашій машині, у вільній їзді його бачать і інші гравці: до 8 літер A–Z і цифр.",
+  "Original plate": "Оригінальний номер",
+  "\"{value}\" is not a license plate (letters A to Z and digits, at most 8)": "«{value}» — не номер (літери від A до Z і цифри, не більше 8)",
+  "\"{value}\" is not a license plate (it reads as a slur)": "«{value}» — не номер (читається як образливе слово)"
 }

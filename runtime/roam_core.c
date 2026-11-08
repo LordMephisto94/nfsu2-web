@@ -360,6 +360,12 @@ int rc_state_get(rc_r *r, rc_state *s, int ext){
 /* a flag's code: lower case letters and '-' (roam_game.c looks it up; one it does not have shows none) */
 static int flag_ok(const char *s, uint32_t n){ for (uint32_t i = 0; i < n; i++) if (!((s[i] >= 'a' && s[i] <= 'z') || s[i] == '-')) return 0; return 1; }
 static uint32_t flag_len(const char *s){ uint32_t n = 0; while (n <= RC_FLAG_MAX && s[n]) n++; return n; }   /* RC_FLAG_MAX + 1: too long */
+int rc_plate_ok(const char *s, uint32_t n){
+    if (n > RC_PLATE_MAX) return 0;
+    for (uint32_t i = 0; i < n; i++) if (!((s[i] >= 'A' && s[i] <= 'Z') || (s[i] >= '0' && s[i] <= '9'))) return 0;
+    return 1;
+}
+static uint32_t plate_len(const char *s){ uint32_t n = 0; while (n <= RC_PLATE_MAX && s[n]) n++; return n; }   /* RC_PLATE_MAX + 1: too long */
 static int printable(const char *s, uint32_t n){ for (uint32_t i = 0; i < n; i++) if ((uint8_t)s[i] < 0x20 || (uint8_t)s[i] >= 0x7F) return 0; return 1; }
 
 /* a LOBBY message's fields: a known op, state and reason, an id for the
@@ -414,13 +420,18 @@ int rc_encode(const rc_msg *m, uint8_t *out, int cap){
         for (int i = 0; i < m->u.hello.n_seen; i++) rc_put32(&w, m->u.hello.seen[i]);
         uint32_t fl = flag_len(m->u.hello.flag);
         if (fl > RC_FLAG_MAX || !flag_ok(m->u.hello.flag, fl)) return -1;
-        if (m->u.hello.n_crews || m->u.hello.links || m->u.hello.duel || fl){
+        /* the plate goes with the header's flag only, and the flag with a plate only (rc_decode reads it by the flag) */
+        uint32_t pl = plate_len(m->u.hello.plate);
+        int plate = (m->h.flags & RC_HF_PLATE) != 0;
+        if (!rc_plate_ok(m->u.hello.plate, pl) || plate != (pl > 0)) return -1;
+        if (m->u.hello.n_crews || m->u.hello.links || m->u.hello.duel || fl || plate){
             if (!(m->h.flags & RC_HF_CREW) || m->u.hello.n_crews > RC_CREW_MAX || m->u.hello.links > RC_MAX_PEERS) return -1;
             rc_put8(&w, m->u.hello.n_crews);
             for (int i = 0; i < m->u.hello.n_crews; i++){ if (!m->u.hello.crews[i]) return -1; rc_put32(&w, m->u.hello.crews[i]); }
-            if (m->u.hello.links || m->u.hello.duel || fl) rc_put8(&w, m->u.hello.links);   /* (a core or hub before version 10 skips it) */
-            if (m->u.hello.duel || fl) rc_put32(&w, m->u.hello.duel);                         /* (...before version 11 this) */
-            if (fl){ rc_put8(&w, fl); rc_putb(&w, m->u.hello.flag, fl); }                  /* (...before version 13 this) */
+            if (m->u.hello.links || m->u.hello.duel || fl || plate) rc_put8(&w, m->u.hello.links);   /* (a core or hub before version 10 skips it) */
+            if (m->u.hello.duel || fl || plate) rc_put32(&w, m->u.hello.duel);                         /* (...before version 11 this) */
+            if (fl || plate){ rc_put8(&w, fl); rc_putb(&w, m->u.hello.flag, fl); }                  /* (...before version 13 this) */
+            if (plate){ rc_put8(&w, pl); rc_putb(&w, m->u.hello.plate, pl); }                         /* (...before version 17 this) */
         }
         break; }
     case RC_MSG_PEERS:
@@ -510,6 +521,15 @@ int rc_encode(const rc_msg *m, uint8_t *out, int cap){
         rc_putb(&w, nm, RC_RACEREP_NAME);
         break; }
     case RC_MSG_SAY: rc_put8(&w, m->u.say.phrase); rc_put8(&w, m->u.say.seq); rc_put8(&w, m->u.say.stay); rc_put8(&w, 0); break;
+    case RC_MSG_DENTS:
+        if (!m->u.dents.rev || (m->u.dents.op != RC_DENTS_STATE && m->u.dents.op != RC_DENTS_HAVE)) return -1;
+        rc_put8(&w, m->u.dents.op); rc_put16(&w, m->u.dents.rev);
+        if (m->u.dents.op == RC_DENTS_STATE){
+            if (m->u.dents.n > RC_DMG_MAX || (m->u.dents.n && !m->u.dents.data)) return -1;
+            rc_put8(&w, m->u.dents.epoch); rc_put16(&w, m->u.dents.first); rc_put8(&w, m->u.dents.n);
+            rc_putb(&w, m->u.dents.data, (uint32_t)m->u.dents.n * RC_DMG_BYTES);
+        }
+        break;
     case RC_MSG_RACERES: {
         const rc_raceres *r = &m->u.raceres;
         if (!raceres_ok(r)) return -1;
@@ -573,6 +593,15 @@ int rc_decode(const uint8_t *buf, int len, rc_msg *m){
                 if (fl <= RC_FLAG_MAX && r.n + fl <= r.len){
                     rc_getb(&r, m->u.hello.flag, fl); m->u.hello.flag[fl] = 0;
                     if (!flag_ok(m->u.hello.flag, fl)) m->u.hello.flag[0] = 0;
+                }
+            }
+            /* the license plate (core 17), with the header's flag: one that is not capitals and digits, or reads as a
+             * slur (every plate heard comes through here, as every name), none: the game's own plate */
+            if ((m->h.flags & RC_HF_PLATE) && r.n < r.len){
+                uint32_t pl = rc_get8(&r);
+                if (pl <= RC_PLATE_MAX && r.n + pl <= r.len){
+                    rc_getb(&r, m->u.hello.plate, pl); m->u.hello.plate[pl] = 0;
+                    if (!rc_plate_ok(m->u.hello.plate, pl) || name_blocked(m->u.hello.plate)) m->u.hello.plate[0] = 0;
                 }
             }
             r.n = r.len;                                              /* (a newer core's additions) */
@@ -727,6 +756,19 @@ int rc_decode(const uint8_t *buf, int len, rc_msg *m){
         if (r.err) return RC_E_SHORT;
         if (!raceres_ok(q)) return RC_E_FIELD;
         break; }
+    case RC_MSG_DENTS:
+        m->u.dents.op = (uint8_t)rc_get8(&r); m->u.dents.rev = (uint16_t)rc_get16(&r);
+        if (r.err) return RC_E_SHORT;
+        if (!m->u.dents.rev) return RC_E_FIELD;
+        if (m->u.dents.op == RC_DENTS_STATE){
+            m->u.dents.epoch = (uint8_t)rc_get8(&r); m->u.dents.first = (uint16_t)rc_get16(&r); m->u.dents.n = (uint8_t)rc_get8(&r);
+            if (r.err) return RC_E_SHORT;
+            if (m->u.dents.n > RC_DMG_MAX) return RC_E_FIELD;
+            if (!r_have(&r, (uint32_t)m->u.dents.n * RC_DMG_BYTES)) return RC_E_SHORT;
+            m->u.dents.data = r.p + r.n; r.n += (uint32_t)m->u.dents.n * RC_DMG_BYTES;
+        }
+        r.n = r.len;                                                  /* (a newer core's ops and additions) */
+        break;
     default: return RC_E_TYPE;
     }
     if (r.err) return RC_E_SHORT;
@@ -1043,6 +1085,9 @@ int rc_interp_eval(rc_interp *ip, int64_t now_us, int64_t frame_dt_us, int64_t d
 #define T_HUB_LATE     3000000      /* a list after none for this long: our link (or the whole page) stood (hub_late_us) */
 #define T_HUB_SILENT  10000000      /* no list for this long (or from the start): discovery and gossip again */
 #define T_FAR_FED      1500000      /* a far peer's HELLOs and pings are rarer while it got a SNAP within this (rc_tick) */
+#define T_DENTS_AGAIN  1000000      /* our crash damage to a peer that has not said it has it: again after this, twice as
+                                       long each time after (up to 8x) */
+#define T_DENTS_HAVE    500000      /* the answer to a damage we had already (its HAVE went missing): at most this often */
 #define RL_DGRAMS      100          /* per second and source */
 #define RL_BYTES     65536
 
@@ -1423,6 +1468,7 @@ static void fill_hello(rc_session *s, rc_msg *m, const rc_peer *to, int crews){
     if (s->conf.lobbies) m->h.flags |= RC_HF_LOBBY;
     if (s->conf.say) m->h.flags |= RC_HF_SAY;
     if (s->conf.seat2) m->h.flags |= RC_HF_SEAT2;
+    if (s->conf.dents && to) m->h.flags |= RC_HF_DENTS;      /* (to a peer: the hub and the beacon have no use for it) */
     if (!to) m->h.flags |= RC_HF_ALL;
     m->u.hello.core_ver = RC_CORE_VER; m->u.hello.platform = s->conf.platform; m->u.hello.status = s->status;
     m->u.hello.listen_port = s->conf.port; m->u.hello.cfg_rev = s->cfg_rev; m->u.hello.room = s->conf.room;
@@ -1431,6 +1477,14 @@ static void fill_hello(rc_session *s, rc_msg *m, const rc_peer *to, int crews){
     if (to || !s->conf.hub_ip){
         uint32_t fl = flag_len(s->conf.flag);
         if (fl <= RC_FLAG_MAX && flag_ok(s->conf.flag, fl)){ memcpy(m->u.hello.flag, s->conf.flag, fl); m->u.hello.flag[fl] = 0; }
+    }
+    /* our license plate to each peer, from the first HELLO on (its core version not known yet: an older core reads past
+     * it, rc_decode's newer additions), and with no hub the beacon's too; none of it, when we have none, so the HELLO
+     * is the bytes it was */
+    uint32_t pl = plate_len(s->conf.plate);
+    if (pl && rc_plate_ok(s->conf.plate, pl) && (to || !s->conf.hub_ip)){
+        memcpy(m->u.hello.plate, s->conf.plate, pl); m->u.hello.plate[pl] = 0;
+        m->h.flags |= RC_HF_PLATE;
     }
     int n = 0;
     /* a peer that sees its id here takes us as established, so it is named
@@ -1500,6 +1554,34 @@ static void want_cfg(rc_session *s, rc_peer *p, uint16_t rev, int64_t now){
     rc_msg m; hdr(s, &m, RC_MSG_CFG_REQ);
     m.u.cfgreq.cfg_rev = rev; m.u.cfgreq.have_mask = p->asm_rev == rev ? p->asm_mask : 0;
     tx(s, p, &m); p->last_cfgreq_tx = now;
+}
+/* our crash damage to peer p, when it shows friends' damage, gets our car, is near (its snapshots: every one; 0 not
+ * yet), and has not said it has this revision: at once for a new one, then again less and less often */
+static void dents_to(rc_session *s, rc_peer *p, int64_t now){
+    if (!s->dents_rev || p->state != RC_PS_EST || !p->dents || p->dents_have == s->dents_rev || p->far > 1) return;
+    if (s->conf.hub_ip && (p->hub_way & RC_MARK_RXONLY)) return;
+    if (p->dents_tx_rev == s->dents_rev){
+        int shift = p->dents_tries < 3 ? p->dents_tries : 3;
+        if (now - p->dents_tx_us < ((int64_t)T_DENTS_AGAIN << shift)) return;
+    } else p->dents_tries = 0;
+    rc_msg m; hdr(s, &m, RC_MSG_DENTS);
+    m.u.dents.op = RC_DENTS_STATE; m.u.dents.rev = s->dents_rev; m.u.dents.epoch = s->dents_epoch;
+    m.u.dents.first = s->dents_first; m.u.dents.n = s->dents_n; m.u.dents.data = s->dent;
+    tx(s, p, &m);
+    if (p->dents_tx_rev == s->dents_rev && p->dents_tries < 255) p->dents_tries++;
+    p->dents_tx_rev = s->dents_rev; p->dents_tx_us = now; s->dents_tx++;
+}
+void rc_set_dents(rc_session *s, uint8_t epoch, uint16_t first, int n, const uint8_t *dents, int64_t now){
+    static const uint8_t none[RC_DMG_BYTES];
+    if (n <= 0 || !dents){ n = 0; dents = none; }
+    if (n > RC_DMG_MAX){ first = (uint16_t)(first + (n - RC_DMG_MAX)); dents += (size_t)(n - RC_DMG_MAX) * RC_DMG_BYTES; n = RC_DMG_MAX; }
+    if (s->dents_rev && epoch == s->dents_epoch && first == s->dents_first && n == s->dents_n &&
+        !memcmp(dents, s->dent, (size_t)n * RC_DMG_BYTES)) return;
+    if (!s->dents_rev && !n) return;                              /* nothing to say yet */
+    s->dents_rev++; if (!s->dents_rev) s->dents_rev = 1;
+    s->dents_epoch = epoch; s->dents_first = first; s->dents_n = (uint8_t)n;
+    if (n) memcpy(s->dent, dents, (size_t)n * RC_DMG_BYTES);
+    for (int i = 0; i < RC_TABLE; i++) dents_to(s, &s->peer[i], now);
 }
 static int rate_ok(rc_peer *p, int len, int64_t now){
     if (now - p->rl_t0 >= 1000000 || now < p->rl_t0){ p->rl_t0 = now; p->rl_n = 0; p->rl_bytes = 0; }
@@ -1618,12 +1700,14 @@ void rc_receive(rc_session *s, uint32_t ip, uint16_t port, const uint8_t *buf, i
         int first = !p->name[0];
         memcpy(p->name, m.u.hello.name, sizeof p->name);
         memcpy(p->flag, m.u.hello.flag, sizeof p->flag);
+        memcpy(p->plate, m.u.hello.plate, sizeof p->plate);
         p->platform = m.u.hello.platform; p->status = m.u.hello.status; p->cfg_rev_seen = m.u.hello.cfg_rev;
         p->core_ver = m.u.hello.core_ver; p->duels = (m.h.flags & RC_HF_DUELS) != 0;
         p->drifts = p->duels && (m.h.flags & RC_HF_DRIFT) != 0;
         p->lobbies = (m.h.flags & RC_HF_LOBBY) != 0;
         p->statex = (m.h.flags & RC_HF_STATEX) != 0;
         p->say = (m.h.flags & RC_HF_SAY) != 0;
+        p->dents = (m.h.flags & RC_HF_DENTS) != 0;
         int was = p->reads_crews;
         p->reads_crews = (m.h.flags & RC_HF_CREW) != 0;
         p->n_crews = m.u.hello.n_crews;
@@ -1747,6 +1831,25 @@ void rc_receive(rc_session *s, uint32_t ip, uint16_t port, const uint8_t *buf, i
         s->say_in[s->n_say_in].seq = m.u.say.seq; s->say_in[s->n_say_in].stay = m.u.say.stay;
         s->n_say_in++;
         break;
+    case RC_MSG_DENTS: {
+        if (p->state != RC_PS_EST) return;
+        if (m.u.dents.op == RC_DENTS_HAVE){ p->dents_have = m.u.dents.rev; break; }
+        if (m.u.dents.op != RC_DENTS_STATE || !s->conf.dents) return;
+        /* (a player the hub links us one way to sends no car of its own: none of its damage either, as its SNAPs) */
+        if (s->conf.hub_ip && (p->hub_way & RC_MARK_TXONLY)){ s->rx_policy++; return; }
+        s->dents_rx++;
+        int fresh = m.u.dents.rev != p->dents_rev;
+        if (fresh){
+            p->dents_rev = m.u.dents.rev; p->dents_epoch = m.u.dents.epoch; p->dents_first = m.u.dents.first;
+            p->dents_n = m.u.dents.n; memcpy(p->dent, m.u.dents.data, (size_t)m.u.dents.n * RC_DMG_BYTES);
+            p->dents_gen++;
+        }
+        /* the answer: at once for a new one, and for a repeat (ours went missing) at most every T_DENTS_HAVE */
+        if (fresh || now - p->dents_have_us >= T_DENTS_HAVE){
+            rc_msg a; hdr(s, &a, RC_MSG_DENTS); a.u.dents.op = RC_DENTS_HAVE; a.u.dents.rev = m.u.dents.rev;
+            tx(s, p, &a); p->dents_have_us = now;
+        }
+        break; }
     case RC_MSG_BYE: {
         int k = 0;
         if (s->nbye < 4) k = s->nbye++;
@@ -1801,7 +1904,7 @@ void rc_tick(rc_session *s, int64_t now){
         if (now - p->last_hello_tx >= every) send_hello(s, p, now);
         if (p->state == RC_PS_EST && now - p->last_ping_tx >= T_PING * slow){
             rc_msg m; hdr(s, &m, RC_MSG_PING); m.u.ping.t0 = (uint32_t)now; tx(s, p, &m); p->last_ping_tx = now; }
-        if (p->state == RC_PS_EST) want_cfg(s, p, p->cfg_rev_seen, now);
+        if (p->state == RC_PS_EST){ want_cfg(s, p, p->cfg_rev_seen, now); dents_to(s, p, now); }
     }
     if (!hub && (s->peers_dirty || now - s->last_peers_tx >= T_PEERS)){
         rc_msg m; hdr(s, &m, RC_MSG_PEERS);

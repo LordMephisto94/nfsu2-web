@@ -168,10 +168,10 @@
     "many": "{names} sono stati modificati con un editor di salvataggi: valori che il gioco non creerebbe possono mandarlo in crash o rovinare la carriera.",
     "other": "{names} sono stati modificati con un editor di salvataggi: valori che il gioco non creerebbe possono mandarlo in crash o rovinare la carriera."
   },
-  "{names} have modded cars this game lacks: it may crash or show them wrong.": {
-    "one": "{names} ha auto di una mod che questo gioco non ha: potrebbe andare in crash o mostrarle in modo sbagliato.",
-    "many": "{names} hanno auto di una mod che questo gioco non ha: potrebbe andare in crash o mostrarle in modo sbagliato.",
-    "other": "{names} hanno auto di una mod che questo gioco non ha: potrebbe andare in crash o mostrarle in modo sbagliato."
+  "{names} have cars from a modded game: here they show as stock cars, and your save keeps them as they are unless you change them here.": {
+    "one": "{names} ha auto di un gioco moddato: qui appaiono come auto di serie, e il tuo salvataggio le conserva così come sono, a meno che tu non le modifichi qui.",
+    "many": "{names} hanno auto di un gioco moddato: qui appaiono come auto di serie, e il tuo salvataggio le conserva così come sono, a meno che tu non le modifichi qui.",
+    "other": "{names} hanno auto di un gioco moddato: qui appaiono come auto di serie, e il tuo salvataggio le conserva così come sono, a meno che tu non le modifichi qui."
   },
   "Left out, as the game would not load them: {list}.": {
     "one": "Escluso, perché il gioco non lo caricherebbe: {list}.",
@@ -376,6 +376,7 @@
   "Next song": "Brano successivo",
   "Autosave": "Autosalvataggio",
   "Sets each profile's Save option to Autosave once. A later change in the game's Options stays.": "Imposta una volta l'opzione Modalità di salvataggio di ogni profilo su Autosalvataggio. Una modifica successiva nelle Opzioni del gioco resta.",
+  "No boost": "Senza spinta",
   "Startup movies": "Filmati di avvio",
   "Logos, PSA and intro. Skippable: Enter, Esc, Space, a click, A, B or Start skips each. Original: only the intro can be skipped.": "Loghi, PSA e intro. Saltabili: Enter, Esc, Spazio, un clic, A, B o Start salta ciascuno. Originale: si può saltare solo l'intro.",
   "Skippable": "Saltabili",
@@ -1536,13 +1537,16 @@
   "Complete English subtitles in the movies.": "Sottotitoli inglesi completi nei filmati.",
   "The EA Trax songs unedited.": "I brani EA Trax non modificati.",
   "Engine sounds right above 60 fps.": "Suoni del motore alla giusta velocità sopra i 60 fps.",
+  "NFS Carbon's gearbox whine on your car.": "Il fischio del cambio di NFS Carbon sulla tua auto.",
   "Drift camera, high beam, EU cars and more.": "Visuale drift, abbaglianti, auto europee e altro.",
+  "Dents, loose parts and scratches.": "Ammaccature, parti che si staccano e graffi.",
   "New rim brands in the rim shop.": "Nuove marche di cerchi nel negozio dei cerchi.",
   "Mod parts on other cars": "Parti dei mod sulle altre auto",
   "Original: other players' cars with the game's own parts instead.": "Originale: le auto degli altri giocatori con le parti del gioco al loro posto.",
   "Shown": "Mostrate",
   "The 33 hidden races on the map.": "Le 33 gare nascoste sulla mappa.",
   "DVD covers by stage, not by your car's parts.": "Copertine DVD in base al livello, non ai pezzi della tua auto.",
+  "Career rivals that wait and catch up.": "Avversari in carriera che aspettano e recuperano.",
   "Mods": "Mod",
   "The core gameplay is the original's, with a few improvements, fixes and multiplayer on top.": "Il gameplay di base è quello originale, con qualche miglioria, correzione e il multigiocatore in più.",
   "The game's files didn't load properly. On this page: Game, Delete game data, then Play (your saves stay). If it happens again, your network may be blocking the game: try another network.": "I file del gioco non si sono caricati bene. In questa pagina: Gioco, Elimina i dati di gioco, poi Gioca (i tuoi salvataggi restano). Se succede di nuovo, forse la tua rete blocca il gioco: prova un'altra rete.",
@@ -1608,5 +1612,10 @@
   "Own name…": "Nome a scelta…",
   "Own name": "Nome a scelta",
   "\"{name}\"": "\"{name}\"",
-  "Nobody else is in {world} now. Main world is in the menu.": "Ora non c'è nessun altro in {world}. Il Mondo principale è nel menu."
+  "Nobody else is in {world} now. Main world is in the menu.": "Ora non c'è nessun altro in {world}. Il Mondo principale è nel menu.",
+  "License plate": "Targa",
+  "On your car, also for other players in free roam: up to 8 letters and digits.": "Sulla tua auto, anche per gli altri giocatori in modalità Esplora: fino a 8 lettere e cifre.",
+  "Original plate": "Targa originale",
+  "\"{value}\" is not a license plate (letters A to Z and digits, at most 8)": "\"{value}\" non è una targa (lettere dalla A alla Z e cifre, al massimo 8)",
+  "\"{value}\" is not a license plate (it reads as a slur)": "\"{value}\" non è una targa (sembra un insulto)"
 }

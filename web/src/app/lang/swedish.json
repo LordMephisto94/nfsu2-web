@@ -165,9 +165,9 @@
     "one": "{names} har ändrats med en sparfilsredigerare: värden som spelet inte skulle skapa kan få det att krascha eller förstöra karriären.",
     "other": "{names} har ändrats med en sparfilsredigerare: värden som spelet inte skulle skapa kan få det att krascha eller förstöra karriären."
   },
-  "{names} have modded cars this game lacks: it may crash or show them wrong.": {
-    "one": "{names} har moddade bilar som det här spelet saknar: det kan krascha eller visa dem fel.",
-    "other": "{names} har moddade bilar som det här spelet saknar: det kan krascha eller visa dem fel."
+  "{names} have cars from a modded game: here they show as stock cars, and your save keeps them as they are unless you change them here.": {
+    "one": "{names} har bilar från ett moddat spel: här visas de som standardbilar, och din sparning behåller dem som de är om du inte ändrar dem här.",
+    "other": "{names} har bilar från ett moddat spel: här visas de som standardbilar, och din sparning behåller dem som de är om du inte ändrar dem här."
   },
   "Left out, as the game would not load them: {list}.": {
     "one": "Utelämnad, eftersom spelet inte skulle ladda den: {list}.",
@@ -363,6 +363,7 @@
   "Next song": "Nästa låt",
   "Autosave": "Autospara",
   "Sets each profile's Save option to Autosave once. A later change in the game's Options stays.": "Ställer en gång in varje profils alternativ Spara på Autospara. En senare ändring i spelets Alternativ behålls.",
+  "No boost": "Ingen boost",
   "Startup movies": "Startfilmer",
   "Logos, PSA and intro. Skippable: Enter, Esc, Space, a click, A, B or Start skips each. Original: only the intro can be skipped.": "Logotyper, PSA och intro. Avbrytbara: Enter, Esc, Mellanslag, ett klick, A, B eller Start hoppar över var och en. Original: bara introt kan hoppas över.",
   "Skippable": "Avbrytbara",
@@ -1511,13 +1512,16 @@
   "Complete English subtitles in the movies.": "Kompletta engelska undertexter i filmerna.",
   "The EA Trax songs unedited.": "EA Trax-låtarna oredigerade.",
   "Engine sounds right above 60 fps.": "Motorljud i rätt takt över 60 fps.",
+  "NFS Carbon's gearbox whine on your car.": "NFS Carbons växellådsvin på din bil.",
   "Drift camera, high beam, EU cars and more.": "Driftkamera, helljus, de europeiska bilarna och mer.",
+  "Dents, loose parts and scratches.": "Bucklor, lösa delar och repor.",
   "New rim brands in the rim shop.": "Nya fälgmärken i fälgbutiken.",
   "Mod parts on other cars": "Moddelar på andras bilar",
   "Original: other players' cars with the game's own parts instead.": "Original: andra spelares bilar med spelets egna delar i stället.",
   "Shown": "Visas",
   "The 33 hidden races on the map.": "De 33 dolda racen på kartan.",
   "DVD covers by stage, not by your car's parts.": "DVD-omslag efter nivå, inte efter bilens delar.",
+  "Career rivals that wait and catch up.": "Karriärens motståndare som väntar och kommer ikapp.",
   "Mods": "Moddar",
   "The core gameplay is the original's, with a few improvements, fixes and multiplayer on top.": "Spelmekaniken är originalets, med några förbättringar, fixar och flerspelarläge ovanpå.",
   "The game's files didn't load properly. On this page: Game, Delete game data, then Play (your saves stay). If it happens again, your network may be blocking the game: try another network.": "Spelets filer laddades inte ordentligt. På den här sidan: Spel, Radera speldata, sedan Spela (dina sparfiler finns kvar). Om det händer igen kan ditt nätverk blockera spelet: prova ett annat nätverk.",
@@ -1583,5 +1587,10 @@
   "Own name…": "Eget namn…",
   "Own name": "Eget namn",
   "\"{name}\"": "\"{name}\"",
-  "Nobody else is in {world} now. Main world is in the menu.": "Ingen annan är i {world} nu. Huvudvärlden finns i menyn."
+  "Nobody else is in {world} now. Main world is in the menu.": "Ingen annan är i {world} nu. Huvudvärlden finns i menyn.",
+  "License plate": "Registreringsskylt",
+  "On your car, also for other players in free roam: up to 8 letters and digits.": "På din bil, i läget Utforska även för andra spelare: upp till 8 bokstäver och siffror.",
+  "Original plate": "Originalskylt",
+  "\"{value}\" is not a license plate (letters A to Z and digits, at most 8)": "\"{value}\" är ingen registreringsskylt (bokstäverna A till Z och siffror, högst 8)",
+  "\"{value}\" is not a license plate (it reads as a slur)": "\"{value}\" är ingen registreringsskylt (det läses som ett glåpord)"
 }

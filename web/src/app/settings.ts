@@ -19,16 +19,18 @@ import { onlineName } from './claim';
 import { crewsOk, rgbsOk } from './crews';
 import { groupsOk, phrasesOk } from './phrases';
 import { flagCode } from './flags';
+import { plateUpper, plateValid } from './plates';
 import { fill, LANGUAGES, N, type Vars } from './i18n';
 export { LANGUAGES };
 
 /** bundle.m's K_* kinds, and the browser's own crews (a list of names: crews.ts), blocked players (names: a list of
  *  players' names) and flag (one of flags.ts's codes).  ic: K_IC, "value ; comment" (the free-roam keys).  room:
  *  K_ROOM, text that does not read as a slur (names.mjs, as a player's name).  key: one of our controls' key, the
- *  browser's name of it (KeyboardEvent.code: sitekeys.ts), or off. */
+ *  browser's name of it (KeyboardEvent.code: sitekeys.ts), or off.  plate: a license plate's text (plates.ts), small
+ *  letters as capitals, none that reads as a slur. */
 export type Kind = 'raw' | 'bool' | 'boolInv' | 'enum' | 'num' | 'id' | 'token' | 'int' | 'name' | 'peers'
   | 'path' | 'text' | 'room' | 'wxh' | 'fixes' | 'ifname' | 'ipv4' | 'mac' | 'host' | 'parts' | 'dump' | 'crews' | 'rgbs'
-  | 'phrases' | 'sayGroups' | 'names' | 'key' | 'flag';
+  | 'phrases' | 'sayGroups' | 'names' | 'key' | 'flag' | 'plate';
 
 export interface KeyDef {
   key: string;
@@ -116,6 +118,8 @@ export const KEYS: readonly KeyDef[] = [
   { key: 'roam_name', env: 'NFSU2_ROAM_NAME', kind: 'name', ic: true, scope: 'web' },
   // the flag before the name (flags.ts; runtime/roam_game.c flag_*): the page has the list, so not in bundle.m's table
   { key: 'roam_flag', env: 'NFSU2_ROAM_FLAG', kind: 'flag', ic: true, scope: 'web' },
+  // the license plate on the player's car (runtime/plates.c; the game checks it too)
+  { key: 'license_plate', env: 'NFSU2_LICENSE_PLATE', kind: 'plate', ic: true, scope: 'web' },
   { key: 'roam_port', env: 'NFSU2_ROAM_PORT', kind: 'int', vals: '1024..65535', ic: true, scope: 'mac' },
   { key: 'roam_peers', env: 'NFSU2_ROAM_PEERS', kind: 'peers', ic: true, scope: 'mac' },
   { key: 'roam_discovery', env: 'NFSU2_ROAM_DISCOVERY', kind: 'bool', ic: true, scope: 'web' },
@@ -189,8 +193,11 @@ export const KEYS: readonly KeyDef[] = [
   // the career's visual rating set by the stage, not by the car's parts (runtime/visualrep.c).  Not in bundle.m's
   // table: there a lower-case key, so it reaches the runtime as NFSU2_VISUAL_REP_REMOVER all the same
   { key: 'visual_rep_remover', env: 'NFSU2_VISUAL_REP_REMOVER', kind: 'bool', scope: 'web' },
-  // The rims are out for now (mods.ts): these two keys come back with their lines in TEMPLATE, after
-  // visual_rep_remover's:
+  // the career's rubberbanding: original, noboost (opponents ahead still wait, none behind beats its own pace) or off
+  // (runtime/catchup.c).  Not in bundle.m's table: there a lower-case key, so it reaches the runtime as NFSU2_CATCHUP
+  // all the same
+  { key: 'catchup', env: 'NFSU2_CATCHUP', kind: 'enum', vals: 'original|noboost|off', scope: 'web' },
+  // The rims are out for now (mods.ts): these two keys come back with their lines in TEMPLATE, after catchup's:
   //   # New rim brands in the rim shop: Blitz.  Everyone's game has their rims,
   //   # so a friend's car with them looks the same either way, and rims already
   //   # on your car stay.  off = the shops offer only the original game's.
@@ -209,6 +216,10 @@ export const KEYS: readonly KeyDef[] = [
   // look-alikes, else the stock ones; free roam's cars and the race's).  Not in bundle.m's table: there a lower-case
   // key, so it reaches the runtime as NFSU2_OTHERS_MOD_PARTS all the same
   // { key: 'others_mod_parts', env: 'NFSU2_OTHERS_MOD_PARTS', kind: 'enum', vals: 'shown|original', scope: 'web' },
+  // each local player's gearbox whine over the game's sound, as ropi's Underground 2 Transmission Whine (runtime/whine.c;
+  // its sounds from the game folder's MODPACKS/WHINE, read only when on: tools/whinepack.py).  Not in bundle.m's
+  // table: there a lower-case key, so it reaches the runtime as NFSU2_GEARBOX_WHINE all the same
+  { key: 'gearbox_whine', env: 'NFSU2_GEARBOX_WHINE', kind: 'bool', scope: 'web' },
   // the game's own textures without smoothing (only the page's renderer reads it: subsystems.ts, gpu/encoder.ts
   // pointTex).  Not in bundle.m's table
   { key: 'pixelated_textures', env: 'NFSU2_PIXELATED_TEXTURES', kind: 'bool', scope: 'web' },
@@ -239,6 +250,9 @@ export const KEYS: readonly KeyDef[] = [
   { key: 'button_horn', env: 'NFSU2_BUTTON_HORN', kind: 'enum', vals: 'ls|rs|off', scope: 'web', device: true },
   { key: 'button_chat', env: 'NFSU2_BUTTON_CHAT', kind: 'enum', vals: 'rs|ls|off', scope: 'web', device: true },
   { key: 'button_look', env: 'NFSU2_BUTTON_LOOK', kind: 'enum', vals: 'auto|off', scope: 'web', device: true },
+  // the racers' visual crash damage, FRS Mods' Crashing Foreign Cars (runtime/damage.c), off unless asked for.  Not in
+  // bundle.m's table
+  { key: 'crash_damage', env: 'NFSU2_DAMAGE', kind: 'bool', scope: 'web' },
 ];
 
 /** strcasecmp's and toupper's folding: ASCII letters only (String.toLowerCase would also fold the Kelvin sign to 'k') */
@@ -339,6 +353,34 @@ export const TEMPLATE = `# NFSU2 settings, read at every launch.
 # off = the original game.
 # [NFSU2_VISUAL_REP_REMOVER]
 #visual_rep_remover = off
+
+# Crash damage, as FRS Mods' Crashing Foreign Cars has it: the racers' cars
+# (yours and the AI's) dent where they are hit, scratch, lose their bumpers,
+# mirrors, hood, trunk lid and doors, and break their lights.  Only what is
+# seen: the engine, the suspension and the handling are as before, and the
+# game's own repair (a race's start, the garage) takes the damage away.
+# In free roam other players who have it on see the damage of your car;
+# off, you see every car undamaged.  off (the default) = the original game.
+# [NFSU2_DAMAGE]
+#crash_damage = off
+
+# The career's rubberbanding (Mods: Rubberbanding).  In a career race the
+# game slows opponents who are ahead of you and gives ones behind you more
+# power, grip and top speed (up to 37% more when they are 320 m behind).
+# noboost = they still wait for you, but none behind ever beats its own
+# pace; off = neither, as Quick Race with Catch Up off.  original = the
+# original game.  Only your own career races: Quick Race keeps its own Catch
+# Up option, and LAN and online races have no computer opponents.
+# [NFSU2_CATCHUP]
+#catchup = original
+
+# NFS Carbon's transmission whine on your car, as ropi's Underground 2
+# Transmission Whine (github.com/ropi336/UG2WhineGen) has it: a whine rising
+# with the speed, quiet for a moment at each upshift, and its own in
+# reverse, by the game's Engine Volume.  Its sounds download once it is on.
+# off = the original game.
+# [NFSU2_GEARBOX_WHINE]
+#gearbox_whine = off
 
 # What the game does while this tab is hidden or another window is active:
 # "pause" freezes it and pauses its sound, like alt-tab on Windows; "run"
@@ -528,6 +570,11 @@ export const TEMPLATE = `# NFSU2 settings, read at every launch.
 # gb-nir for England, Scotland, Wales and Northern Ireland.  Empty = none.
 # [NFSU2_ROAM_FLAG]
 #roam_flag =
+
+# Your license plate, on your car: up to 8 letters A to Z and digits (other
+# players see it in free roam).  Empty = the game's own plate.
+# [NFSU2_LICENSE_PLATE]
+#license_plate =
 
 # Your horn (key_horn and button_horn: N and the left stick click), in free roam and in
 # Online and LAN races; the other players hear the one you pick: dual (two
@@ -891,6 +938,11 @@ export function checkSetting(key: string, val: string): Checked | Refused | null
       if (blockedName(val)) return refuse(N('"{value}" is not a name (it reads as a slur)'), val);
       break;
     }
+    case 'plate':
+      out = plateUpper(val);
+      if (!plateValid(out)) return refuse(N('"{value}" is not a license plate (letters A to Z and digits, at most 8)'), val);
+      if (blockedName(out)) return refuse(N('"{value}" is not a license plate (it reads as a slur)'), val);
+      break;
     case 'room':
       if (!valueOk('text', val)) return refuse(N('"{value}" is not {kind}'), val, { kind: KIND_TEXT.text! });
       if (blockedName(val)) return refuse(N('"{value}" is not a world name (it reads as a slur)'), val);

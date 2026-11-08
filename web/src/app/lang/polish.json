@@ -171,11 +171,11 @@
     "many": "Profile {names} zostały zmienione edytorem zapisów: wartości, których gra sama by nie utworzyła, mogą spowodować jej awarię lub zepsuć karierę.",
     "other": "Profile {names} zostały zmienione edytorem zapisów: wartości, których gra sama by nie utworzyła, mogą spowodować jej awarię lub zepsuć karierę."
   },
-  "{names} have modded cars this game lacks: it may crash or show them wrong.": {
-    "one": "Profil {names} ma samochody z modów, których ta gra nie ma: gra może ulec awarii albo pokazać je źle.",
-    "few": "Profile {names} mają samochody z modów, których ta gra nie ma: gra może ulec awarii albo pokazać je źle.",
-    "many": "Profile {names} mają samochody z modów, których ta gra nie ma: gra może ulec awarii albo pokazać je źle.",
-    "other": "Profile {names} mają samochody z modów, których ta gra nie ma: gra może ulec awarii albo pokazać je źle."
+  "{names} have cars from a modded game: here they show as stock cars, and your save keeps them as they are unless you change them here.": {
+    "one": "Profil {names} ma samochody z gry z modami: tutaj widać je jako seryjne, a twój zapis zachowa je bez zmian, chyba że zmienisz je tutaj.",
+    "few": "Profile {names} mają samochody z gry z modami: tutaj widać je jako seryjne, a twój zapis zachowa je bez zmian, chyba że zmienisz je tutaj.",
+    "many": "Profile {names} mają samochody z gry z modami: tutaj widać je jako seryjne, a twój zapis zachowa je bez zmian, chyba że zmienisz je tutaj.",
+    "other": "Profile {names} mają samochody z gry z modami: tutaj widać je jako seryjne, a twój zapis zachowa je bez zmian, chyba że zmienisz je tutaj."
   },
   "Left out, as the game would not load them: {list}.": {
     "one": "Pominięty, bo gra by go nie wczytała: {list}.",
@@ -389,6 +389,7 @@
   "Next song": "Następny utwór",
   "Autosave": "Autozapis",
   "Sets each profile's Save option to Autosave once. A later change in the game's Options stays.": "Jednorazowo ustawia opcję „Zapis” każdego profilu na „Autozapis”. Późniejsza zmiana w Opcjach gry zostaje zachowana.",
+  "No boost": "Bez wspomagania",
   "Startup movies": "Filmy na starcie",
   "Logos, PSA and intro. Skippable: Enter, Esc, Space, a click, A, B or Start skips each. Original: only the intro can be skipped.": "Loga, PSA i intro. „Do pominięcia”: każdy z nich pomija Enter, Esc, Spacja, kliknięcie, A, B lub Start. „Oryginał”: pominąć można tylko intro.",
   "Skippable": "Do pominięcia",
@@ -1569,13 +1570,16 @@
   "Complete English subtitles in the movies.": "Pełne angielskie napisy do filmów.",
   "The EA Trax songs unedited.": "Utwory EA Trax bez zmian.",
   "Engine sounds right above 60 fps.": "Właściwe dźwięki silnika powyżej 60 fps.",
+  "NFS Carbon's gearbox whine on your car.": "Wycie skrzyni biegów z NFS Carbon w twoim aucie.",
   "Drift camera, high beam, EU cars and more.": "Kamera driftu, długie światła, europejskie auta i więcej.",
+  "Dents, loose parts and scratches.": "Wgniecenia, luźne części i rysy.",
   "New rim brands in the rim shop.": "Nowe marki felg w sklepie z felgami.",
   "Mod parts on other cars": "Części z modów na innych autach",
   "Original: other players' cars with the game's own parts instead.": "Oryginał: auta innych graczy z częściami z gry w zamian.",
   "Shown": "Widoczne",
   "The 33 hidden races on the map.": "33 ukryte wyścigi na mapie.",
   "DVD covers by stage, not by your car's parts.": "Okładki DVD zależą od etapu, a nie od części twojego auta.",
+  "Career rivals that wait and catch up.": "Rywale w karierze, którzy czekają i doganiają.",
   "Mods": "Mody",
   "The core gameplay is the original's, with a few improvements, fixes and multiplayer on top.": "Podstawowa rozgrywka jest jak w oryginale, z kilkoma ulepszeniami, poprawkami i trybem wieloosobowym.",
   "The game's files didn't load properly. On this page: Game, Delete game data, then Play (your saves stay). If it happens again, your network may be blocking the game: try another network.": "Pliki gry nie wczytały się poprawnie. Na tej stronie: „Gra”, „Usuń dane gry”, potem „Graj” (twoje zapisy zostaną). Jeśli to się powtórzy, twoja sieć może blokować grę: spróbuj innej sieci.",
@@ -1641,5 +1645,10 @@
   "Own name…": "Własna nazwa…",
   "Own name": "Własna nazwa",
   "\"{name}\"": "„{name}”",
-  "Nobody else is in {world} now. Main world is in the menu.": "{world}: nie ma tu teraz nikogo poza tobą. Główny świat znajdziesz w menu."
+  "Nobody else is in {world} now. Main world is in the menu.": "{world}: nie ma tu teraz nikogo poza tobą. Główny świat znajdziesz w menu.",
+  "License plate": "Tablica rejestracyjna",
+  "On your car, also for other players in free roam: up to 8 letters and digits.": "Na twoim samochodzie, na przejażdżce widoczna też dla innych graczy: do 8 liter i cyfr.",
+  "Original plate": "Oryginalna tablica",
+  "\"{value}\" is not a license plate (letters A to Z and digits, at most 8)": "„{value}” to nie tablica rejestracyjna (litery od A do Z i cyfry, najwyżej 8)",
+  "\"{value}\" is not a license plate (it reads as a slur)": "„{value}” to nie tablica rejestracyjna (brzmi jak obelga)"
 }

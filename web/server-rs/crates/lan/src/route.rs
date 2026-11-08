@@ -15,7 +15,7 @@ use crate::away;
 use crate::compact;
 use crate::conn::{Conn, Out};
 use crate::lag::{self, SHARE_FULL};
-use crate::{BROADCAST, Cause, Cut, KIND_LAN_ICMP, KIND_LAN_UDP, KIND_STREAM, KIND_UDP, LanSwitch, Peer, STREAM_LOW, slot};
+use crate::{BROADCAST, Cause, Cut, KIND_LAN_ICMP, KIND_LAN_UDP, KIND_STREAM, KIND_UDP, LanSwitch, Peer, STREAM_LOW, plates, slot};
 
 /// What a stream segment waiting at the switch costs it besides its bytes (its entry here, its copy's allocation),
 /// counted with them against `stream_share` and `stream_queue`, so that those bound the memory for segments of a few
@@ -85,6 +85,16 @@ impl LanSwitch {
     /// three locks and a clock read): the destinations go up to the first whose running total one of the buckets
     /// cannot pay for, which is where checking them one destination after the other stops.
     pub(crate) fn route(&self, peer: &Arc<Peer>, data: &Bytes, dsts: impl Iterator<Item = u32> + Clone) -> bool {
+        // free roam's license plates (plates.rs): a HELLO goes on without a broken plate or a slur, and with the last
+        // plate for a change too soon
+        let fixed;
+        let data = match plates::hello_plate(data).and_then(|p| self.plate_fix(peer, data, p)) {
+            Some(f) => {
+                fixed = f;
+                &fixed
+            }
+            None => data,
+        };
         let n = data.len();
         let lan_only = (KIND_LAN_UDP..=KIND_LAN_ICMP).contains(&data[0]);
         if lan_only {
@@ -126,6 +136,36 @@ impl LanSwitch {
             self.stats.limited.inc();
         }
         all_paid
+    }
+
+    /// A HELLO with a license plate from `peer` (plates.rs): the frame to send in its place (without its plate, or with
+    /// the player's last one), None to send it as it is; the `[plate]` line of a new one or of a slur
+    fn plate_fix(&self, peer: &Peer, data: &Bytes, p: plates::Found<'_>) -> Option<Bytes> {
+        if !plates::intact(data) {
+            return None; // (no game takes it)
+        }
+        let plates::Found::Plate { at, plate, name } = p else {
+            return plates::rewrite(data, None, None).map(Bytes::from);
+        };
+        let name: String = String::from_utf8_lossy(name).chars().map(|c| if c.is_control() { '?' } else { c }).collect();
+        let plate_s = std::str::from_utf8(plate).unwrap_or("");
+        match plates::judge(&peer.plates, plate, mono_ms() as i64) {
+            plates::Verdict::Go => None,
+            plates::Verdict::New => {
+                self.line(&format!("[plate] {} \"{name}\" {plate_s}", nfsu2_util::vip_str(peer.vip)));
+                None
+            }
+            plates::Verdict::Last(last) => plates::rewrite(data, Some(at), Some(&last)).map(Bytes::from),
+            plates::Verdict::Slur { tell } => {
+                if tell {
+                    self.line(&format!(
+                        "[plate] {} \"{name}\" {plate_s}: reads as a slur, dropped (its HELLOs go on without it)",
+                        nfsu2_util::vip_str(peer.vip)
+                    ));
+                }
+                plates::rewrite(data, Some(at), None).map(Bytes::from)
+            }
+        }
     }
 
     /// one destination that was paid for: the trace, a host, or the browsers
@@ -455,8 +495,8 @@ fn own(data: &Bytes, src: u32, dst: u32) -> Bytes {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::{BASE, UDP_SET};
     use crate::{AttachCtx, LanOptions};
+    use crate::{BASE, UDP_SET};
 
     /// a peer on the switch without a socket: its connection's queue only fills
     pub(crate) fn peer(sw: &Arc<LanSwitch>, group: &str) -> (Arc<Conn>, Arc<AttachCtx>, Arc<Peer>) {
@@ -679,7 +719,9 @@ pub(crate) mod tests {
         let sw = LanSwitch::new(LanOptions::default(), "", None, Some(Arc::new(Hub)), None, None);
         let (_ac, _actx, a) = peer(&sw, "a");
         let (_bc, _bctx, b) = peer(&sw, "b");
-        let hello = |bundle: u8| match crate::text::parse_json(format!(r#"{{"t":"hello","name":"x","bundle":{bundle},"compact":{bundle}}}"#).as_bytes()) {
+        let hello = |bundle: u8| match crate::text::parse_json(
+            format!(r#"{{"t":"hello","name":"x","bundle":{bundle},"compact":{bundle}}}"#).as_bytes(),
+        ) {
             Some(serde_json::Value::Object(m)) => m,
             _ => unreachable!(),
         };
@@ -695,11 +737,17 @@ pub(crate) mod tests {
         assert!(matches!(sw.send_to(b.vip, from(hub, b.vip, KIND_UDP), None), nfsu2_util::SendResult::Sent));
         assert!(matches!(sw.send_to(a.vip, from(BASE | 1, a.vip, KIND_STREAM), None), nfsu2_util::SendResult::Sent));
         let kinds = |p: &Peer| {
-            p.conn.out.q.lock().iter().filter_map(|o| match o {
-                Out::Dgram { src, dst, .. } => Some(format!("dgram {src:x}>{dst:x}")),
-                Out::Raw(f) => Some(format!("raw {:x}", u32::from_be_bytes([f[4], f[5], f[6], f[7]]))),
-                _ => None,
-            }).collect::<Vec<_>>()
+            p.conn
+                .out
+                .q
+                .lock()
+                .iter()
+                .filter_map(|o| match o {
+                    Out::Dgram { src, dst, .. } => Some(format!("dgram {src:x}>{dst:x}")),
+                    Out::Raw(f) => Some(format!("raw {:x}", u32::from_be_bytes([f[4], f[5], f[6], f[7]]))),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
         };
         assert_eq!(kinds(&a), [format!("dgram {hub:x}>{:x}", a.vip), format!("raw {:x}", BASE | 1)]);
         assert_eq!(kinds(&b), [format!("raw {hub:x}")]);

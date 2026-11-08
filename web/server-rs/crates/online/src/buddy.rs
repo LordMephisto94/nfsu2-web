@@ -82,14 +82,14 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use indexmap::IndexMap;
-use nfsu2_util::json;
+use nfsu2_util::{Bucket, json};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 use crate::aries::{FieldMap, Fields, FrameReader, V, encode_frame};
 use crate::core::Core;
 use crate::jsx::{self, clean_text, lower, strip_at, valid_name};
-use crate::lobby::{LBucket, four_printable};
+use crate::lobby::four_printable;
 use crate::omap::OrderedMap;
 use crate::timers::{Action, TimerId};
 use crate::vhost::{ConnId, Svc};
@@ -295,8 +295,8 @@ pub struct Buddy {
     told: Option<f64>,
     presence_timer: Option<TimerId>,
     mail_timer: Option<TimerId>,
-    rate: LBucket,
-    heavy: LBucket,
+    rate: Bucket,
+    heavy: Bucket,
     tries: u32,
     reader: FrameReader,
     login_timer: Option<TimerId>,
@@ -330,7 +330,7 @@ pub struct Buddies {
     pruned: f64,
     swept: f64,
     /// client group -> bucket: new friends lists
-    made: HashMap<Arc<str>, LBucket>,
+    made: HashMap<Arc<str>, Bucket>,
     timer: Option<TimerId>,
     /// the lists (lower case) that changed since they were last written
     dirty: HashSet<String>,
@@ -345,26 +345,22 @@ pub struct Buddies {
 struct Shelf;
 
 impl Shelf {
-    fn file(dir: &Path, k: &str) -> (PathBuf, PathBuf) {
+    fn file(dir: &Path, k: &str) -> PathBuf {
         let h: String = Sha256::digest(k.as_bytes()).iter().take(16).map(|b| format!("{b:02x}")).collect();
-        let sub = dir.join(SHELF).join(&h[..2]);
-        let file = sub.join(format!("{h}.json"));
-        (sub, file)
+        dir.join(SHELF).join(&h[..2]).join(format!("{h}.json"))
     }
 
     fn read(dir: &Path, k: &str) -> Option<serde_json::Map<String, Value>> {
-        let (_, file) = Shelf::file(dir, k);
-        let bytes = std::fs::read(file).ok()?;
+        let bytes = std::fs::read(Shelf::file(dir, k)).ok()?;
         crate::jsonparse::parse(&String::from_utf8_lossy(&bytes)).ok()?.as_object().cloned()
     }
 
     fn write(dir: &Path, k: &str, body: &str) -> Result<(), String> {
-        let (sub, file) = Shelf::file(dir, k);
-        crate::files::write_atomic(&sub, &file, body.as_bytes())
+        crate::files::write_atomic(&Shelf::file(dir, k), body.as_bytes())
     }
 
     fn remove(dir: &Path, k: &str) {
-        let _ = std::fs::remove_file(Shelf::file(dir, k).1);
+        let _ = std::fs::remove_file(Shelf::file(dir, k));
     }
 }
 
@@ -510,7 +506,7 @@ pub(crate) fn shelf_texts(dir: &Path) -> Vec<String> {
         for f in std::fs::read_dir(sub.path()).unwrap().flatten() {
             let text = std::fs::read_to_string(f.path()).unwrap();
             let name = crate::jsonparse::parse(&text).unwrap()["name"].as_str().unwrap().to_string();
-            assert_eq!(f.path(), Shelf::file(dir, &lower(&name)).1, "{name}'s file is where its name says");
+            assert_eq!(f.path(), Shelf::file(dir, &lower(&name)), "{name}'s file is where its name says");
             out.push((name, text));
         }
     }
@@ -521,10 +517,7 @@ pub(crate) fn shelf_texts(dir: &Path) -> Vec<String> {
 /// the same lists read and written again
 #[cfg(test)]
 pub(crate) fn shelf_reread(dir: &Path) -> Vec<String> {
-    shelf_texts(dir)
-        .iter()
-        .map(|t| list_json(&list_of_json(crate::jsonparse::parse(t).unwrap().as_object().unwrap()).unwrap()))
-        .collect()
+    shelf_texts(dir).iter().map(|t| list_json(&list_of_json(crate::jsonparse::parse(t).unwrap().as_object().unwrap()).unwrap())).collect()
 }
 
 /// a time the file keeps (ms since 1970, whole)
@@ -1136,8 +1129,8 @@ impl Core {
                 told: None,
                 presence_timer: None,
                 mail_timer: None,
-                rate: LBucket::new(l.msg_rate, 3.0 * l.msg_rate, now),
-                heavy: LBucket::new(l.heavy_rate, 4.0, now),
+                rate: Bucket::with_burst_at(l.msg_rate, 3.0 * l.msg_rate, now),
+                heavy: Bucket::with_burst_at(l.heavy_rate, 4.0, now),
                 tries: 0,
                 reader: FrameReader::default(),
                 login_timer: Some(t),
@@ -1171,7 +1164,7 @@ impl Core {
                 return;
             }
             let now = self.bnow();
-            if !self.buddies.conns.get_mut(&b).is_some_and(|x| x.rate.take(now, 1.0)) {
+            if !self.buddies.conns.get_mut(&b).is_some_and(|x| x.rate.take_at(now, 1.0)) {
                 return self.conn_destroy(conn, "buddy: too many messages");
             }
             if !four_printable(&m.kind) {
@@ -1300,11 +1293,11 @@ impl Core {
         let l = self.buddies.l;
         if !self.buddies.made.contains_key(group) {
             if self.buddies.made.len() >= 10_000 {
-                self.buddies.made.retain(|_, x| !(x.take(now, 0.0) && x.v >= x.cap));
+                self.buddies.made.retain(|_, x| !(x.has_at(now, 0.0) && x.v >= x.cap));
             }
-            self.buddies.made.insert(group.clone(), LBucket::new(l.list_rate / 3600.0, l.list_rate, now));
+            self.buddies.made.insert(group.clone(), Bucket::with_burst_at(l.list_rate / 3600.0, l.list_rate, now));
         }
-        if !self.buddies.made.get_mut(group).expect("just made").take(now, 1.0) {
+        if !self.buddies.made.get_mut(group).expect("just made").take_at(now, 1.0) {
             return false;
         }
         self.new_list(name, now);
@@ -1647,7 +1640,8 @@ impl Core {
             .filter(|(k, (_, t))| waits(t) && not_friend(k) && !bs.blocks(&mk, k))
             .map(|(_, (n, _))| n.clone())
             .collect();
-        let sent = l.into_iter().flat_map(|l| l.r.iter()).filter(|(k, (_, t))| waits(t) && not_friend(k)).map(|(_, (n, _))| n.clone()).collect();
+        let sent =
+            l.into_iter().flat_map(|l| l.r.iter()).filter(|(k, (_, t))| waits(t) && not_friend(k)).map(|(_, (n, _))| n.clone()).collect();
         let contact = l.and_then(|l| l.contact.clone());
         FriendReply { me: Some(me), done, friends, asks, sent, mail, contact }
     }
@@ -1859,14 +1853,8 @@ impl Core {
     fn msg_slur(&mut self, mk: &str, who: &str, body: &str, group: Option<&Arc<str>>) -> bool {
         let Some(word) = nfsu2_names::chat_slur(body).map(str::to_string) else { return false };
         let (now, l) = (self.bnow(), self.lobby.l);
-        let x = self.buddies.msg_slurs.entry(mk.to_string()).or_default();
-        x.0.retain(|t| now - t < l.slur_window_ms);
-        x.0.push(now);
-        let muted = x.0.len() as f64 >= l.slur_lines;
-        if muted {
-            x.1 = now + l.slur_mute_ms;
-            x.0.clear();
-        }
+        let (times, until) = self.buddies.msg_slurs.entry(mk.to_string()).or_default();
+        let muted = l.slur_said(times, until, now);
         let off = nfsu2_util::js::number_to_string(l.slur_mute_ms / 1000.0);
         let then = if muted { format!("; messages off for {off} s") } else { String::new() };
         let word = serde_json::to_string(&word).expect("a string");
@@ -2038,7 +2026,7 @@ impl Core {
             "EPGT" => self.bsend(b, "EPGT", &wid(fields![("ENAB", "N"), ("ADDR", "")]), ""),
             "RGET" => {
                 let now = self.bnow();
-                if !self.buddies.conns.get_mut(&b).expect("held").heavy.take(now, 1.0) {
+                if !self.buddies.conns.get_mut(&b).expect("held").heavy.take_at(now, 1.0) {
                     return self.bsend(b, "RGET", &with_id, "full");
                 }
                 let which = list_field(f);
@@ -2224,7 +2212,7 @@ impl Core {
                 // Search: personas online now or known from their races whose name starts with the text (at most
                 // MAXR, 20)
                 let now = self.bnow();
-                if !self.buddies.conns.get_mut(&b).expect("held").heavy.take(now, 1.0) {
+                if !self.buddies.conns.get_mut(&b).expect("held").heavy.take_at(now, 1.0) {
                     return self.bsend(b, "USCH", &wid(fields![("SIZE", 0)]), "");
                 }
                 let q = jsx::slice16(&lower(strip_at(f.str("USER"))), 15).to_string();
@@ -2450,7 +2438,7 @@ mod tests {
         // a third list pushes the least recently seen out of memory
         s.make_room(&none);
         s.lists.insert("charlie".into(), FriendsList::new("Charlie", "2026-10".into()));
-        assert!(!s.lists.contains_key("alpha") && s.fans.get("bravo").is_none(), "Alpha's list out, and its fan entry");
+        assert!(!s.lists.contains_key("alpha") && !s.fans.contains_key("bravo"), "Alpha's list out, and its fan entry");
         assert!(s.fetch("alpha", 0.0, &none), "back from the shelf");
         let x = s.list("Alpha").unwrap();
         assert_eq!((x.b.keys().map(String::as_str).collect::<Vec<_>>(), x.r.len(), x.owner.as_deref()), (vec!["bravo"], 1, Some(&*a)));

@@ -165,9 +165,9 @@
     "one": "{names} is gewijzigd met een save-editor: waarden die het spel niet zou maken, kunnen het laten crashen of de carrière kapotmaken.",
     "other": "{names} zijn gewijzigd met een save-editor: waarden die het spel niet zou maken, kunnen het laten crashen of de carrière kapotmaken."
   },
-  "{names} have modded cars this game lacks: it may crash or show them wrong.": {
-    "one": "{names} heeft wagens uit mods die dit spel niet heeft: het spel kan crashen of ze verkeerd tonen.",
-    "other": "{names} hebben wagens uit mods die dit spel niet heeft: het spel kan crashen of ze verkeerd tonen."
+  "{names} have cars from a modded game: here they show as stock cars, and your save keeps them as they are unless you change them here.": {
+    "one": "{names} heeft wagens uit een gemodde game: hier zie je ze als standaardwagens, en je opslag houdt ze zoals ze zijn, tenzij je ze hier verandert.",
+    "other": "{names} hebben wagens uit een gemodde game: hier zie je ze als standaardwagens, en je opslag houdt ze zoals ze zijn, tenzij je ze hier verandert."
   },
   "Left out, as the game would not load them: {list}.": {
     "one": "Weggelaten, omdat het spel het niet zou laden: {list}.",
@@ -363,6 +363,7 @@
   "Next song": "Volgend nummer",
   "Autosave": "Automatisch opslaan",
   "Sets each profile's Save option to Autosave once. A later change in the game's Options stays.": "Zet de optie Opslaan van elk profiel eenmalig op Automatisch opslaan. Een latere wijziging in de Opties van het spel blijft.",
+  "No boost": "Geen boost",
   "Startup movies": "Openingsfilmpjes",
   "Logos, PSA and intro. Skippable: Enter, Esc, Space, a click, A, B or Start skips each. Original: only the intro can be skipped.": "Logo's, PSA en intro. Overslaan: Enter, Esc, spatie, een klik, A, B of Start slaat elk ervan over. Origineel: alleen de intro is over te slaan.",
   "Skippable": "Overslaan",
@@ -1511,13 +1512,16 @@
   "Complete English subtitles in the movies.": "Volledige Engelse ondertitels in de filmpjes.",
   "The EA Trax songs unedited.": "De EA Trax-nummers onbewerkt.",
   "Engine sounds right above 60 fps.": "Motorgeluiden op de juiste snelheid boven 60 fps.",
+  "NFS Carbon's gearbox whine on your car.": "Het gierende versnellingsbak-geluid van NFS Carbon op je auto.",
   "Drift camera, high beam, EU cars and more.": "Driftcamera, grootlicht, Europese wagens en meer.",
+  "Dents, loose parts and scratches.": "Deuken, losse onderdelen en krassen.",
   "New rim brands in the rim shop.": "Nieuwe velgmerken in de velgenwinkel.",
   "Mod parts on other cars": "Modonderdelen op andere auto's",
   "Original: other players' cars with the game's own parts instead.": "Origineel: auto's van andere spelers met de eigen onderdelen van het spel.",
   "Shown": "Getoond",
   "The 33 hidden races on the map.": "De 33 verborgen races op de kaart.",
   "DVD covers by stage, not by your car's parts.": "Dvd-covers per niveau, niet volgens de onderdelen van je wagen.",
+  "Career rivals that wait and catch up.": "Carrièretegenstanders die wachten en inlopen.",
   "Mods": "Mods",
   "The core gameplay is the original's, with a few improvements, fixes and multiplayer on top.": "De gameplay is die van het origineel, met een paar verbeteringen, correcties en multiplayer erbij.",
   "The game's files didn't load properly. On this page: Game, Delete game data, then Play (your saves stay). If it happens again, your network may be blocking the game: try another network.": "De bestanden van het spel zijn niet goed geladen. Op deze pagina: Spel, Spelgegevens verwijderen, dan Spelen (je opgeslagen spellen blijven). Gebeurt het nog eens, dan blokkeert je netwerk het spel misschien: probeer een ander netwerk.",
@@ -1583,5 +1587,10 @@
   "Own name…": "Eigen naam…",
   "Own name": "Eigen naam",
   "\"{name}\"": "“{name}”",
-  "Nobody else is in {world} now. Main world is in the menu.": "Er is nu niemand anders in {world}. Hoofdwereld staat in het menu."
+  "Nobody else is in {world} now. Main world is in the menu.": "Er is nu niemand anders in {world}. Hoofdwereld staat in het menu.",
+  "License plate": "Kenteken",
+  "On your car, also for other players in free roam: up to 8 letters and digits.": "Op je wagen, ook voor andere spelers in Verkennen: tot 8 letters en cijfers.",
+  "Original plate": "Oorspronkelijk kenteken",
+  "\"{value}\" is not a license plate (letters A to Z and digits, at most 8)": "“{value}” is geen kenteken (letters A tot Z en cijfers, hooguit 8)",
+  "\"{value}\" is not a license plate (it reads as a slur)": "“{value}” is geen kenteken (het leest als een scheldwoord)"
 }

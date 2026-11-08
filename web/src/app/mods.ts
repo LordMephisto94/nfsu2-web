@@ -39,7 +39,7 @@ export interface Mod {
   mod?: string;
   /** the mod's authors as its page names them */
   authors: readonly Author[];
-  /** page: its nfsmods.xyz page; source: its source code */
+  /** page: its page (nfsmods.xyz, or the site its author put it on); source: its source code */
   links: { page?: string; source?: string };
   kind: ModKind;
   uses?: Uses;
@@ -57,7 +57,9 @@ export interface Mod {
   /** a mod of several parts (NFSU2 Extra Options): each part, what it does (English, as details) and who sees it */
   parts?: readonly { name: string; text: string; online: Online }[];
   /** the mod's licence, where it states one */
-  licence?: 'MIT' | 'GPL-3.0';
+  licence?: 'MIT' | 'GPL-3.0' | 'No Rights Reserved';
+  /** its code ported by the mod's own author, in this repo's history (his commits): no licence file of its own */
+  ownPort?: true;
   /** about how much the mod's own files add to the download (a shared row's: each its own, so they add up) */
   sizeMB?: number;
   /** another default on phones (device.ts deviceDefaults) */
@@ -180,6 +182,15 @@ export const MODS: readonly Mod[] = [
     details: 'While the GPS arrow shows the way, the distance to its destination in a straight line, not by road, in metres or feet as Speedometer Units has it. None in races, or while the GPS finds no route.',
     online: 'mine', files: ['runtime/gpsdistance.c', 'runtime/gpsdistance_format.h'],
   },
+  {
+    id: 'gearbox-whine', name: 'Transmission Whine', mod: 'Underground 2 Transmission Whine',
+    authors: [{ name: 'ropi', url: 'https://github.com/ropi336' }],
+    links: { page: 'https://nfsmods.xyz/mod/5927', source: 'https://github.com/ropi336/UG2WhineGen' },
+    kind: 'screen', uses: 'code', licence: 'No Rights Reserved', control: { setting: 'gearbox_whine' },
+    line: N('NFS Carbon\'s gearbox whine on your car.'),
+    details: 'The mod\'s sounds are NFS Carbon\'s: the BMW M3 GTR\'s gearbox whine. Here they play over the game\'s own, a whine rising with the car\'s speed and gear, a second layer louder the faster it goes, a pause at each upshift and a whine of its own in reverse, as loud as the game\'s Master and Engine Volume make them. In split screen and co-op each player\'s car has its own. The sounds download once it is on.',
+    online: 'you', sizeMB: 0.5, files: ['runtime/whine.c', 'runtime/whine.h', 'tools/whinepack.py', 'licenses/UG2WhineGen.txt'],
+  },
 
   // ---- Seen by others
   {
@@ -201,6 +212,15 @@ export const MODS: readonly Mod[] = [
         text: 'Up to 127 laps, and up to 5 opponents in every race but drags, which keep 3; Lap KO no longer fixes them.' },
     ],
     online: 'seen', files: ['runtime/cameras.c', 'runtime/lightkey.c', 'runtime/regional.c', 'runtime/vinylcat.c', 'runtime/quickrace.c'],
+  },
+  {
+    id: 'crash-damage', name: 'Crash Damage', mod: 'Crashing Foreign Cars', authors: [{ name: 'Chrystian Farias (FRS Mods)' }],
+    links: { page: 'https://streetsmodz.com.br/mods/underground-2/crashing-foreign-cars' },
+    kind: 'shared', uses: 'code', ownPort: true, control: { setting: 'crash_damage' },
+    line: N('Dents, loose parts and scratches.'),
+    details: 'The racers\' cars, yours and the AI\'s, dent where they are hit, scratch, break their lights and lose their bumpers, mirrors, hood, trunk lid and doors, which lie on the road for a while. Only what is seen: the car drives as in the original game. In free roam, other players who have it on see your car\'s damage; with it off you see every car undamaged. The game\'s own repair, at a race\'s start or in the garage, takes it away.',
+    online: 'seen', sizeMB: 1, files: ['runtime/damage.c', 'runtime/damagecore.cpp', 'runtime/damage/Dent.h',
+      'runtime/damage/Tessellate.h', 'runtime/damage_none.c', 'tools/damagepack.py', 'tools/damage/scratches.tpk'],
   },
   // The rims are out for now (with settings.ts's mod_rims and others_mod_parts, settings-ui.ts's rows and
   // runtime/modpacks.c's shop switch); back with their makers' names and link:
@@ -228,6 +248,13 @@ export const MODS: readonly Mod[] = [
     line: N('DVD covers by stage, not by your car\'s parts.'),
     details: 'In the original game a stage\'s DVD cover shoots come only once your car\'s parts rate enough stars, and pay more for more stars. On, the rating is the stage\'s: 0, 1, 3, 5.5 and 8 stars in stages 0 to 4, 10 from stage 5, so the stage\'s cover shoots come and pay by it. The shops show no Visual Rating box.',
     online: 'career', files: ['runtime/visualrep.c', 'licenses/novisualrep.txt'],
+  },
+  {
+    id: 'rubberbanding', name: 'Rubberbanding', authors: [{ name: '007hacky007', url: 'https://github.com/007hacky007' }], links: {},
+    kind: 'rules', uses: 'original', control: { setting: 'catchup', values: ['noboost', 'off'] }, off: false,
+    line: N('Career rivals that wait and catch up.'),
+    details: 'In a career race the game slows the opponents ahead of you and gives the ones behind more power and grip. Original, the default, keeps that; No boost keeps the waiting, but one behind never beats its own pace; Off drops both, as Quick Race with Catch Up off. Only in your own career races: never in Quick Race, LAN or online races.',
+    online: 'career', files: ['runtime/catchup.c'],
   },
 ];
 

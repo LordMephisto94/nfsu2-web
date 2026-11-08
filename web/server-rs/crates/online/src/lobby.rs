@@ -63,7 +63,9 @@ use std::sync::Arc;
 use hmac::{Hmac, Mac};
 use indexmap::{IndexMap, IndexSet};
 use md5::Md5;
-use nfsu2_util::{js, rand, vip_str};
+// (the limits the free-roam hub's race checks share: RACE_MPS, THIRD_SHARE, QUICK_WINS, JUMP_M, MODE_DRIFT)
+use nfsu2_anticheat::{CAR_KMH, JUMP_M, MODE_DRIFT, Quickest, RACE_MPS, THIRD_SHARE, jump_seen};
+use nfsu2_util::{Bucket, js, rand, vip_str};
 use sha2::{Digest, Sha256};
 
 use crate::aries::{FieldMap, Fields, FrameReader, MAX_FRAME, V, encode_fields, encode_frame, is_secret};
@@ -177,6 +179,22 @@ impl Default for Limits {
     }
 }
 
+impl Limits {
+    /// One more line that reads as a slur at `now` (a chat line, a friend's message), `times` its sender's of the last
+    /// slur_window_ms: slur_lines of them mute the sender (`until`: now + slur_mute_ms) and the count starts again.
+    /// True: muted now
+    pub fn slur_said(&self, times: &mut Vec<f64>, until: &mut f64, now: f64) -> bool {
+        times.retain(|t| now - t < self.slur_window_ms);
+        times.push(now);
+        let muted = times.len() as f64 >= self.slur_lines;
+        if muted {
+            *until = now + self.slur_mute_ms;
+            times.clear();
+        }
+        muted
+    }
+}
+
 /// the rooms everyone shares: a lounge and one per race type
 pub const ROOMS: [&str; 7] = ["Lounge", "Circuit", "Sprint", "Drift", "Drag", "StreetX", "URL"];
 const ROOM_LIMIT: usize = 50;
@@ -244,8 +262,7 @@ const MIN_RACE_S: [f64; 7] = [20.0, 20.0, 5.0, 20.0, 20.0, 20.0, 20.0];
 /// the finish, a speed hack.  Real races are far closer (a car twice as slow is lapped in a circuit race long before
 /// it finishes); a drift race is won by points, and is left out.
 const FAR_AHEAD: f64 = 0.4;
-const KIND_DRIFT: u8 = 3;
-/// A race's winner in under this share of the third quickest other racer's time of its track (race type, track,
+/// A race's winner in under THIRD_SHARE of the third quickest other racer's time of its track (race type, track,
 /// direction and laps: each finisher's of its clean races, two finishers or more and no line of the racer), once the
 /// track had QUICK_WINS clean races, is a `[cheat]` line (`quick_win`): a car made faster than any tuning makes one, a
 /// speed hack, wins far quicker than the best honest racers do (the free-roam lobbies' races of 2026-10-30 on
@@ -255,13 +272,8 @@ const KIND_DRIFT: u8 = 3;
 /// quickest of 10 clean wins).  Every finisher counts, not the winners alone: the quick cars' races are often close,
 /// one of them the winner (nfsu2.xyz, 2026-10-31: a drag racer won two drags in 23.3 s, under 70 % of the third
 /// quickest of 12 winners' 36.9 s, having finished within 0.6 s of two others in 23.4 to 24.0 s in another).  The
-/// tracks kept (`Lobby::wins`), and the quickest racers each.
-const THIRD_SHARE: f64 = 0.7;
-const QUICK_WINS: u32 = 10;
+/// tracks kept (`Lobby::wins`), and the quickest racers each (TOP_KEPT).
 const TRACKS_KEPT: usize = 4096;
-const TOP_KEPT: usize = 4;
-/// no car of the game averages this over a race (m/s: 350 km/h; the fastest tuned cars make 350 at the most)
-const RACE_MPS: f64 = 350.0 / 3.6;
 /// a finisher who drove less than this share of what another racer drove (`race_cheats`)
 const DROVE_SHARE: f64 = 0.5;
 /// a racer still on the way when the race ended: its way counts against a finisher's when its time is at most this
@@ -285,13 +297,7 @@ const SEEN_KEPT: usize = 8;
 /// 38,967 personas with a top speed record on nfsu2.xyz on 2026-10-30, half had under 218 km/h, the fastest tuned
 /// cars 377, 12 over 380 and 5 over 420 (one the racer of a circuit won at 383 km/h on average); a free-roam lobby
 /// race's edited 350Z made 444
-const CAR_MPS: f64 = 420.0 / 3.6;
-/// a car's jump at once (m) no lag makes, as the other racers' games had it (`jump_code`, `jump_lines`): a line once
-/// JUMP_SEEN of them said so, or the only other one of a race of two.  Honest races' largest are under 50 m (a reset to
-/// the road, a hit; runtime/racenet.c); nfsu2.xyz, 2026-11-04, a player said another stood still for laps and then
-/// finished at once, and the host's game had that car jump 279.9 m once (a free-roam lobby race's heat)
-const JUMP_M: f64 = 150.0;
-const JUMP_SEEN: usize = 2;
+const CAR_MPS: f64 = CAR_KMH / 3.6;
 /// the Rankings screens' six boards in their order (Circuit, Sprint, Drift, Drag, Street X, URL: SPEED2.EXE 0x58ce30,
 /// 0x582530) as race types (RACE_TYPES: drag 2, drift 3)
 const SLOT_TYPES: [u32; 6] = [0, 1, 3, 2, 4, 5];
@@ -299,30 +305,6 @@ const SLOT_TYPES: [u32; 6] = [0, 1, 3, 2, 4, 5];
 /// results", then "Waiting for final server results"; SPEED2.EXE 0x4e9210): a guess at how long the others take to
 /// finish and report, no limit (the table comes once the result stands)
 const RESULTS_WAIT_MS: f64 = 60_000.0;
-
-/// A token bucket: `rate` a second, at most `burst`, full at the start (on the lobby's clock)
-#[derive(Clone, Copy, Debug)]
-pub struct LBucket {
-    pub rate: f64,
-    pub cap: f64,
-    pub v: f64,
-    pub t: f64,
-}
-
-impl LBucket {
-    pub fn new(rate: f64, burst: f64, now: f64) -> LBucket {
-        LBucket { rate, cap: burst, v: burst, t: now }
-    }
-    pub fn take(&mut self, now: f64, n: f64) -> bool {
-        self.v = self.cap.min(self.v + (now - self.t) / 1000.0 * self.rate);
-        self.t = now;
-        if self.v < n {
-            return false;
-        }
-        self.v -= n;
-        true
-    }
-}
 
 pub struct Session {
     pub id: SessId,
@@ -345,10 +327,10 @@ pub struct Session {
     t0: f64,
     pub last_in: f64,
     last_ping: f64,
-    msgs: LBucket,
-    chats: LBucket,
-    creates: LBucket,
-    acts: LBucket,
+    msgs: Bucket,
+    chats: Bucket,
+    creates: Bucket,
+    acts: Bucket,
     mute_until: f64,
     /// when its lines that read as a slur were said (those of the last slur_window_ms)
     slurs: Vec<f64>,
@@ -406,9 +388,37 @@ pub struct Own {
 
 /// the game's player car types (CarTypeInfo 0..30 in GLOBAL\GlobalB), for `edited_code`'s
 const CAR_TYPES: [&str; 31] = [
-    "PEUGOT", "FOCUS", "COROLLA", "240SX", "MIATA", "CIVIC", "PEUGOT106", "CORSA", "HUMMER", "NAVIGATOR", "ESCALADE", "TIBURON",
-    "SENTRA", "CELICA", "IS300", "SUPRA", "GOLF", "A3", "RSX", "ECLIPSE", "TT", "RX8", "350Z", "G35", "3000GT", "GTO", "MUSTANGGT",
-    "SKYLINE", "LANCEREVO8", "RX7", "IMPREZAWRX",
+    "PEUGOT",
+    "FOCUS",
+    "COROLLA",
+    "240SX",
+    "MIATA",
+    "CIVIC",
+    "PEUGOT106",
+    "CORSA",
+    "HUMMER",
+    "NAVIGATOR",
+    "ESCALADE",
+    "TIBURON",
+    "SENTRA",
+    "CELICA",
+    "IS300",
+    "SUPRA",
+    "GOLF",
+    "A3",
+    "RSX",
+    "ECLIPSE",
+    "TT",
+    "RX8",
+    "350Z",
+    "G35",
+    "3000GT",
+    "GTO",
+    "MUSTANGGT",
+    "SKYLINE",
+    "LANCEREVO8",
+    "RX7",
+    "IMPREZAWRX",
 ];
 
 /// A rank's code from a game that raced a car whose data is edited (runtime/mprace.c mprace_rank_code: the car type's
@@ -437,14 +447,14 @@ fn jump_lines(game: &str, r: &RaceReport, players: &mut [Player]) -> Vec<String>
     let mut lines = Vec::new();
     for p in players.iter_mut() {
         let mut far: Vec<f64> = p.jumped.iter().map(|x| x.1).filter(|&m| m >= JUMP_M).collect();
-        if p.jump_told || !(far.len() >= JUMP_SEEN || (two && far.len() == 1)) {
+        if p.jump_told || !jump_seen(far.len(), two) {
             continue;
         }
         far.sort_by(|a, b| b.total_cmp(a));
         p.jump_told = true;
         let place = match p.own {
-            Some(o) if o.finished && o.place == 1 && r.kind != KIND_DRIFT => "; it won".to_string(),
-            Some(o) if o.finished && r.kind != KIND_DRIFT => format!("; it came {}", o.place),
+            Some(o) if o.finished && o.place == 1 && r.kind != MODE_DRIFT => "; it won".to_string(),
+            Some(o) if o.finished && r.kind != MODE_DRIFT => format!("; it came {}", o.place),
             _ => String::new(),
         };
         lines.push(format!(
@@ -600,32 +610,9 @@ pub struct Lobby {
     /// lower-case persona -> its last lines (said_lines of the last said_ms), the oldest first; a persona's lines
     /// stay after it left
     pub said: HashMap<String, VecDeque<Said>>,
-    /// the clean races of each track (race type, track, direction, laps) since the start (`quick_win`)
-    pub wins: HashMap<(u8, u16, u8, u8), Wins>,
-}
-
-/// A track's clean races: how many, and the quickest finishers (each once by lower-case name, its best, quickest first)
-#[derive(Clone, Debug, Default)]
-pub struct Wins {
-    pub wins: u32,
-    pub top: Vec<(String, f64)>,
-}
-
-impl Wins {
-    /// one finisher's time (a race counts in `wins` by itself)
-    fn add(&mut self, who: String, time: f64) {
-        match self.top.iter_mut().find(|(w, _)| *w == who) {
-            Some(x) => x.1 = x.1.min(time),
-            None => self.top.push((who, time)),
-        }
-        self.top.sort_by(|a, b| a.1.total_cmp(&b.1));
-        self.top.truncate(TOP_KEPT);
-    }
-
-    /// the third quickest racer's time but `who`'s, once there were QUICK_WINS races
-    fn third(&self, who: &str) -> Option<f64> {
-        (self.wins >= QUICK_WINS).then(|| self.top.iter().filter(|(w, _)| w != who).nth(2).map(|x| x.1)).flatten()
-    }
+    /// the clean races of each track (race type, track, direction, laps) since the start (`quick_win`: a race counts
+    /// once, with every finisher's time by lower-case name)
+    pub wins: HashMap<(u8, u16, u8, u8), Quickest>,
 }
 
 impl Lobby {
@@ -888,7 +875,7 @@ fn race_cheats(
     players: &mut [Player],
 ) -> Vec<String> {
     let kind = r.kind;
-    let drift = kind == KIND_DRIFT;
+    let drift = kind == MODE_DRIFT;
     if let Some(p) = mine
         && players[me].own.is_none()
     {
@@ -916,7 +903,8 @@ fn race_cheats(
         // its own time, average and way: a finisher's that another game saw finish then, no other finisher close
         let agreed = players[i].seen.iter().any(|&t| (t - o.time).abs() <= AGREE_S);
         let close = players.iter().enumerate().any(|(j, x)| {
-            j != i && x.own.filter(|y| y.finished).map(|y| y.time).into_iter().chain(x.seen.iter().copied()).any(|t| t * CLOSE_SHARE <= o.time)
+            j != i
+                && x.own.filter(|y| y.finished).map(|y| y.time).into_iter().chain(x.seen.iter().copied()).any(|t| t * CLOSE_SHARE <= o.time)
         });
         let taken = !drift && o.finished && agreed && !close;
         if let Some(&min) = MIN_RACE_S.get(kind as usize)
@@ -980,7 +968,7 @@ fn race_cheats(
 /// The `[cheat]` line of a race whose winner (the quickest finisher) took under FAR_AHEAD of the next finisher's time,
 /// with the winner's address for `nfsu2-server ctl kick|ban`; None for any other race
 fn far_ahead(game: &str, kind: u8, order: &[RacePlayer], players: &[Player]) -> Option<String> {
-    if kind == KIND_DRIFT {
+    if kind == MODE_DRIFT {
         return None;
     }
     let mut done: Vec<&RacePlayer> = order.iter().filter(|p| p.place != 0 && p.time > 0.0).collect();
@@ -1007,14 +995,14 @@ fn far_ahead(game: &str, kind: u8, order: &[RacePlayer], players: &[Player]) -> 
 /// finishers or more, its winner told of by no line, `told`) counts in the track's, with each finisher's time but those
 /// a line told of
 fn quick_win(
-    wins: &mut HashMap<(u8, u16, u8, u8), Wins>,
+    wins: &mut HashMap<(u8, u16, u8, u8), Quickest>,
     game: &str,
     r: &RaceReport,
     order: &[RacePlayer],
     players: &[Player],
     told: bool,
 ) -> Option<String> {
-    if r.kind == KIND_DRIFT {
+    if r.kind == MODE_DRIFT {
         return None;
     }
     let w = order.iter().find(|p| p.place == 1 && p.time > 0.0)?;
@@ -1196,10 +1184,10 @@ impl Core {
                 t0: t,
                 last_in: t,
                 last_ping: t,
-                msgs: LBucket::new(l.msg_rate, 2.0 * l.msg_rate, t),
-                chats: LBucket::new(l.chat_rate, 5.0, t),
-                creates: LBucket::new(l.create_rate, 3.0, t),
-                acts: LBucket::new(l.act_rate, 4.0, t),
+                msgs: Bucket::with_burst_at(l.msg_rate, 2.0 * l.msg_rate, t),
+                chats: Bucket::with_burst_at(l.chat_rate, 5.0, t),
+                creates: Bucket::with_burst_at(l.create_rate, 3.0, t),
+                acts: Bucket::with_burst_at(l.act_rate, 4.0, t),
                 mute_until: 0.0,
                 slurs: Vec::new(),
                 gone: false,
@@ -1222,7 +1210,7 @@ impl Core {
                 return;
             }
             let now = self.now();
-            if !self.lobby.sm(s).msgs.take(now, 1.0) {
+            if !self.lobby.sm(s).msgs.take_at(now, 1.0) {
                 return self.ldrop(s, "too many messages");
             }
             if !four_printable(&m.kind) {
@@ -1625,7 +1613,7 @@ impl Core {
             }
         }
         let now = self.now();
-        if !self.lobby.sm(s).acts.take(now, 1.0) {
+        if !self.lobby.sm(s).acts.take_at(now, 1.0) {
             return self.lsend(s, "move", &[], "full");
         }
         let old = self.lobby.s(s).room;
@@ -1765,7 +1753,7 @@ impl Core {
         self.lsend(s, "+who", &w, "");
         // to the others at act_rate: past it they see it with the player's next record (a room, a game)
         let now = self.now();
-        if !self.lobby.sm(s).acts.take(now, 1.0) {
+        if !self.lobby.sm(s).acts.take_at(now, 1.0) {
             return;
         }
         if let Some(r) = self.lobby.s(s).room.filter(|r| self.lobby.room(*r).is_some()) {
@@ -1924,7 +1912,7 @@ impl Core {
             return self.end_if_back(g);
         }
         let r = r.expect("checked");
-        let drift = r.kind == KIND_DRIFT;
+        let drift = r.kind == MODE_DRIFT;
         // a drift race: what the reporter's own game says it did, points and its biggest single drift with them (the
         // result line has only the points, and what each report shows of the others is the others' own games' word)
         if drift && let Some(p) = r.players.iter().find(|p| lower(&names[p.index as usize]) == persona) {
@@ -2029,9 +2017,10 @@ impl Core {
             let lobby = &mut self.lobby;
             let players = &lobby.games.get(&g).or_else(|| lobby.dead.get(&g)).expect("held").players;
             let told = far.is_some()
-                || order.iter().find(|p| p.place == 1).is_some_and(|w| {
-                    players.iter().any(|p| lower(&p.name) == lower(&w.name) && p.own.is_some_and(|o| o.told))
-                });
+                || order
+                    .iter()
+                    .find(|p| p.place == 1)
+                    .is_some_and(|w| players.iter().any(|p| lower(&p.name) == lower(&w.name) && p.own.is_some_and(|o| o.told)));
             let quick = quick_win(&mut lobby.wins, &gname, &r, &order, players, told);
             let gm = self.lobby.game_mut(g).expect("held");
             gm.result = Some(key);
@@ -2053,7 +2042,8 @@ impl Core {
             };
             let rt = REPORT_TYPES[r.kind as usize];
             // (a drift race's line names its track and laps: its points go by them)
-            let at = if drift { format!(", track {}, {} lap{}", r.track, r.laps, if r.laps == 1 { "" } else { "s" }) } else { String::new() };
+            let at =
+                if drift { format!(", track {}, {} lap{}", r.track, r.laps, if r.laps == 1 { "" } else { "s" }) } else { String::new() };
             self.llog(&format!("[online] \"{gname}\" ({rt}, {}{at}): {line}{tail}", if ranked { "ranked" } else { "unranked" }), s);
         } else {
             if !gm.reports.is_empty() && !gm.reports.iter().any(|(_, k)| finishers_of(k) == decides) {
@@ -2296,7 +2286,7 @@ impl Core {
         if now < self.lobby.s(s).mute_until {
             return self.lsend(s, "mesg", &[], "mute");
         }
-        if !self.lobby.sm(s).chats.take(now, 1.0) {
+        if !self.lobby.sm(s).chats.take_at(now, 1.0) {
             let mute = self.lobby.l.mute_ms;
             self.lobby.sm(s).mute_until = now + mute;
             self.llog(&format!("[online] {}: chat flood, muted for {} s", self.who(s), js::number_to_string(mute / 1000.0)), s);
@@ -2317,13 +2307,7 @@ impl Core {
         if let Some(word) = &slur {
             let l = self.lobby.l;
             let x = self.lobby.sm(s);
-            x.slurs.retain(|t| now - t < l.slur_window_ms);
-            x.slurs.push(now);
-            let muted = x.slurs.len() as f64 >= l.slur_lines;
-            if muted {
-                x.mute_until = now + l.slur_mute_ms;
-                x.slurs.clear();
-            }
+            let muted = l.slur_said(&mut x.slurs, &mut x.mute_until, now);
             let then = if muted { format!("; muted for {} s", js::number_to_string(l.slur_mute_ms / 1000.0)) } else { String::new() };
             let word = serde_json::to_string(word).expect("a string");
             self.llog(&format!("[online] {}: a line with {word} in it, shown to no one else{then}", self.who(s)), s);
@@ -2497,7 +2481,7 @@ impl Core {
             return self.lsend(s, "gcre", &[], "full");
         }
         let now = self.now();
-        if self.lobby.games.len() as f64 >= self.lobby.l.games || !self.lobby.sm(s).creates.take(now, 1.0) {
+        if self.lobby.games.len() as f64 >= self.lobby.l.games || !self.lobby.sm(s).creates.take_at(now, 1.0) {
             return self.lsend(s, "gcre", &[], "full");
         }
         let (vip, group) = {
@@ -2632,7 +2616,7 @@ impl Core {
 
     fn game_join(&mut self, s: SessId, f: &FieldMap) {
         let now = self.now();
-        if !self.lobby.sm(s).acts.take(now, 1.0) {
+        if !self.lobby.sm(s).acts.take_at(now, 1.0) {
             return self.lsend(s, "gjoi", &[], "full");
         }
         // nor joins one

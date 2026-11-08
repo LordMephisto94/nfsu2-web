@@ -20,6 +20,7 @@ use hmac::{Hmac, Mac};
 use parking_lot::Mutex;
 use serde_json::Value;
 
+use nfsu2_util::atomic_file::Options;
 use nfsu2_util::{js, log};
 
 use super::settings_days::{self, Report, Tally};
@@ -97,7 +98,7 @@ impl Today {
         let mut t = Today { day, key, sets: Default::default(), settings: Tally::from_json(v.get("settings")), changed: false };
         for (i, k) in KINDS.iter().enumerate() {
             let b = js::from_base64url(v.get(*k).and_then(Value::as_str).unwrap_or(""));
-            t.sets[i] = b.chunks_exact(8).take(MAX_A_DAY).map(|c| u64::from_le_bytes(c.try_into().expect("8 bytes"))).collect();
+            t.sets[i] = b.as_chunks::<8>().0.iter().take(MAX_A_DAY).map(|c| u64::from_le_bytes(*c)).collect();
         }
         Some(t)
     }
@@ -192,7 +193,7 @@ impl Days {
             t.changed = false;
             t.to_json()
         };
-        nfsu2_claims::write_atomic(&self.file, body.as_bytes()).map(|_| true)
+        Options::new().make_folder().write(&self.file, body.as_bytes()).map(|_| true).map_err(|e| e.to_string())
     }
 
     /// a day that ended: its line in days.csv (once: a line of that day already there stays the only one) and the
