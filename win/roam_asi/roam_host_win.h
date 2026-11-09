@@ -73,6 +73,9 @@ uint64_t    roam_win_ns(void);
 #define rh_plate_mine()  ""
 #define rh_plate_car(k, car, text) ((void)(k), (void)(car), (void)(text))
 #define rh_plates_forget() ((void)0)
+#define rh_stance_mine(v) ((void)(v), 0)
+#define rh_stance_car(k, car, has, v) ((void)(k), (void)(car), (void)(has), (void)(v))
+#define rh_stance_forget() ((void)0)
 /* the game's "No Profile" in English only (the port also knows the other
  * languages' names from the game's text, language.c) */
 #define rh_no_profile(name) (!strcasecmp((name), "No Profile"))
@@ -80,6 +83,8 @@ uint64_t    roam_win_ns(void);
 #define rh_drift_tuning(out) ((void)(out), 0)
 #define ROAM_HOST_DRIFT  0               /* ...so no drift battles */
 #define rh_drift_want()  0
+/* no trips to the race tracks' maps here (travel.c): always the city */
+#define rh_travel_room() 0u
 #define rh_drift_begin() ((void)0)
 #define rh_drift_go(c)   ((void)(c))
 #define rh_drift_score(b, p) (*(b) = 0, *(p) = 0)

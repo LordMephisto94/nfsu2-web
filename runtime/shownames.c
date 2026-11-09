@@ -19,23 +19,20 @@
  * as powerunits.c says: the row goes in only where the screen's package has
  * them for the list's last entry too, which ours makes one more. */
 #include "cpu.h"
+#include "guest.h"
+#include "game.h"
 #include "widescreen.h"           /* HOOK_SITE */
 #include <stdio.h>
 #include <string.h>
 
-void dispatch_indirect(CPU *c, uint32_t addr);
 int  win32_reg_get_dword(const char *nm, uint32_t *out);
 void win32_reg_put_dword(const char *nm, uint32_t v);
 
 #define REG_NAME      "ShowPlayerNames"
 #define A_NAMES       0x008500c9u   /* byte: Show Player Names, 1 = on */
-#define FN_NEW        0x00575620u   /* cdecl (size): operator new */
 #define FN_TOGGLE     0x0051e230u   /* thiscall (screen +0xFC, +0x10C, +0x114, +0x11C, 1): a toggle entry */
 #define FN_ADD        0x0054ef30u   /* thiscall screen (entry, 1): Options > Gameplay's list takes a toggle */
 #define FN_ADD_PAUSE  0x0054f170u   /* thiscall screen (entry, 1): the pause menu's */
-#define FN_FE_HASH    0x00505450u   /* cdecl (name) -> hash */
-#define FN_FE_PACKAGE 0x0052cef0u   /* cdecl (package name) -> FEPackage* */
-#define FN_PKG_FIND   0x00517f80u   /* thiscall package (hash) -> its object, 0: none */
 #define VT_NAMES      0x00791b70u   /* Show Player Names' class (UI_OLMAIN's Options) */
 #define MSG_LEFT      0x9120409eu
 #define MSG_RIGHT     0xb5971bf1u
@@ -45,24 +42,6 @@ void win32_reg_put_dword(const char *nm, uint32_t v);
 static int g_loaded;
 static int g_on = -1;                            /* 1: on, 0: off, -1: the game's (no registry value) */
 static uint32_t g_scr;                           /* guest memory: scratch for a part's name */
-
-/* a guest function with ecx and stack arguments, the CPU as it was after */
-static uint32_t gcall(CPU *c, uint32_t fn, uint32_t ecx, int n, const uint32_t *arg){
-    CPU save = *c;
-    c->esp = (c->esp - 256u) & ~15u;
-    for (int i = n - 1; i >= 0; i--) PUSH32(arg[i]);
-    c->ecx = ecx;
-    PUSH32(fn);                                  /* the callee's ret pops it */
-    dispatch_indirect(c, fn);
-    uint32_t r = c->eax;
-    *c = save;
-    return r;
-}
-static void gstr(uint32_t a, const char *s, uint32_t cap){
-    uint32_t i = 0;
-    for (; s[i] && i + 1 < cap; i++) MR8(a + i) = (uint8_t)s[i];
-    MR8(a + i) = 0;
-}
 
 static void load(void){
     if (g_loaded) return;
@@ -93,7 +72,7 @@ static uint32_t part(CPU *c, uint32_t pk, uint32_t base, uint32_t n, char *nm, s
     int k = 0;
     for (; k < 32 && MR8(base + (uint32_t)k); k++) nm[k] = (char)MR8(base + (uint32_t)k);
     snprintf(nm + k, cap - (size_t)k, "%u", n);
-    gstr(g_scr, nm, 48);
+    guest_write_str(g_scr, nm, 48);
     uint32_t h = gcall(c, FN_FE_HASH, 0, 1, &g_scr);
     return gcall(c, FN_PKG_FIND, pk, 1, &h);
 }

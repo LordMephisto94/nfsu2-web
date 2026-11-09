@@ -82,6 +82,34 @@ test("free roam's players' cars shown: 16 on a phone, 24 on a tablet, Auto on ev
   assert.equal(on(mac, 5, 820, 1180, true, 8, 8), '24', 'a tablet stays at 24 whatever its cores');
 });
 
+test('anisotropic filtering where the game asks for it: computers on, phones and tablets off', () => {
+  const on = (ua, touchPoints, w, h, coarse) => {
+    Object.defineProperty(globalThis, 'navigator', { value: { userAgent: ua, maxTouchPoints: touchPoints, hardwareConcurrency: 8 }, configurable: true, writable: true });
+    globalThis.screen = { width: w, height: h };
+    globalThis.matchMedia = () => ({ matches: coarse });
+    return deviceDefaults().anisotropic;
+  };
+  const mac = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15';
+  assert.equal(on('Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1', 5, 390, 844, true), 'off');
+  assert.equal(on(mac, 5, 820, 1180, true), 'off');                                // an iPad
+  assert.equal(on(mac, 0, 1512, 982, false), 'on');                               // a Mac
+  assert.equal(on('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36', 10, 1920, 1080, false), 'on');   // a touch laptop
+});
+
+test('HQ vinyls: computers on, phones and tablets off', () => {
+  const on = (ua, touchPoints, w, h, coarse) => {
+    Object.defineProperty(globalThis, 'navigator', { value: { userAgent: ua, maxTouchPoints: touchPoints, hardwareConcurrency: 8 }, configurable: true, writable: true });
+    globalThis.screen = { width: w, height: h };
+    globalThis.matchMedia = () => ({ matches: coarse });
+    return deviceDefaults().hq_vinyls;
+  };
+  const mac = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15';
+  assert.equal(on('Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1', 5, 390, 844, true), 'off');
+  assert.equal(on(mac, 5, 820, 1180, true), 'off');                               // an iPad
+  assert.equal(on(mac, 0, 1512, 982, false), 'on');                               // a Mac
+  assert.equal(on('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36', 10, 1920, 1080, false), 'on');   // a touch laptop
+});
+
 test("free roam's world map: 2048 other players on a phone, the file's 4096 on tablets and computers", () => {
   const on = (ua, touchPoints, w, h, coarse) => {
     Object.defineProperty(globalThis, 'navigator', { value: { userAgent: ua, maxTouchPoints: touchPoints, hardwareConcurrency: 8 }, configurable: true, writable: true });
@@ -113,6 +141,24 @@ test("the guest heap's window: computers only, not Safari, not under 8 GB where 
   assert.equal(heapWindow('pc', android, 8), false, 'an Android tablet with a mouse');
   assert.equal(heapWindow('pc', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36', 8, 'Android'), false, 'DeX: a desktop address, Android underneath');
   assert.equal(heapWindow('pc', chromeWin, 8, 'Windows'), true);
+});
+
+test("the game's Full Scene Anti-Aliasing: not offered on the computers' graphics it broke (AMD GCN-5, Qualcomm)", () => {
+  Object.defineProperty(globalThis, 'navigator', { value: { userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0', maxTouchPoints: 0, hardwareConcurrency: 12 }, configurable: true, writable: true });
+  globalThis.screen = { width: 1366, height: 768 };
+  globalThis.matchMedia = () => ({ matches: false });
+  try {
+    noteGraphics(undefined);
+    assert.equal(deviceDefaults().fsaa, undefined, 'before the graphics are known: the file\'s default');
+    noteGraphics('amd gcn-5');
+    assert.equal(deviceDefaults().fsaa, 'off', 'a Ryzen 5 5600GT: the graphics gone 3 frames in');
+    noteGraphics('qualcomm adreno-7xx');
+    assert.equal(deviceDefaults().fsaa, 'off', 'a Snapdragon laptop: scrambled blocks');
+    for (const g of ['amd rdna-2', 'amd gcn-4', 'nvidia lovelace', 'intel gen-12lp', 'apple metal-3']) {
+      noteGraphics(g);
+      assert.equal(deviceDefaults().fsaa, undefined, g);
+    }
+  } finally { noteGraphics(''); }
 });
 
 test('full screen on a phone, but not where PowerVR B-Series graphics stop in it (POCO M7 Pro: the window works)', () => {

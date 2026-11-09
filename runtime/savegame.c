@@ -39,7 +39,8 @@
  *    it goes back to what it was once the save is over.
  *  - The save: 0x4A3100 (cdecl: the package that asks, the package to tell,
  *    the job, 4 more) with the job 0x151, as the crib's Return to Explore
- *    Mode (0x4AF383) and the test run's pause menu (0x5648DB) call it:
+ *    Mode (0x4AF383) and the dyno menu's Quit Tuning (its "save your
+ *    profile now?" Yes, 0x5648DB, runtime/dyno.c) call it:
  *    MC_Main.fng over that package; its end (0x4A31D0) tells the package
  *    0x251BF83E and takes MC_Main off, and the job's word ([0x836514]) is 0
  *    again (0x4A3272; not after a job with 0x2000, so here MC_Main up is
@@ -64,21 +65,19 @@
  * Log lines start "[save]"; tests/scripts/pause_save.txt checks it in the
  * game. */
 #include "cpu.h"
+#include "guest.h"
+#include "game.h"
 #include <math.h>
 #include <stdio.h>
 #include <strings.h>
 
-void dispatch_indirect(CPU *c, uint32_t addr);
 long autotest_frame(void);
 int career_fe_active(const char *name);
 int mprace_car_ok(void);              /* mprace.c: the career has a car of its own (not a new one's prologue) */
 int roam_game_in_lobby(void);         /* roam_game.c: in a free-roam race lobby (its trip can start any moment) */
+int travel_city(float p[3], uint16_t *h);   /* travel.c: on a race track's map, the city's place the car left */
 
-#define HOOK_RET       0x00581475u   /* the main-loop hook's return address, as guest calls see it */
-#define G_GAMEMODE     0x00850078u   /* 1 the career */
-#define G_RACEKIND     0x0089e7b0u   /* 0 free roam, 7 an outrun */
 #define G_PLAYER1      SPLIT_PLAYERS_INDEX   /* Player*: +4 its car */
-#define G_PROFILE      0x0083a9e0u   /* the profile's name, 32 bytes; +0x20 1: a profile is loaded */
 #define G_MC_JOB       0x00836514u   /* the save screen's job: 0 none */
 #define G_MC_MANAGER   0x00836498u   /* the save screen's manager: +6 the overwrite question answered Yes this game, */
 #define MGR_YES        6u
@@ -86,15 +85,9 @@ int roam_game_in_lobby(void);         /* roam_game.c: in a free-roam race lobby 
 #define FN_LIB_FLAGS   0x006fbfccu   /* thiscall (the +0x5C) (on, bits; ret 8): the library's flags on or off */
 #define LIB_ASKED      0x100u        /* ... set: the overwrite question answered Yes (not asked again) */
 #define G_AUTOSAVE     0x00844ad9u   /* byte: Save at Autosave */
-#define G_CAREER       0x0085ad40u
-#define C_KEEP         0x8744u       /* byte: the world's next load puts the car at the place below */
-#define C_PLACE        0x8750u       /* float[3] */
-#define C_HEADING      0x8760u       /* u16 */
 #define CAR_PLACE      0x60u
 #define CAR_VELOCITY   0x70u
 #define CAR_HEADING    0x40cu
-#define FN_NEW         0x00575620u   /* cdecl (size): operator new */
-#define FN_ITEM        0x0051f670u   /* thiscall (icon, label, 0; ret 0xC): a menu item's constructor */
 #define FN_ADD_ITEM    0x0050dab0u   /* thiscall (item; ret 4): a menu's AddOption */
 #define FN_MC_JOB      0x004a3100u   /* cdecl (package, package to tell, job, 0, 0, 0, 0) */
 #define VT_EXPLORE     0x007954d8u   /* Return to Explore Mode's class */
@@ -118,28 +111,12 @@ static struct {
 } S;
 static int g_writes;                 /* profiles the game wrote (fileio.c) */
 
-static int ok(uint32_t a, uint32_t n){ return a && mem_is_committed(a) && mem_is_committed(a + n); }
-static uint32_t rd32(uint32_t a){ return ok(a, 3) ? MR32(a) : 0u; }
-
-/* a guest function with ecx and stack arguments, the CPU as it was after */
-static uint32_t gcall(CPU *c, uint32_t fn, uint32_t ecx, int n, const uint32_t *arg){
-    CPU save = *c;
-    c->esp = (c->esp - 256u) & ~15u;
-    for (int i = n - 1; i >= 0; i--) PUSH32(arg[i]);
-    c->ecx = ecx;
-    PUSH32(HOOK_RET);
-    dispatch_indirect(c, fn);
-    uint32_t r = c->eax;
-    *c = save;
-    return r;
-}
-
-static uint32_t player_car(void){ uint32_t p = rd32(G_PLAYER1), car = p ? rd32(p + 4u) : 0; return ok(car, CAR_HEADING + 2u) ? car : 0; }
+static uint32_t player_car(void){ uint32_t p = guest_rd32(G_PLAYER1), car = p ? guest_rd32(p + 4u) : 0; return guest_ok(car, CAR_HEADING + 2u) ? car : 0; }
 
 /* why Save cannot run now (0: it can) */
 static const char *not_now(void){
-    if (MR32(G_GAMEMODE) != 1u || MR32(G_RACEKIND) != 0u) return "not career free roam";
-    if (!MR8(G_PROFILE + 0x20u)) return "no profile loaded";
+    if (MR32(G_GAMEMODE) != 1u || MR32(G_RACETYPE) != 0u) return "not career free roam";
+    if (!MR8(G_PROFILE_NAME + 0x20u)) return "no profile loaded";
     if (!mprace_car_ok()) return "no car of the career's own yet";
     if (roam_game_in_lobby()) return "in a race lobby";
     if (S.pending || career_fe_active(MC_PACKAGE)) return "a save runs";
@@ -157,43 +134,50 @@ static const char *not_now(void){
 
 /* photo.c's AddOption patch, after the game's add: after Return to Explore Mode, Save */
 void savegame_item(CPU *c, uint32_t menu, uint32_t it){
-    if (!ok(it, IT_LABEL + 4u) || MR32(it) != VT_EXPLORE || MR32(it + IT_LABEL) != LBL_EXPLORE) return;
-    if (MR32(G_GAMEMODE) != 1u || MR32(G_RACEKIND) != 0u) return;
-    uint32_t n = ITEM_BYTES, sv = gcall(c, FN_NEW, 0, 1, &n);
-    if (!ok(sv, ITEM_BYTES)) return;
+    if (!guest_ok(it, IT_LABEL + 4u) || MR32(it) != VT_EXPLORE || MR32(it + IT_LABEL) != LBL_EXPLORE) return;
+    if (MR32(G_GAMEMODE) != 1u || MR32(G_RACETYPE) != 0u) return;
+    uint32_t n = ITEM_BYTES, sv = gcall_main(c, FN_NEW, 0, 1, &n);
+    if (!guest_ok(sv, ITEM_BYTES)) return;
     uint32_t arg[3] = { ICON_SAVE, LBL_SAVE, 0 };
-    gcall(c, FN_ITEM, sv, 3, arg);
+    gcall_main(c, FN_ITEM, sv, 3, arg);
     MR32(sv) = VT_REPLAY;
     const char *why = not_now();
     MR8(sv + IT_GREY) = why ? 1 : 0;
-    gcall(c, FN_ADD_ITEM, menu, 1, &sv);
+    gcall_main(c, FN_ADD_ITEM, menu, 1, &sv);
     fprintf(stderr, "[save] f=%ld the pause menu's Save%s%s%s\n", autotest_frame(), why ? " (greyed out: " : "", why ? why : "", why ? ")" : "");
 }
 
 /* photo.c's patch of Replay's action, first: Save's Accept saves; 1 when it was Save's (the call returned) */
 int savegame_accept(CPU *c){
     uint32_t it = c->ecx, pkg = MR32(c->esp + 4u), msg = MR32(c->esp + 8u);
-    if (!ok(it, IT_LABEL + 4u) || MR32(it + IT_LABEL) != LBL_SAVE || MR32(it) != VT_REPLAY) return 0;
+    if (!guest_ok(it, IT_LABEL + 4u) || MR32(it + IT_LABEL) != LBL_SAVE || MR32(it) != VT_REPLAY) return 0;
     if (msg == MSG_ACCEPT && !MR8(it + IT_GREY)){
         const char *why = not_now();
         if (why) fprintf(stderr, "[save] f=%ld Save: not now (%s)\n", autotest_frame(), why);
         else {
             uint32_t car = player_car(), k = G_CAREER;
-            S.keep_was = MR8(k + C_KEEP);
-            for (uint32_t i = 0; i < 3u; i++) MRF32(k + C_PLACE + 4u * i) = MRF32(car + CAR_PLACE + 4u * i);
-            MR16(k + C_HEADING) = MR16(car + CAR_HEADING);
-            MR8(k + C_KEEP) = 1;
-            uint32_t mgr = rd32(G_MC_MANAGER), lib = ok(mgr, MGR_LIB + 3u) ? rd32(mgr + MGR_LIB) : 0;
+            float city[3]; uint16_t city_h;
+            S.keep_was = MR8(k + C_SPOT_SET);
+            if (travel_city(city, &city_h)){              /* on a race track's map: the city's place it left (a save
+                                                           * loads in the city, in the stock game too) */
+                for (uint32_t i = 0; i < 3u; i++) MRF32(k + C_SPOT + 4u * i) = city[i];
+                MR16(k + C_SPOT_HEADING) = city_h;
+            } else {
+                for (uint32_t i = 0; i < 3u; i++) MRF32(k + C_SPOT + 4u * i) = MRF32(car + CAR_PLACE + 4u * i);
+                MR16(k + C_SPOT_HEADING) = MR16(car + CAR_HEADING);
+            }
+            MR8(k + C_SPOT_SET) = 1;
+            uint32_t mgr = guest_rd32(G_MC_MANAGER), lib = guest_ok(mgr, MGR_LIB + 3u) ? guest_rd32(mgr + MGR_LIB) : 0;
             if (MR8(G_AUTOSAVE) && lib){                     /* no "overwrite?", whose No turns Autosave off */
                 MR8(mgr + MGR_YES) = 1;
                 uint32_t on[2] = { 1u, LIB_ASKED };
-                gcall(c, FN_LIB_FLAGS, lib, 2, on);
+                gcall_main(c, FN_LIB_FLAGS, lib, 2, on);
             }
             uint32_t arg[7] = { pkg, pkg, MC_JOB_SAVE, 0, 0, 0, 0 };
             S.pending = 1; S.at = autotest_frame(); S.writes_at = g_writes;
             fprintf(stderr, "[save] f=%ld Save: the career at %.1f %.1f %.1f (heading %04x), the save screen\n", S.at,
-                    (double)MRF32(k + C_PLACE), (double)MRF32(k + C_PLACE + 4u), (double)MRF32(k + C_PLACE + 8u), MR16(k + C_HEADING));
-            gcall(c, FN_MC_JOB, 0, 7, arg);
+                    (double)MRF32(k + C_SPOT), (double)MRF32(k + C_SPOT + 4u), (double)MRF32(k + C_SPOT + 8u), MR16(k + C_SPOT_HEADING));
+            gcall_main(c, FN_MC_JOB, 0, 7, arg);
         }
     }
     POP32(c->eip);                   /* thiscall, 5 arguments */
@@ -213,7 +197,7 @@ void savegame_frame(void){
     long f = autotest_frame();
     int up = MR32(G_MC_JOB) || career_fe_active(MC_PACKAGE);   /* MC_Main comes up through the front end's queue */
     if ((up || f - S.at < 10) && f - S.at < WAIT_FRAMES) return;
-    MR8(G_CAREER + C_KEEP) = (uint8_t)S.keep_was;
+    MR8(G_CAREER + C_SPOT_SET) = (uint8_t)S.keep_was;
     S.pending = 0;
     int w = g_writes - S.writes_at;
     fprintf(stderr, "[save] f=%ld Save: %s after %ld frames (%s)\n", f, up ? "the save screen still up" : "over", f - S.at,

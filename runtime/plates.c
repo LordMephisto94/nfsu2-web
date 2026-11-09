@@ -42,6 +42,8 @@
  * Tests: tests/plates_unit.c (the pictures, the HELLO), tests/scripts/
  * license_plate*.txt; "[plates]" log lines. */
 #include "cpu.h"
+#include "guest.h"
+#include "game.h"
 #include "coop.h"
 #include "names.h"
 #include "plate_image.h"
@@ -58,13 +60,6 @@ const char *autotest_screen_batch(int i);       /* autotest.c: the screens the f
 void metal_upload_texture(unsigned id, unsigned level, const void *data, unsigned pitch, unsigned w, unsigned h, unsigned fmt);
 
 #define GPTR(a)         (g_mem + (uint32_t)(a))   /* guest memory as a host pointer */
-#define G_FLOW          0x008654a4u   /* 3 the front end, 6 in the world */
-#define G_GAMEMODE      0x00850078u   /* 4: a split race (Quick Race's split screen) */
-#define G_NET_ONLINE    0x0089cf69u   /* byte: an online session */
-#define G_NET_CLIENT    0x008669f4u   /* > 0 in a network race */
-#define G_NET_HOST      0x00866a14u
-#define HOOK_RET        0x00581475u   /* the main-loop hook's return address, as guest calls see it */
-#define FN_NEW          0x00575620u   /* cdecl (size): operator new */
 #define FN_FREE         0x00575630u   /* cdecl (p): operator delete */
 #define FN_TEXINFO      0x004901d0u   /* cdecl (hash, default, 0) -> the TextureInfo loaded of that name */
 #define FN_TEX_CREATE   0x005ce170u   /* thiscall TextureInfo: its D3D texture from +0x70's pixels */
@@ -127,28 +122,14 @@ static uint32_t g_stock_px;           /* the game's plate's pixels g_stock was d
 static uint8_t  g_px[PLATE_BYTES];    /* a picture being made */
 static unsigned g_made, g_freed;
 
-static int ok(uint32_t a, uint32_t n){ return a && mem_is_committed(a) && mem_is_committed(a + n); }
-static uint32_t rd32(uint32_t a){ return ok(a, 3) ? MR32(a) : 0u; }
 static double now_s(void){ struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts); return ts.tv_sec + ts.tv_nsec * 1e-9; }
-/* a guest function with ecx and stack arguments, the CPU as it was after (from the main-loop hook only) */
-static uint32_t gcall(CPU *c, uint32_t fn, uint32_t ecx, int n, const uint32_t *arg){
-    CPU save = *c;
-    c->esp = (c->esp - 256u) & ~15u;
-    for (int i = n - 1; i >= 0; i--) PUSH32(arg[i]);
-    c->ecx = ecx;
-    PUSH32(HOOK_RET);
-    dispatch_indirect(c, fn);
-    uint32_t r = c->eax;
-    *c = save;
-    return r;
-}
 
 /* ---- our text ------------------------------------------------------------------------------------------------------ */
 /* text if it is a plate's (n capitals and digits) and reads as no slur, else none */
 static void take(char *dst, const char *text, const char *from){
     size_t n = text ? strlen(text) : 0;
     if (n > RC_PLATE_MAX || !rc_plate_ok(text, (uint32_t)n)){ fprintf(stderr, "[plates] %s: not a plate (capitals and digits, at most %d): none\n", from, RC_PLATE_MAX); n = 0; }
-    else if (n && name_blocked(text)){ fprintf(stderr, "[plates] %s reads as a slur: none\n", from); n = 0; }
+    else if (n && name_plate_blocked(text)){ fprintf(stderr, "[plates] %s reads as a slur: none\n", from); n = 0; }
     if (n) memcpy(dst, text, n);
     dst[n] = 0;
 }
@@ -179,18 +160,19 @@ static int network_race(void){
 }
 /* one of our cars: player 1's, a split race's other players', co-op's player 2's */
 static int ours(uint32_t car){
-    uint32_t p1 = rd32(SPLIT_PLAYERS_INDEX);
-    if (car == rd32(p1 + PL_CAR)) return 1;
+    uint32_t p1 = guest_rd32(SPLIT_PLAYERS_INDEX);
+    if (car == guest_rd32(p1 + PL_CAR)) return 1;
     if (car == coop_p2_car()) return 1;
     if (MR32(G_GAMEMODE) == 4u || coop_racing_together()){
         uint32_t n = MR32(SPLIT_PLAYERS_COUNT);
-        for (uint32_t i = 1; i < n && i < SPLIT_PORT_CAPACITY; i++) if (car == rd32(rd32(SPLIT_PLAYERS_INDEX + 4u * i) + PL_CAR)) return 1;
+        for (uint32_t i = 1; i < n && i < SPLIT_PORT_CAPACITY; i++) if (car == guest_rd32(guest_rd32(SPLIT_PLAYERS_INDEX + 4u * i) + PL_CAR)) return 1;
     }
     return 0;
 }
 /* The front end draws one car, the one its screen is about: ours in the garage and the shops, the car lot's, a car
  * select's or another player's (Online) elsewhere.  It wears our plate from a screen of ours on, until a screen of
  * others' (any other screen: a dialog, the help bar, changes nothing) */
+static char g_fe_screen[64];                    /* the newest screen of either list (fe_follow) */
 static int screen_in(const char *s, const char *const *list){
     for (int i = 0; list[i]; i++) if (!strncasecmp(s, list[i], strlen(list[i]))) return 1;
     return 0;
@@ -203,7 +185,7 @@ static void fe_follow(void){
         "UI_StartCareer", "UI_Main", "MC_", "UI_Options", "UI_PC_LAN", "PC_OL", 0 };
     static uint32_t flow;
     static char told[64];
-    if (MR32(G_FLOW) != flow){ flow = MR32(G_FLOW); g_fe_ours = 0; told[0] = 0; }
+    if (MR32(G_FLOW) != flow){ flow = MR32(G_FLOW); g_fe_ours = 0; told[0] = 0; g_fe_screen[0] = 0; }
     if (flow != 3u) return;
     /* the newest screen of either list (the game starts a screen with the garage's backdrop and its help line in
      * the same frame: autotest_screen_batch has them all, the screen first) */
@@ -211,6 +193,7 @@ static void fe_follow(void){
     for (int i = 0; (b = autotest_screen_batch(i)); i++) if (screen_in(b, other_screens) || screen_in(b, our_screens)) s = b;
     if (!s) return;
     g_fe_ours = screen_in(s, our_screens) && !screen_in(s, other_screens);
+    snprintf(g_fe_screen, sizeof g_fe_screen, "%s", s);
     if (g_mine[0] && strcmp(told, s)){
         snprintf(told, sizeof told, "%s", s);
         fprintf(stderr, "[plates] f=%ld %s: %s\n", autotest_frame(), s, g_fe_ours ? "our car, our plate" : "not our car, the game's plate");
@@ -225,25 +208,25 @@ static int find(const char *text){
 /* the game's plate decoded (our plates are drawn on it), once its pixels are where we read them last; 0 where they are
  * not as the game's data has them (a plain plate stands in) */
 static const uint8_t *stock(uint32_t src){
-    uint32_t px = rd32(src + TI_PIXELS), plat = rd32(src);
-    if (!px || !ok(px, PLATE_W * PLATE_H / 2u - 1u) || MR16(src + TI_W) != PLATE_W || MR16(src + TI_H) != PLATE_H
-        || !ok(plat, PLAT_SZ) || MR32(plat + PLAT_FORMAT) != FMT_DXT1) return 0;
+    uint32_t px = guest_rd32(src + TI_PIXELS), plat = guest_rd32(src);
+    if (!px || !guest_ok(px, PLATE_W * PLATE_H / 2u - 1u) || MR16(src + TI_W) != PLATE_W || MR16(src + TI_H) != PLATE_H
+        || !guest_ok(plat, PLAT_SZ) || MR32(plat + PLAT_FORMAT) != FMT_DXT1) return 0;
     if (px != g_stock_px){ plate_dxt1(GPTR(px), PLATE_W, PLATE_H, g_stock); g_stock_px = px; }
     return g_stock;
 }
 /* slot i's texture made, or remade, for text: 1 done */
 static int make(CPU *c, int i, const char *text){
     Slot *s = &g_slot[i];
-    uint32_t a[3] = { PLATE_HASH, 0, 0 }, src = gcall(c, FN_TEXINFO, 0, 3, a);
-    if (!ok(src, TI_SZ) || !ok(rd32(src), PLAT_SZ)) return 0;           /* not loaded (yet) */
+    uint32_t a[3] = { PLATE_HASH, 0, 0 }, src = gcall_main(c, FN_TEXINFO, 0, 3, a);
+    if (!guest_ok(src, TI_SZ) || !guest_ok(guest_rd32(src), PLAT_SZ)) return 0;           /* not loaded (yet) */
     if (!plate_image(text, strlen(text), stock(src), g_px)) return 0;
     uint32_t ti = s->ti;
     if (!ti){
         /* our TextureInfo, its platform record and its pixels in one block of the game's */
         uint32_t size = TI_SZ + PLAT_SZ + 64u + PLATE_BYTES;
-        if (!(ti = gcall(c, FN_NEW, 0, 1, &size)) || !ok(ti, size)) return 0;
+        if (!(ti = gcall_main(c, FN_NEW, 0, 1, &size)) || !guest_ok(ti, size)) return 0;
         uint32_t pl = ti + TI_SZ, pix = (pl + PLAT_SZ + 63u) & ~63u;
-        memcpy(GPTR(ti), GPTR(src), TI_SZ); memcpy(GPTR(pl), GPTR(rd32(src)), PLAT_SZ);
+        memcpy(GPTR(ti), GPTR(src), TI_SZ); memcpy(GPTR(pl), GPTR(guest_rd32(src)), PLAT_SZ);
         MR32(pl) = MR32(pl + 4u) = 0;                                   /* on no list of the game's */
         MR32(pl + PLAT_TEX) = MR32(pl + PLAT_LIST) = 0;
         MR32(pl + PLAT_FORMAT) = FMT_ARGB;
@@ -259,7 +242,7 @@ static int make(CPU *c, int i, const char *text){
     }
     uint32_t pl = MR32(ti), pix = MR32(ti + TI_PIXELS), tex = MR32(pl + PLAT_TEX);
     memcpy(GPTR(pix), g_px, PLATE_BYTES);
-    if (!tex) gcall(c, FN_TEX_CREATE, ti, 0, 0);
+    if (!tex) gcall_main(c, FN_TEX_CREATE, ti, 0, 0);
     else {
         /* the texture is there: the new pixels into it, level by level (the port's texture, com.c) */
         uint32_t off = 0, w = PLATE_W, h = PLATE_H;
@@ -278,19 +261,19 @@ static int make(CPU *c, int i, const char *text){
  * block freed */
 static void drop(CPU *c, int i){
     Slot *s = &g_slot[i];
-    uint32_t pl = rd32(s->ti), tex = pl ? rd32(pl + PLAT_TEX) : 0;
-    if (pl && ok(rd32(pl), 7) && ok(rd32(pl + 4u), 7)){
+    uint32_t pl = guest_rd32(s->ti), tex = pl ? guest_rd32(pl + PLAT_TEX) : 0;
+    if (pl && guest_ok(guest_rd32(pl), 7) && guest_ok(guest_rd32(pl + 4u), 7)){
         uint32_t next = MR32(pl), before = MR32(pl + 4u);
         MR32(before) = next; MR32(next + 4u) = before;
         MR32(pl) = MR32(pl + 4u) = 0;
     }
     for (int n = 0; tex && n < 8; n++){
-        uint32_t release = rd32(rd32(tex) + 8u);
-        if (!release || !gcall(c, release, 0, 1, &tex)) break;
+        uint32_t release = guest_rd32(guest_rd32(tex) + 8u);
+        if (!release || !gcall_main(c, release, 0, 1, &tex)) break;
     }
     if (pl) MR32(pl + PLAT_TEX) = 0;
     fprintf(stderr, "[plates] f=%ld slot %d (%s) freed: no car wanted it for %.0f s\n", autotest_frame(), i, s->text[0] ? s->text : "none", FREE_S);
-    if (s->ti) gcall(c, FN_FREE, 0, 1, &s->ti);
+    if (s->ti) gcall_main(c, FN_FREE, 0, 1, &s->ti);
     memset(s, 0, sizeof *s);
     g_freed++;
 }
@@ -298,7 +281,7 @@ static void drop(CPU *c, int i){
 static int want(CPU *c, const char *text, int *uploads){
     int i = find(text);
     /* (its D3D texture still there: the game releases every one of its list when its device is lost, 0x5CE400) */
-    if (i >= 0 && g_slot[i].ready && rd32(rd32(g_slot[i].ti) + PLAT_TEX)){ g_slot[i].wanted = g_frame; g_slot[i].wanted_s = now_s(); return i; }
+    if (i >= 0 && g_slot[i].ready && guest_rd32(guest_rd32(g_slot[i].ti) + PLAT_TEX)){ g_slot[i].wanted = g_frame; g_slot[i].wanted_s = now_s(); return i; }
     if (*uploads >= UPLOADS_PER_FRAME) return -1;
     if (i < 0){
         /* a slot: an empty one first, else the one no car wanted for longest (and not for REUSE_FRAMES) */
@@ -346,7 +329,7 @@ void plates_frame(CPU *c){
 /* ---- the drawing ---------------------------------------------------------------------------------------------------- */
 /* 0x620AE0 / 0x6162E0 (showoff.c, photo.c): the car of render info ri is drawn now; what was drawing before, back after */
 uint32_t plates_begin(uint32_t ri){
-    uint32_t before = g_drawing, car = ok(ri, 3) ? MR32(ri + RI_CAR) : 0;
+    uint32_t before = g_drawing, car = guest_ok(ri, 3) ? MR32(ri + RI_CAR) : 0;
     g_drawing = 0;
     if (!car) return before;
     int slot = -1;
@@ -357,15 +340,19 @@ uint32_t plates_begin(uint32_t ri){
     return before;
 }
 void plates_end(uint32_t before){ g_drawing = before; }
+/* stance.c: the front end's car is ours (fe_follow) */
+int plates_fe_ours(void){ return g_fe_ours; }
+/* ... and the screen that says so ("" none yet) */
+const char *plates_fe_screen(void){ return g_fe_screen; }
 /* 0x5C5930 (overrides.c): a model of the car being drawn into the render lists (item: its model); keep says what to
  * put back after (keep[0] the place, 0: nothing) */
 void plates_model(uint32_t item, uint32_t keep[2]){
     keep[0] = 0;
-    if (!g_drawing || !ok(item, 0x10u)) return;
+    if (!g_drawing || !guest_ok(item, 0x10u)) return;
     uint32_t solid = MR32(item + 0xcu);
-    if (!ok(solid, SOLID_TABLE + 3u)) return;
+    if (!guest_ok(solid, SOLID_TABLE + 3u)) return;
     uint32_t n = MR8(solid + SOLID_COUNT), table = MR32(solid + SOLID_TABLE);
-    if (!n || !ok(table, n * 8u - 1u)) return;
+    if (!n || !guest_ok(table, n * 8u - 1u)) return;
     for (uint32_t k = 0; k < n; k++){
         if (MR32(table + 8u * k) != PLATE_HASH) continue;
         keep[0] = table + 8u * k + 4u; keep[1] = MR32(keep[0]);

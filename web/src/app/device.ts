@@ -11,6 +11,7 @@
 //                laptop whose screen also takes touch.
 // The Controls sheet and the hints follow touch first (html[data-touch]).
 import { allPads } from '../input/steampad';
+import { DEVICE_RENDER, localStore } from './prefs';
 
 export function isPhone(): boolean {
   const uad = (navigator as unknown as { userAgentData?: { mobile?: boolean } }).userAgentData;
@@ -36,12 +37,18 @@ export function touchFirst(): boolean { return matchMedia('(pointer: coarse)').m
  *  until 2026-11-02, and lost a fifth of their frames on fast displays).  The
  *  world map's other players: 2048 on phones, the file's 4096 elsewhere (each marker costs the open map's frames,
  *  about 7 us a frame on a busy Ryzen 5900X, a phone's several times that).  Full screen stays off on phones with
- *  PowerVR's B-Series graphics (fullScreenFails). */
+ *  PowerVR's B-Series graphics (fullScreenFails).  The game's Full Scene Anti-Aliasing is not offered on phones
+ *  (runtime/com.c MULTISAMPLING): its 4-sample screen and Z, kept between passes, take four times the screen's memory;
+ *  nor on the computers' graphics it broke (fsaaFails).
+ *  Anisotropic filtering where the game asks for it on computers only (gpu/encoder.ts aniso): no GPU time measured on an
+ *  M4 Pro at 2560x1440 (5.01 against 4.99 ms a frame, 2026-11-08), none measured on a phone's.  HQ vinyls on computers
+ *  (the page can paint them only with BC compression, gpu/hqskin.ts): the game's designs and colours, sharper; up to
+ *  16 skins of 1024 at once (gpu/encoder.ts OVER_MAX), each ~5.3 MB of graphics memory with its mips. */
 export function deviceDefaults(): Record<string, string> {
   const kind = deviceKind();
-  if (kind === 'phone') return { render: rememberedRender() === 'backing' ? 'backing' : 'scale:0.75', fullscreen: fullScreenFails() ? 'off' : 'on', hud: '43', roam_max_cars: '16', roam_map_max: '2048', coop: 'off' };
-  if (kind === 'tablet') return { roam_max_cars: '24', coop: 'off' };
-  return { roam_max_cars: 'auto' };
+  if (kind === 'phone') return { render: rememberedRender() === 'backing' ? 'backing' : 'scale:0.75', fullscreen: fullScreenFails() ? 'off' : 'on', hud: '43', roam_max_cars: '16', roam_map_max: '2048', coop: 'off', fsaa: 'off', anisotropic: 'off', hq_vinyls: 'off' };
+  if (kind === 'tablet') return { roam_max_cars: '24', coop: 'off', anisotropic: 'off', hq_vinyls: 'off' };
+  return { roam_max_cars: 'auto', anisotropic: 'on', hq_vinyls: 'on', ...fsaaFails() ? { fsaa: 'off' } : {} };
 }
 
 /** the graphics as the page's check named them (checks.ts checkGpu: "img-tec b-series ..."), '' until it has */
@@ -51,6 +58,13 @@ export function noteGraphics(info: string | undefined) { graphics = info ?? ''; 
  *  stopped seconds after Play or a turn to landscape (vkBindImageMemory: VK_ERROR_OUT_OF_DEVICE_MEMORY, with the
  *  canvas the whole screen), in the window the game ran (a player's: "without full screen game works nice") */
 export const fullScreenFails = (g = graphics) => /^img-tec b-series/i.test(g);
+/** The game's Full Scene Anti-Aliasing at 4 samples broke these computers' graphics in Chrome and Edge (2026-11-08):
+ *  AMD's GCN-5 (a Ryzen 5 5600GT's built-in Vega, Edge on Windows: the graphics process gone 3 frames into every game,
+ *  "A valid external Instance reference no longer exists"), Qualcomm's Adreno (a Snapdragon laptop, Chrome on
+ *  Windows: the picture in scrambled blocks past the main menu).  Not offered there, a registry with it on is drawn
+ *  with 1 sample (the game keeps the option's maximum of -1) and Play does not ask about it; settings.ini fsaa = on
+ *  offers it still. */
+export const fsaaFails = (g = graphics) => /^(amd gcn-5|qualcomm)\b/i.test(g);
 
 /** the device as its defaults see it: a phone, a touch-first one that is not a phone (a tablet), or a computer */
 export function deviceKind(): 'phone' | 'tablet' | 'pc' {
@@ -74,13 +88,9 @@ export function heapWindow(kind = deviceKind(), ua = navigator.userAgent,
 
 /** the render check's verdict on this phone: in this browser only, like the other device defaults (settings.ini,
  *  and with it the cloud saves, never has it) */
-const RENDER_KEY = 'nfsu2.device.render';
-export function rememberedRender(): string | null {
-  try { return localStorage.getItem(RENDER_KEY); } catch { return null; }
-}
+export function rememberedRender(): string | null { return localStore.get(DEVICE_RENDER); }
 export function rememberRender(v: string | null) {
-  try { if (v) localStorage.setItem(RENDER_KEY, v); else localStorage.removeItem(RENDER_KEY); }
-  catch { /* storage off: the check measures again next time */ }
+  if (v) localStore.set(DEVICE_RENDER, v); else localStore.remove(DEVICE_RENDER);      // (storage off: the check measures again next time)
 }
 
 /** whether the browser shows the page a controller (Chrome: only after a button press on the page) */

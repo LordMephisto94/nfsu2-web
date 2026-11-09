@@ -7,13 +7,7 @@
 #import <QuartzCore/CAMetalLayer.h>
 #import <QuartzCore/QuartzCore.h>
 
-/* getenv() SCANS the environment array and takes a lock on every call.  On
- * per-draw paths (e.g. the "PDLIST" check in SetVertexShaderConstantF was
- * the FIRST term of the && chain) that has a measurable cost: in the
- * profile getenv+__findenv_locked ate 3% of the guest thread.
- * Environment variables do not change during a run -> resolve once, keep. */
-#define ENVC(nm_) ({ static const char *_ev_; static int _ei_; \
-                     if (!_ei_){ _ei_ = 1; _ev_ = getenv(nm_); } _ev_; })
+#include "setting.h"      /* ENVC: getenv once per call site (per-draw paths) */
 
 #import <Metal/Metal.h>
 #include "enhance.h"
@@ -630,6 +624,8 @@ static _Atomic long g_zsweep_at = 0;
 static unsigned long g_z_swept = 0;
 void metal_z_forget(unsigned zid){
     if (zid < MAXZ){ atomic_store(&g_zdead[zid], 0); atomic_store(&g_zforget[zid], 1); } }
+/* the back buffer's samples (com.c MULTISAMPLING: browser only); the Mac's MSAA is NFSU2_MSAA's */
+void metal_set_bb_samples(unsigned n){ (void)n; }
 static id<MTLDepthStencilState> g_dss[64];
 static float    g_cur_aref   = 0.f;
 /* D3DRS_FOGENABLE(28) + D3DRS_FOGCOLOR(34).  Fog was NEVER applied: the

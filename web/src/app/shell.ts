@@ -28,7 +28,8 @@ import { LastGameKeeper, lastGameEnd, lastGameLine, lastGameToOffer, type LastGa
 import { androidMajor, browserBrief, deviceBrief } from './devicelog';
 import { canFullscreen, enterFullscreen, exitFullscreen, fromHomeScreen, homeScreenInstead, isFullscreen, keepScreenOn, measureRefresh, settledSize, trackCanvasSize } from './display';
 import { deviceDefaults, deviceKind, heapWindow, isPhone, markTouch, noPinchZoom, noteGraphics, padSeen, phoneScreen, touchFirst } from './device';
-import { phoneSeed, phoneUpgrade } from './phonegraphics';
+import { deviceSeed, fsaaAnswer, fsaaAsk, phoneUpgrade } from './phonegraphics';
+import { compare, fetchPair } from './compare';
 import { markPad, padPress, pageDialog } from './padnav';
 import { controlsSheet, type ControlsSheet, type Tab } from './controls';
 import { TouchControls } from './touch';
@@ -39,12 +40,14 @@ import { DriftPanel } from './drift';
 import { PhotoMode, photoMark } from './photo';
 import type { PadPage } from '../input/gamepad';
 import type { NetBanCase, NetQueue, NetRaces, NetRemoved, NetRename } from '../net';
-import { blockList, changedSettings, checkSetting, HOST_FIXED, pageOnly, resolveEnv, settingsUpgrade, TEMPLATE, uiPack, type Resolved } from './settings';
+import { blockList, changedSettings, checkSetting, HOST_FIXED, pageOnly, putKey, resolveEnv, TEMPLATE, uiPack, type Resolved } from './settings';
+import { SettingsFile } from './settings-store';
 import { checkSaves, exists, filesOf, listProfiles, NO_SAVE, PROFILES_DIR, readText, removeSaveDir, SavesOff, setWritesOff, settleStaged, UNREADABLE, writeFile, type SavesCheck } from './savefs';
 import { coverOf, newProfileName, turnOnAutosave } from './profile';
-import { crewControl, putKey, SettingsPanel, showCrewCounts } from './settings-ui';
-import { askCrews, askWorlds, countText, PlayersPanel, queueText, roomHash, roomText, serverAnswers, watchPlayers, type PlayerCounts, type Reach } from './players';
+import { crewControl, SettingsPanel, showCrewCounts } from './settings-ui';
+import { askCrews, askSpots, askWorlds, countText, PlayersPanel, queueText, roomHash, roomText, serverAnswers, watchPlayers, type PlayerCounts, type Reach } from './players';
 import { isMain, isOwn, noGhost, WORLDS, worldName, worldNamed, worldRooms } from './worlds';
+import { atName, friendSpot, SAID_LOCKED, SAID_NOT_FOUND, SAID_NOT_NOW, TRACKS, trackRoom, trackRooms, travelSaid, travelState, whyText, WHY_COOP } from './tracks';
 import { panelTabs, refitTabs, type PanelTabs } from './tabs';
 import { CREW_MAX, crewList, crewsOf, crewsValue, freeColour, rgbsValue, rgbWords, type Crew } from './crews';
 import { checkInvite, checkRoom, inviteLink, readInvite, sameName, tidyInvite, type Invite } from './invite';
@@ -62,7 +65,7 @@ import { FpsOverlay, FPS_MODES, type FpsMode } from './overlay';
 import { LobbyPanel } from './lobby';
 import { ICON as CHAT_ICON, QuickChat } from './quickchat';
 import { groupsOf, phrasesOf } from './phrases';
-import { FriendPrompt, FriendsApi, FriendsPanel } from './friends';
+import { FriendPrompt, FriendsApi, FriendsPanel, type Friend } from './friends';
 import { ChatDialog, FriendMessages, MessageStore } from './messages';
 import { named } from './cards';
 import { applySiteKeys, keyName, menuKeyOf, siteButton, siteKey, siteKeyList, SiteKeysView } from './sitekeys';
@@ -82,6 +85,7 @@ import type { Packs } from '../host/datacache';
 import type { GameMemory } from '../host/memory';
 import { texSplit } from '../gpu/index';
 import { copyText, copyToast } from './copy';
+import { OTHER_BUILD, PAGE_TAB, sessionStore, UPDATE_FOR } from './prefs';
 
 type Phase = 'boot' | 'ready' | 'error' | 'waiting' | 'starting' | 'playing' | 'exited';
 
@@ -148,7 +152,7 @@ let lastGame: LastGame | null = null;    // the last game's copy, when that game
 let hiddenAt = 0;                        // when the page was hidden during a game (0: shown)
 const checks = new Map<string, Check>();
 let instance: ReturnType<typeof claimInstance>;
-let settingsText: string | null = null;
+const settingsFile = new SettingsFile(() => SAVE, s => log.add(s));
 let starting = false;                    // Play pressed, the session not there yet
 let savesLocked = false;                 // the game about to start reads the saves: no cloud version comes in (VaultPanel's playing)
 let fatal: { what: string; code?: string } | null = null;   // why the running game had to be stopped (English, for t())
@@ -285,8 +289,11 @@ function evaluate() {
   }
   if (pending) { if (phase !== 'exited') setPhase('boot', T('Loading'), () => `${label(pending)}: ${detail(pending)}`); return; }
   if (phase === 'exited') { updatePlay(); return; }
-  const press = N('Press Play to start.');
-  setPhase('ready', T('Ready'), offline ? () => t('No connection to the server: you can play, but not with others. {press}', { press: t(press) }) : T(press));
+  // with free roam with others on, where the others are: new players looked for them in the game's Online menu (its
+  // race rooms) or Quick Race's Free Run
+  const press = N('Press Play to start.'), career = N('Play career to join others in free roam.');
+  setPhase('ready', T('Ready'), offline ? () => t('No connection to the server: you can play, but not with others. {press}', { press: t(press) })
+    : () => t(resolved().env.NFSU2_ROAM === '1' ? career : press));
 }
 
 function updatePlay() {
@@ -296,30 +303,19 @@ function updatePlay() {
 }
 
 // ------------------------------------------------------------- settings --
-/** settings.ini read (the template written where there is none); throws where it did not read, and then writes nothing
- *  (savefs.ts missing: Firefox's "UnknownError" was taken for no file, and the template went over the player's) */
+/** settings.ini read for the game (SettingsFile.load: the template written where there is none); throws where it did
+ *  not read, and then writes nothing */
 async function loadSettings(): Promise<string | null> {
-  let text = await readText(SAVE, 'settings.ini');
-  if (text === null && instance.owner) {
-    text = TEMPLATE;
-    await writeFile(SAVE, 'settings.ini', text);
-    log.add(`[app] settings: wrote template /save/settings.ini`);
-  } else if (text !== null && instance.owner) {
-    const up = settingsUpgrade(text);
-    if (up) { text = up.text; await writeFile(SAVE, 'settings.ini', text); log.add(`[app] settings: added the new options ${up.added.join(', ')} to /save/settings.ini (commented out, defaults unchanged)`); }
-  }
-  settingsText = text;
+  const text = await settingsFile.load(instance.owner);
   // who plays on this server, asked again with this file's room and crews (the first question went without them)
   players?.now();
+  evaluate();                           // (Ready's line: free roam with others on or off)
   return text;
 }
-/** settings.ini changed by edit, on top of the file as it is now (the template where there is none), and kept as the
- *  page's copy: never on top of the page's copy alone, which is null where the file did not read.  Throws where it did not
- *  read or write (nothing written then). */
+/** settings.ini changed by edit, on top of the file as it is now (SettingsFile.edit), and the panel reads it again.
+ *  Throws where it did not read or write (nothing written then). */
 async function editSettings(edit: (text: string) => string): Promise<string> {
-  const text = edit(await readText(SAVE, 'settings.ini') ?? TEMPLATE);
-  await writeFile(SAVE, 'settings.ini', text);
-  settingsText = text;
+  const text = await settingsFile.edit(edit);
   void settings.refresh();
   return text;
 }
@@ -327,7 +323,7 @@ async function editSettings(edit: (text: string) => string): Promise<string> {
  *  off, and the first Play asked; the game's own default stays off), and this device's (a phone's: device.ts).  A test
  *  page keeps free roam off (takeParams): its tools set NFSU2_ROAM where they want it */
 const DEVICE: Record<string, string> = { roam: 'on', ...deviceDefaults() };
-function resolved(host: Record<string, string> = {}): Resolved { return resolveEnv(settingsText, ENVIRONMENT, host, DEVICE); }
+function resolved(host: Record<string, string> = {}): Resolved { return resolveEnv(settingsFile.forGame, ENVIRONMENT, host, DEVICE); }
 /** the game's language (runtime/language.c): which language pack the page fetches ahead and counts */
 const language = (r: Resolved = resolved()) => (r.env.NFSU2_LANGUAGE ?? 'english').toLowerCase();
 /** the texture packs picked (runtime/web/texrep_web.c), comma-separated, '' for none: the ones the page fetches ahead
@@ -339,7 +335,7 @@ const texpack = (r: Resolved = resolved()) => [uiPack(r.env.NFSU2_UI_TEXTURES), 
  *  switch on) */
 const packs = (r: Resolved = resolved()): Packs => ({ texpack: texpack(r), songs: (r.env.NFSU2_SONGS ?? '').trim().toLowerCase(),
   damage: r.env.NFSU2_DAMAGE === '1', whine: r.env.NFSU2_GEARBOX_WHINE === '1' });
-const packsKey = () => { const p = packs(); return `${language()}/${p.texpack}/${p.songs}/${p.damage ? 1 : 0}/${p.whine ? 1 : 0}`; };
+const packsKey = (r: Resolved = resolved()) => { const p = packs(r); return `${language(r)}/${p.texpack}/${p.songs}/${p.damage ? 1 : 0}/${p.whine ? 1 : 0}`; };
 
 // ----------------------------------------------------------------- play --
 function stageCanvas(): HTMLCanvasElement {
@@ -363,9 +359,9 @@ let untrack: (() => void) | null = null;
  * the server keeps no cloud saves.  Turned on, the keyphrase is shown to keep (copy, download) before the game starts;
  * it failed, the reason.
  */
-async function askCloud() {
+async function askCloud(): Promise<boolean> {
   const games = gamesStarted(), played = playedMs();
-  if (testPage() || offline || !vault.offerable(games, played) || !await newestProfile()) return;
+  if (testPage() || offline || !vault.offerable(games, played) || !await newestProfile()) return false;
   const which = vault.offered(games, played);
   const p = (text: string) => Object.assign(document.createElement('p'), { textContent: text });
   const body = document.createElement('div');
@@ -386,11 +382,37 @@ async function askCloud() {
   $<HTMLButtonElement>('#confirm-ok').focus();
   const on = await answer;
   log.add(`[app] cloud saves: ${on ? 'turned on' : 'not now'} (asked at Play, ${which})`);
-  if (!on) return;
+  if (!on) return true;
   const phrase = await enableCloud();
-  if (!phrase) return;
+  if (!phrase) return true;
   const claimed = name && info?.state === 'free' && !info.mine ? await claimQuietly(playDeps(), name, info, quietCheck) : null;
   await showPassphrase(phrase, claimed?.name ?? null, taken);
+  return true;
+}
+
+/**
+ * A returning player on a computer, once: the game's Full Scene Anti-Aliasing, which the browser game could not offer
+ * before (runtime/com.c MULTISAMPLING; a new computer's registry has it on: phonegraphics.ts deviceSeed), turned on or
+ * kept off, so the frame rate never drops unasked.  The player's car with it off and on, a line to drag between them
+ * (compare.ts: the server's TEXPACKS/fsaa-off.webp and fsaa-on.webp, tools/fsaapics.py; without them, or offline, the
+ * question alone).  Either answer, Esc too, is marked in registry.txt.  Not on phones or tablets, a test page, or
+ * playing without saving; at a Play where cloud saves were asked, the next one.
+ */
+async function askFsaa() {
+  // (not where it is not offered: settings.ini's fsaa, or this computer's graphics, device.ts fsaaFails)
+  if (testPage() || deviceKind() !== 'pc' || resolved().env.NFSU2_FSAA === '0') return;
+  const text = await readText(SAVE, 'registry.txt').catch(() => null);
+  if (text === null || !fsaaAsk(text)) return;
+  const body = document.createElement('div');
+  const pair = await fetchPair('/data/TEXPACKS/fsaa-off.webp', '/data/TEXPACKS/fsaa-on.webp', 'image/webp');
+  const pic = pair ? compare(pair[0], pair[1], { before: t('Off'), after: t('On'), drag: t('Drag to compare') }) : null;
+  if (pic) body.append(pic.el);
+  body.append(Object.assign(document.createElement('p'),
+    { textContent: t('Anti-aliasing smooths jagged edges. On a slower computer it can lower the frame rate. Change it any time in the game\'s Display options.') }));
+  const on = await choiceBox(t('Smoother edges?'), body, t('Turn on'), t('Keep off')) === 'ok';
+  pic?.dispose();
+  await writeFile(SAVE, 'registry.txt', fsaaAnswer(text, on));
+  log.add(`[app] Full Scene Anti-Aliasing: ${on ? 'turned on' : 'kept off'} (asked once at Play${pic ? '' : ', without its picture'})`);
 }
 
 /** Cloud saves turned on (Play's question, or Claim under Your name without a keyphrase): the keyphrase made, or
@@ -631,7 +653,7 @@ async function startGame() {
     if (cloud === 'stop') { void audio?.close().catch(() => {}); startAudio = null; endStage(); return; }
     if (cloud === 'taken' || pulled) await loadSettings().catch(e => log.add(`[app] settings.ini not read again: ${e}`));
   }
-  if (!noSave) await askCloud();
+  if (!noSave && !await askCloud()) await askFsaa();
   const alone = await askFull(counts);
   // the name this game plays under, by the claims
   const playAs = alone ? null : await playName();
@@ -704,11 +726,15 @@ async function startGame() {
     log.add(`[app] registry seeded from ${q.get('reg')} (page address)`);
   } else if (noSave) {
     // (the save folder's registry where it read, else the built-in defaults)
-    memory.push({ path: reg, text: isPhone() ? phoneSeed(registryDefaults) : registryDefaults });
+    memory.push({ path: reg, text: deviceSeed(deviceKind(), registryDefaults) });
   } else if (!await exists(SAVE, reg)) {
     if (r.env.NFSU2_SEED_REGISTRY === '0') log.add('[app] no registry yet, the game will run its first-run check');
-    else if (isPhone()) { await writeFile(SAVE, reg, phoneSeed(registryDefaults)); log.add(`[app] first launch, registry seeded with the built-in defaults and a phone's graphics (/save/${reg})`); }
-    else { await writeFile(SAVE, reg, registryDefaults); log.add(`[app] first launch, registry seeded with the built-in defaults (/save/${reg})`); }
+    else {
+      const kind = deviceKind();
+      await writeFile(SAVE, reg, deviceSeed(kind, registryDefaults));
+      log.add(`[app] first launch, registry seeded with the built-in defaults${kind === 'phone' ? " and a phone's graphics"
+        : kind === 'pc' ? ' and Full Scene Anti-Aliasing on' : ''} (/save/${reg})`);
+    }
   } else if (isPhone()) {
     // a phone that started before the phone graphics (phonegraphics.ts): once
     const text = await readText(SAVE, reg).catch(() => null);   // null: not read (it is there), left as it is for the next start
@@ -897,13 +923,13 @@ function stopFatal(what: string, code?: string) {
  *  copies (sw.ts) and the module from the server, or from a server swapping its module.  The game is stopped and the
  *  page loaded again from the server: once a tab and module, while the server answers; else as any renderer that
  *  did not start. */
-const OTHER_KEY = 'nfsu2-other-build';
 let reloadAtExit = false;
 function otherBuild(why: string) {
   const s = session, rev = loaded!.info.rev;
   if (!s || s.ended) return;
-  let again = true;
-  try { again = sessionStorage.getItem(OTHER_KEY) === rev; if (!again) sessionStorage.setItem(OTHER_KEY, rev); } catch { /* no storage: no reload that could repeat */ }
+  // (no storage: no reload that could repeat)
+  const again = !sessionStore.usable() || sessionStore.get(OTHER_BUILD) === rev;
+  if (!again) sessionStore.set(OTHER_BUILD, rev);
   if (again || offline) {
     log.add(`[app] this page is of another build than game ${rev} (${why}), ${offline ? 'and the server does not answer' : 'after a reload for that too'}`);
     stopFatal(N('the graphics could not start'), 'GPU-RENDERER');
@@ -939,13 +965,13 @@ const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 /** The page in the game's language (settings.ini language, the page address's on a development server): English until
  *  the player picks another, in Settings or in the list at the top.  A tab that does not own the saves follows the file. */
 function applyLanguage() {
-  void setLanguage(language(resolveEnv(settingsText ?? settings.text, ENVIRONMENT, {}, DEVICE)), logLine);
+  void setLanguage(language(resolveEnv(settingsFile.forGame ?? settingsFile.text, ENVIRONMENT, {}, DEVICE)), logLine);
   syncPicker();
 }
 /** the list at the top shows the language the file asks for (disabled where another tab owns the saves) */
 function syncPicker() {
   const pick = $<HTMLSelectElement>('#lang-pick');
-  pick.value = language(resolveEnv(settingsText ?? settings.text, ENVIRONMENT, {}, DEVICE));
+  pick.value = language(resolveEnv(settingsFile.forGame ?? settingsFile.text, ENVIRONMENT, {}, DEVICE));
   pick.disabled = !instance.owner;
   // as wide as the name shown (CSS field-sizing where the browser has it; Firefox measures it here)
   if (!CSS.supports?.('field-sizing', 'content')) {
@@ -1092,7 +1118,8 @@ function onExit(s: GameSession, code: number) {
 async function saveGone(): Promise<void> {
   log.add('[app] the browser deleted this site\'s data during the game: the saves go back into the empty save folder');
   // settings.ini as the page has it now (it writes the file whenever it changes it)
-  if (settingsText !== null) void snapshotFile(playStart, SAVE, 'settings.ini', new TextEncoder().encode(settingsText));
+  const ini = settingsFile.forGame;
+  if (ini !== null) void snapshotFile(playStart, SAVE, 'settings.ini', new TextEncoder().encode(ini));
   let msg: string;
   try {
     const r = await vault.refill(playStart);
@@ -1179,7 +1206,7 @@ function siteDeps() {
 /** our controls' keys as settings.ini has them now (not while a game runs: it keeps the ones it started with), on the
  *  keys' list and in the Site tab */
 function siteKeysNow() {
-  if (!session) applySiteKeys(resolveEnv(settingsText ?? settings.text, ENVIRONMENT, {}, DEVICE).env);
+  if (!session) applySiteKeys(resolveEnv(settingsFile.forGame ?? settingsFile.text, ENVIRONMENT, {}, DEVICE).env);
   siteKeyList($('#keys'));
   siteView?.render();
   keySheet?.relabel();                    // (the controller's drawing names the sticks' clicks of ours)
@@ -1654,6 +1681,9 @@ function openMenu() {
   fsButton.hidden = !canFullscreen() && fromHomeScreen();         // from an iPhone's Home Screen: already without bars
   m.querySelector<HTMLButtonElement>('[data-act="worlds"]')!.hidden = roamRoom === null || !session?.net?.room;
   menuValue('worlds', roamRoom === null ? '' : worldName(roamRoom));
+  const trip = travelNow();
+  m.querySelector<HTMLButtonElement>('[data-act="tracks"]')!.hidden = !trip;
+  menuValue('tracks', trip ? atName(trip.at) : '');
   m.querySelector<HTMLButtonElement>('[data-act="solid"]')!.hidden = roamCollide === null || !session?.net?.solid;
   menuValue('solid', ghostWord());
   m.querySelector<HTMLButtonElement>('[data-act="crews"]')!.hidden = roamCrews === null || !session?.net?.crews;
@@ -1689,16 +1719,16 @@ function menuValue(act: string, text: string) {
 const collideOf = (v: string | undefined): Collide => { const c = checkSetting('roam_collide', v ?? ''); return c?.ok ? c.value as Collide : 'on'; };
 const crewsCount = () => roamCrews?.length ? String(roamCrews.length) : '';
 /** what the menu shows: its list, or in its place its World, Crews or Friends (a game in free roam) or its Controls */
-type MenuPage = 'main' | 'worlds' | 'crews' | 'friends' | 'controls';
+type MenuPage = 'main' | 'worlds' | 'tracks' | 'crews' | 'friends' | 'controls';
 /** each page's row on the list */
-const MENU_ROW: Record<Exclude<MenuPage, 'main'>, string> = { worlds: 'worlds', crews: 'crews', friends: 'friends', controls: 'help' };
+const MENU_ROW: Record<Exclude<MenuPage, 'main'>, string> = { worlds: 'worlds', tracks: 'tracks', crews: 'crews', friends: 'friends', controls: 'help' };
 let menuAt: MenuPage = 'main';
 /** The menu on page p: the others hidden, the dialog named by p's title.  Back on the list from a page: the keyboard
  *  (or controller) on that page's row, with its state as it is now. */
 function menuPage(p: MenuPage) {
   const was = menuAt;
   menuAt = p;
-  for (const id of ['main', 'worlds', 'crews', 'friends', 'controls'] as const) $(`#menu-${id}`).hidden = id !== p;
+  for (const id of ['main', 'worlds', 'tracks', 'crews', 'friends', 'controls'] as const) $(`#menu-${id}`).hidden = id !== p;
   $('#menu').setAttribute('aria-labelledby', p === 'main' ? 'menu-title' : `menu-${p}-title`);
   if (p !== 'main' || was === 'main') return;
   popAsk++;                                       // (a count asked for the Crews page: not drawn now)
@@ -1794,6 +1824,68 @@ async function switchWorld(room: string) {
   log.add(`[app] the menu's World: ${isOwn(room) ? 'a world of the player\'s own' : worldName(room)}`);
   await joinHere({ room }, true);
 }
+/** the game's trips (tracks.ts travelState of its status's "travel"): where the car is and why a trip cannot go now;
+ *  null: none (a module without them, no game, or not in a career) */
+const travelNow = () => (session?.input?.travel ? travelState(session.status?.read()?.get('travel')) : null);
+/** how many were at each race track's spot when the menu's Tracks last asked, by the spot's room (tracks.ts trackRoom) */
+let trackCountsNow = new Map<number, number>();
+let trackAsk = 0;
+/** The menu's Tracks (career free roam on the race tracks' own maps, runtime/travel.c), in the menu's place (the menu
+ *  opened first, if it isn't): Back to the city while the car is on one, then each spot with how many are there (asked
+ *  of the server as it opens: players.ts askSpots), the car's own marked; why a trip
+ *  cannot go now above them, which then are off. */
+function openTracks() {
+  if (!travelNow()) return;
+  if (!$<HTMLDialogElement>('#menu').open) openMenu();
+  drawTracks();
+  menuPage('tracks');
+  const box = $('#menu-tracks-box');
+  (box.querySelector<HTMLElement>('[aria-current="true"]') ?? box.querySelector<HTMLElement>('button:not(:disabled)'))?.focus();
+  const n = ++trackAsk, game = session, rooms = trackRooms(roomHash(roamRoom ?? ''));
+  if (offline || roamRoom === null) return;
+  void askSpots(rooms, 5000).then(counts => {
+    if (!counts || n !== trackAsk || session !== game || !menuOn('tracks')) return;
+    trackCountsNow = counts;
+    const had = box.contains(document.activeElement) ? (document.activeElement as HTMLElement).dataset.at : undefined;
+    drawTracks();
+    if (had !== undefined) box.querySelector<HTMLElement>(`[data-at="${had}"]`)?.focus();
+  });
+}
+function drawTracks() {
+  const st = travelNow(), at = st?.at ?? 0, why = st?.why ?? 0, base = roomHash(roamRoom ?? ''), rows: HTMLElement[] = [];
+  const note = $('#menu-tracks-note');
+  note.textContent = whyText(why);
+  note.hidden = !why;
+  if (at) {
+    const back = el('button', { type: 'button', className: 'menu-row go', textContent: t('Back to the city') });
+    back.dataset.at = '0';
+    back.disabled = !!why && why !== WHY_COOP;         // (player 2 waits for the city: the way there stays open)
+    back.onclick = () => travelTo(0);
+    rows.push(back);
+  }
+  TRACKS.forEach((s, i) => {
+    const b = el('button', { type: 'button', className: 'menu-row' });
+    b.dataset.at = String(i + 1);
+    const here = at === i + 1, n = trackCountsNow.get(trackRoom(base, s.key));
+    if (here) { b.classList.add('selected'); b.setAttribute('aria-current', 'true'); }
+    else b.disabled = !!why;
+    const end = el('span', { className: 'menu-end' });
+    end.append(el('span', { className: 'menu-val', textContent: n === undefined ? '' : countText(n) }));
+    end.insertAdjacentHTML('beforeend', CHECK);
+    b.append(el('span', { textContent: t(s.name) }), end);
+    b.onclick = () => travelTo(i + 1);
+    rows.push(b);
+  });
+  $('#menu-tracks-box').replaceChildren(...rows);
+}
+/** a spot picked in the menu's Tracks (0: back to the city): back to the game, which goes there */
+function travelTo(k: number) {
+  const m = $<HTMLDialogElement>('#menu'); if (m.open) m.close();
+  const st = travelNow();
+  if (!st || st.at === k || (st.why && !(k === 0 && st.why === WHY_COOP))) return;
+  log.add(`[app] the menu's Tracks: ${k ? TRACKS[k - 1].name : 'back to the city'}`);
+  session?.input?.travel?.(k);
+}
 /** The menu's Crews (free roam only), in the menu's place: the Crews row's control, which changes the game's crews at
  *  once (the menu opened first, if it isn't); the keyboard in its box, or on a crew's colour with 4 */
 function openCrews() {
@@ -1864,7 +1956,7 @@ function popFriendsFocus() {
 function drawPopFriends() {
   const box = $('#menu-friends-box'), had = box.contains(document.activeElement);
   // (the line on Join only where a friend has one)
-  $('#menu-friends-help').hidden = !friendPrompt.drawPlaced(box, room => void joinFriend(room));
+  $('#menu-friends-help').hidden = !friendPrompt.drawPlaced(box, f => void joinFriend(f), !!session?.input?.travelFriend && !!travelNow());
   if (had && !box.contains(document.activeElement)) popFriendsFocus();   // (the field keeps it: friends.ts AskField)
 }
 /** the race lobby card's Invite (its key, a click or a tap): the menu's Friends, whose friends in this room each
@@ -1892,17 +1984,42 @@ function joinCrew(crew: string, room: string) {
   });
 }
 /** a Join in the menu's Friends: that friend's room, at once, and back to the game */
-async function joinFriend(room: string) {
+/** The menu's Friends, a friend's Join: its world, at once, as an invite link's Join, when it is another; then the game
+ *  goes to it (runtime/travel.c: to its race track, if it is at one, then behind its car), and the line says why when
+ *  it could not (the game's "travel_said": watchSaid) */
+async function joinFriend(f: Friend) {
   const m = $<HTMLDialogElement>('#menu'); if (m.open) m.close();
-  // (the friend's page named the room: checked as a link's room is)
-  const inv = tidyInvite({ room }), ok = checkInvite(inv);
-  if (!ok.ok) {
-    log.add(`[app] the menu's Friends: not joining a friend's room: ${ok.why}`);
-    tell(t('This invite link cannot be used: {why}.', { why: tvars(ok.why, ok.v).replace(/[.。]$/, '') }));
-    return;
+  if (f.room !== undefined && !sameName(f.room, roamRoom ?? '')) {
+    // (the friend's page named the room: checked as a link's room is)
+    const inv = tidyInvite({ room: f.room }), ok = checkInvite(inv);
+    if (!ok.ok) {
+      log.add(`[app] the menu's Friends: not joining a friend's room: ${ok.why}`);
+      tell(t('This invite link cannot be used: {why}.', { why: tvars(ok.why, ok.v).replace(/[.。]$/, '') }));
+      return;
+    }
+    log.add('[app] the menu\'s Friends: joining a friend\'s room');
+    tell(joinedText(await applyInvite(inv)));
   }
-  log.add('[app] the menu\'s Friends: joining a friend\'s room');
-  tell(joinedText(await applyInvite(inv)));
+  const game = session;
+  if (!game?.input?.travelFriend || !travelNow()) return;
+  const before = travelSaid(game.status?.read()?.get('travel_said'), -1)?.n ?? 0;
+  log.add(`[app] the menu's Friends: going to a friend (${f.name})`);
+  if (game.input.travelFriend(roomHash(f.name), friendSpot(f.room, f.at))) watchSaid(f.name, before);
+}
+/** the game's word on a trip to friend `name` (travel.c said), a line when it could not go there, watched up to a minute
+ *  (two loads and the wait to see the friend); before: the word's count when it was asked */
+function watchSaid(name: string, before: number) {
+  const game = session, until = performance.now() + 60000;
+  const timer = setInterval(() => {
+    const s = travelSaid(game?.status?.read()?.get('travel_said'), before);
+    if (!s && performance.now() < until && session === game) return;
+    clearInterval(timer);
+    if (!s) return;
+    log.add(`[app] the trip to a friend: ${s.what}${s.why ? ` (${s.why})` : ''}`);
+    if (s.what === SAID_LOCKED) tell(t('{name} is in a part of the city your career hasn\'t opened yet.', { name }));
+    else if (s.what === SAID_NOT_FOUND) tell(t('{name} could not be found in free roam.', { name }));
+    else if (s.what === SAID_NOT_NOW && whyText(s.why)) tell(whyText(s.why));
+  }, 250);
 }
 
 // --------------------------------------------------------- invite links --
@@ -1947,7 +2064,7 @@ function inviteLive(): boolean {
  *  (tidyInvite), whichever way they came. */
 async function applyInvite(given: Invite): Promise<Joined> {
   const inv = tidyInvite(given);
-  const was = await readText(SAVE, 'settings.ini') ?? settingsText ?? TEMPLATE;
+  const was = await settingsFile.peek() ?? settingsFile.forGame ?? TEMPLATE;
   const now = inviteNow(was), d = inviteDiff(inv, now);
   if (d.full) return 'full';
   if (inviteNone(d)) return 'none';
@@ -1960,8 +2077,8 @@ async function applyInvite(given: Invite): Promise<Joined> {
     text = putKey(text, 'roam_crew_colours', rgbsValue(crews)).text;
   }
   if (text !== was) {
-    await writeFile(SAVE, 'settings.ini', text);
-    settingsText = text; void settings.refresh(); players?.now(); vault?.changed(); friendsPanel?.render();
+    await settingsFile.write(text);
+    void settings.refresh(); players?.now(); vault?.changed(); friendsPanel?.render(); evaluate();
   }
   // (the names, for the log as it leaves the browser: privacy.ts)
   if (isOwn(inv.room ?? '')) privacy.name(inv.room, 'room');
@@ -2024,7 +2141,7 @@ async function offerInvite(given: Invite) {
   const inv = tidyInvite(given);
   // once this tab knows whether it owns the saves, has read them, and shows no other question
   await Promise.race([instance.whenOwner, new Promise(r => setTimeout(r, 500))]);
-  if (instance.owner && settingsText === null) await loadSettings().catch(() => null);
+  if (instance.owner && settingsFile.forGame === null) await loadSettings().catch(() => null);
   while (document.querySelector('dialog[open]')) await new Promise(r => setTimeout(r, 500));
   const ok = checkInvite(inv);
   if (!ok.ok) {
@@ -2033,7 +2150,7 @@ async function offerInvite(given: Invite) {
     return;
   }
   const owner = instance.owner;
-  const now = inviteNow(owner ? settingsText : await readText(SAVE, 'settings.ini').catch(() => null)), d = inviteDiff(inv, now);
+  const now = inviteNow(owner ? settingsFile.forGame : await settingsFile.peek().catch(() => null)), d = inviteDiff(inv, now);
   const v = { world: worldNamed(inv.room ?? ''), crew: inv.crew ?? '', old: worldNamed(now.room) };
   // (as the player's own settings spell it)
   if (inviteNone(d)) {
@@ -2139,6 +2256,7 @@ async function menuAction(act: string) {
       break;
     }
     case 'worlds': openWorlds(); break;
+    case 'tracks': openTracks(); break;
     case 'crews': openCrews(); break;
     case 'friends': openFriends(); break;
     case 'back': menuPage('main'); break;
@@ -2317,7 +2435,7 @@ async function loadModule() {
 // sessionStorage names the version a reload was for: a reload that still came
 // back without it offers it, and is not repeated by itself.  A test page (the
 // address's test settings) only offers it: its tool drives it.
-const NEWER_EVERY_MS = 5 * 60_000, UPDATE_KEY = 'nfsu2-update';
+const NEWER_EVERY_MS = 5 * 60_000;
 let newer: string | null = null;
 /** the version a reload of this tab was for and did not bring */
 let tried: string | null = null;
@@ -2353,8 +2471,7 @@ function netBack() { setTimeout(() => void checkNewer(), Math.random() * 30_000)
 /** Reload for the server's version rev.  sessionStorage names it (afterUpdate); by itself only then (false: not
  *  reloaded), at Play either way. */
 async function reloadFor(rev: string, why: string, byItself: boolean): Promise<boolean> {
-  let marked = false;
-  try { sessionStorage.setItem(UPDATE_KEY, rev); marked = true; } catch { /* no storage here */ }
+  const marked = sessionStore.set(UPDATE_FOR, rev);
   if (byItself && !marked) return false;
   log.add(`[app] the server has game ${rev} now, this page ${loaded!.info.rev}: reloading (${why})`);
   await reload();
@@ -2362,11 +2479,10 @@ async function reloadFor(rev: string, why: string, byItself: boolean): Promise<b
 }
 /** after a reload for a new version: whether it brought it */
 function afterUpdate() {
-  let want: string | null = null;
-  try { want = sessionStorage.getItem(UPDATE_KEY); } catch { /* no storage here */ }
+  const want = sessionStore.get(UPDATE_FOR);
   if (!want || !loaded) return;
   if (want === loaded.info.rev) {
-    try { sessionStorage.removeItem(UPDATE_KEY); } catch { /* no storage here */ }
+    sessionStore.remove(UPDATE_FOR);
     updated = true;
     log.add(`[app] reloaded for game ${want}: this page has it`);
   } else {
@@ -2465,7 +2581,7 @@ export async function boot() {
   void setLanguage(lastLanguage(), logLine);
   // the big panel's tabs (the one open last, or the one the address names: #friends) and About's; the Other tab's
   // contents are at the Game tab's end since the Mods tab came (kept or named, #other opens Game there)
-  bigTabs = panelTabs($('#settings'), { store: 'nfsu2.page.tab', hash: true, moved: { other: { tab: 'game', at: '#game-data' } } });
+  bigTabs = panelTabs($('#settings'), { store: PAGE_TAB, hash: true, moved: { other: { tab: 'game', at: '#game-data' } } });
   panelTabs($('#about'));
   // Last.fm: its row under the songs' settings, and the scrobbles of the songs the game plays (lastfm.ts)
   const lastfmApi = new LastfmApi(), lastfmRow = new LastfmRow({ api: lastfmApi, log: logLine, say: pageToast });
@@ -2474,11 +2590,11 @@ export async function boot() {
   onLanguage(() => lastfmRow.render());
   settings = new SettingsPanel($('#settings'), {
     // another language, texture pack or songs count other files as the game data (its pack); a keyphrase sends the file
-    saveDir: SAVE, environment: ENVIRONMENT, defaults: DEVICE, onSaved: text => {
-      const was = packsKey(); settingsText = text;
-      if (packsKey() !== was) void saves.refresh();
+    file: settingsFile, environment: ENVIRONMENT, defaults: DEVICE, onSaved: (_, was) => {
+      if (packsKey() !== packsKey(resolveEnv(was, ENVIRONMENT, {}, DEVICE))) void saves.refresh();
       vault?.changed(); players?.now();
       friendsPanel?.render();
+      evaluate();
       applyLanguage();
       siteKeysNow();
     },
@@ -2537,7 +2653,7 @@ export async function boot() {
   friendsPanel = new FriendsPanel($('#friends'), {
     api: friendsApi, join: room => void offerInvite({ room }), confirm: (title, body, ok) => confirmBox(title, body, ok),
     idle: () => !session && !starting, log: logLine, store: msgStore, chat: name => chatDialog.open(name), waiting: friendsWaiting,
-    crews: () => { const n = inviteNow(settingsText); return { crews: n.crews, room: n.room }; },
+    crews: () => { const n = inviteNow(settingsFile.forGame); return { crews: n.crews, room: n.room }; },
   });
   chatDialog = new ChatDialog(msgStore, { send: (name, body) => friendsPanel.send(name, body), log: logLine });
   $<HTMLButtonElement>('#play').onclick = () => void play();
@@ -2616,8 +2732,8 @@ export async function boot() {
   touch = new TouchControls($('#stage'), { toast, log: logLine, chat: () => quickChat.toggle(), chatOn: () => quickChat.enabled,
     settings: () => openHelp('keys') });
   friendPrompt = new FriendPrompt($('#stage'), {
-    send: m => session?.net?.friend?.(m) ?? false, room: () => roamRoom ?? '', log: logLine, place: placeNotices,
-    toast: (s, o) => toast(o?.name ? named(s, o.name) : s, 5000, false, o?.hot ? 'hot' : ''),
+    send: m => session?.net?.friend?.(m) ?? false, room: () => roamRoom ?? '', spot: () => travelNow()?.at ?? null,
+    log: logLine, place: placeNotices, toast: (s, o) => toast(o?.name ? named(s, o.name) : s, 5000, false, o?.hot ? 'hot' : ''),
     notice: friendNotice, menu: menuName, placed: () => { if (menuOn('friends')) drawPopFriends(); },
     hosted: () => lobbyPanel.hosted(), joinLobby: (host, lobby, race) => session?.input?.lobby?.(LB_JOIN, host, lobby, race) ?? false,
     api: friendsApi, driving: () => quickChat.driving(),
@@ -2693,7 +2809,7 @@ export async function boot() {
     quickChat: () => quickChat.state(), quickChatStick: (x: number, y: number) => quickChat.stick(x, y),
     quickChatClick: () => quickChat.click(),
     messages: () => friendMessages.state(),
-    env: () => resolved().env, settingsText: () => settingsText, checks: () => [...checks.values()],
+    env: () => resolved().env, settingsText: () => settingsFile.forGame, checks: () => [...checks.values()],
     fpsMode: (m?: FpsMode) => { if (m && FPS_MODES.includes(m)) fps.set(m); return fps.mode; },
     quitTimes: { forcedCloseMaxMs: FORCED_CLOSE_MAX_MS, stopAfterMs: STOP_AFTER_MS },
   };

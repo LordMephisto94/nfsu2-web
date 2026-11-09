@@ -33,6 +33,10 @@ export function blockRuns(m: Manifest): { url: string; max: number } {
  *  good. */
 export const runUrl = (base: string, path: string, first: number, n: number, f: { mtime: number; size: number }) =>
   `${dataUrl(base, path)}?b=${first}&n=${n}&m=${f.mtime}&s=${f.size}`;
+/** bytes off .. off+len-1 of a file as they are: a 200 of exactly those bytes, which Cloudflare keeps for good like a
+ *  run (the file's mtime and size in the address).  The HQ vinyls' pictures (gpu/hqskin.ts), ~30 KB each. */
+export const exactUrl = (base: string, path: string, off: number, len: number, f: { mtime: number; size: number }) =>
+  `${dataUrl(base, path)}?o=${off}&l=${len}&m=${f.mtime}&s=${f.size}`;
 export interface DataFile { path: string; size: number; mtime: number }
 export interface CacheFile { h: FileSystemSyncAccessHandle; have: Uint8Array; haveH: FileSystemSyncAccessHandle }
 
@@ -54,7 +58,8 @@ export function songsPath(path: string): string | null {
  *  runtime/language.c) has a file of the same path, that one; no other language's pack; of the texture packs
  *  (TEXPACKS/<name>.pak and its <name>.tracks, runtime/web/texrep_web.c) only those picked (packs.texpack: their
  *  names, comma-separated; '' for none); pfdata/original's files only with the original songs, and then in place
- *  of pfdata's; the crash damage's (MODPACKS/DAMAGE/) only with it on, and MODPACKS/WHINE only with the gearbox whine on. */
+ *  of pfdata's; the crash damage's (MODPACKS/DAMAGE/) only with it on, and MODPACKS/WHINE only with the gearbox whine on.
+ *  HQVINYLS/ never: the HQ vinyls' pictures (gpu/hqskin.ts) are read as cars are seen, 330 MB in all. */
 function gameFiles(files: DataFile[], language: string, packs: Packs): DataFile[] {
   const own = new Set(files.filter(f => { const p = parts(f); return p[0] === 'langpacks' && p[1] === language; })
     .map(f => parts(f).slice(2).join('/')));
@@ -66,6 +71,7 @@ function gameFiles(files: DataFile[], language: string, packs: Packs): DataFile[
     if (p[0] === 'texpacks') return p.length === 2 && packs.texpack.split(',').some(n => n && (p[1] === `${n}.pak` || p[1] === `${n}.tracks`));
     if (p[0] === 'modpacks' && p[1] === 'damage') return !!packs.damage;
     if (p[0] === 'modpacks' && p[1] === 'whine') return !!packs.whine;
+    if (p[0] === 'hqvinyls') return false;
     if (isOriginal(p)) return original;
     if (replaced.has(p.join('/'))) return false;
     return p[0] === 'langpacks' ? p[1] === language : !own.has(p.join('/'));
@@ -100,9 +106,9 @@ export async function openCacheFile(dir: FileSystemDirectoryHandle, f: DataFile)
   const k = cacheKey(f);
   const fh = await dir.getFileHandle(k, { create: true });
   const mh = await dir.getFileHandle(k + '.have', { create: true });
-  const h = await (fh as any).createSyncAccessHandle({ mode: 'readwrite-unsafe' }) as FileSystemSyncAccessHandle;
+  const h = await fh.createSyncAccessHandle({ mode: 'readwrite-unsafe' });
   let haveH: FileSystemSyncAccessHandle;
-  try { haveH = await (mh as any).createSyncAccessHandle({ mode: 'readwrite-unsafe' }) as FileSystemSyncAccessHandle; }
+  try { haveH = await mh.createSyncAccessHandle({ mode: 'readwrite-unsafe' }); }
   catch (e) { h.close(); throw e; }
   const nb = blockCount(f.size);
   const have = new Uint8Array(nb);

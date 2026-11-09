@@ -546,7 +546,11 @@ class Lifter:
                         continue
                     if m in ('hlt','ud2'): break
                     va=i.address+i.size
-                    if len(ins)>maxins: break
+                    if len(ins)>maxins:
+                        # a straight run longer than maxins goes on as the next block (the emitter's
+                        # fall-through goto): without it the C function returned mid-run
+                        if va not in seen: seen.add(va); q.append(va)
+                        break
                 blocks[ins[0].address if ins else va]=ins
                 if jt and ins:
                     b = self._jt_bound(ins)
@@ -926,10 +930,11 @@ class Lifter:
                     16:"c->eax=(c->eax & 0xffff0000u)|((_d)&0xffffu);",
                     32:"c->eax=(_d);"}[bits]
             # On the real CPU the flags come from an implicit "DEST - ACC" compare
-            # (measured with Rosetta); ZF is the same either way round.
+            # (measured with Rosetta); ZF is the same either way round.  The store tests
+            # _d==_a, not c->zf: when the flags are dead after it, _fm() leaves ZF out.
             return [f"{{ uint32_t _a={acc}, _d={E(0)}, _r=_d-_a;"
                     f" FLAGS_SUB_M(_d,_a,_r,{bits},{self._fm()});"
-                    f" if(c->zf){{ {W(0,E(1))} }} else {{ {wacc} }} }}"]
+                    f" if(_d==_a){{ {W(0,E(1))} }} else {{ {wacc} }} }}"]
         if m in ('bsf','bsr'):
             # if the source is 0, ZF=1 and the destination does NOT CHANGE
             fn = "_i=0; while(!((_v>>_i)&1u)) _i++;" if m=='bsf' else \

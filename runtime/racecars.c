@@ -54,11 +54,23 @@
  *    owner's last controls.  One farther off is carried on along its way, up
  *    to CAP_FAR_US.  A correction the interpolator would snap (over 5 m) glides
  *    too;
+ *  - each other car sounds with its own engine, as free roam's friends do
+ *    (roam_game.c, carsfx.c): the game gives the other players' cars an AI
+ *    racer's sound (their records' byte +0x900, 0x4690E0), one engine model
+ *    of its few AI engines (a Focus heard as an S2000's) at an rpm of its own
+ *    (8600 of 10000 with the car standing); so each state carries the engine
+ *    as its owner's game sounds it (roam_game_engine_state: the rpm on the
+ *    sound's scale and the volumes, in the state's extension), and each
+ *    other car's GIN recordings (its car type's and engine upgrades', as
+ *    0x4593B0 picks them: roam_game_engine_files) play at that through
+ *    carsfx.c, the game's AI engine on that car silenced (roam_game.c
+ *    aieng_update, racecars_engine_heard).  A car whose states carry no
+ *    engine (an older game's) keeps the game's;
  *  - a car of an older game (none of these come for it) keeps racenet.c's
  *    way, and an older game drops these (an unknown message on the port).
  *
  * N2RS, version 1 (little-endian):
- *   0 "N2RS", 4 version 1, 5 flags (1: states with the extension), 6 the
+ *   0 "N2RS", 4 version 1, 5 flags (1: states with the extension: the engine), 6 the
  *   sender's race slot, 7 n states (1..NSTATES, newest first), 8 epoch (a
  *   change: its car was put elsewhere, snap), 9 clock epoch (a change: its
  *   stamp clock was set anew, re-sync), 10 status (roam_core.h RC_ST_*), 11 0,
@@ -76,6 +88,7 @@
  * Test knobs (read only with NFSU2_INPUT_SCRIPT set, racenet.c's test_env):
  * NFSU2_RACE_CARS=0 off (the game's and racenet.c's way), NFSU2_RACE_CARS_HZ,
  * NFSU2_RACE_NEAR_M / _FAR_M, NFSU2_RACE_GHOST_MS, NFSU2_RACE_LEAD_MS,
+ * NFSU2_RACE_ENGINES=0 (the game's AI engines on the other cars),
  * NFSU2_RACE_DRIVE=1 (near cars driven, above; 0 the default: all put), NFSU2_RACE_DRIVE_M /
  * _DRIVE_TAU_MS / _DRIVE_TAUR_MS, NFSU2_RACECARS_TRACE=1 (lines on what
  * moved a car: "[rctrace]").
@@ -85,29 +98,23 @@
  * swerve every 5-9 s; tools/race_acc.py): see the commit.
  */
 #include "cpu.h"
+#include "guest.h"
+#include "game.h"
 #include "roam_core.h"
+#include "carsfx.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
-#define G_FLOW       0x008654a4u   /* 6: in the world */
-#define G_NETMODE    0x00850078u   /* 8 Online, 0x200 LAN */
-#define G_WORLD      0x00890080u   /* World*: +0 the cars' list */
 #define G_PLAYER1    SPLIT_PLAYERS_INDEX   /* Player*: +4 car */
-#define G_WORLDDT    0x00865154u   /* float: this step's world dt (s) */
-#define G_RACE       0x00890118u   /* the race coordinator*: +0 state */
 #define RC_RACING    4u
-#define G_NETPLAYERS 0x0089cf50u   /* the race's players by slot: 6 pointers, name at +0x12 (a car's slot: +0xA) */
 #define CAR_SLOT     0x0au         /* a car: int16, its player's race slot (0x5F9840: the players by slot) */
 #define CAR_CTL      0x30u         /* a car: its input (+0x20C throttle, +0x210 handbrake, +0x214 brake, u16 +0x1E0 steer) */
 #define CAR_POS      0x60u
 #define CAR_VEL      0x70u
 #define CAR_ROWS     0x90u         /* the orientation's rows: forward, left (+0xA0), up (+0xB0) */
 #define CAR_SPIN     0x110u
-#define CAR_SPEED    0x42cu
-#define CAR_GEAR     0x434u
-#define CAR_RPM      0x440u
 #define CTL_CAR      0x10u         /* a remote car's controller: its world car */
 #define CTL_PREV_V   0x140u
 #define CTL_HIT      0x184u        /*   world time (1/4000 s) of the last hit it saw */
@@ -157,9 +164,12 @@
 int vlan_rt_send(uint16_t port, uint32_t ip_h, const void *p, int n);
 int racenet_race_peers(uint32_t *ip_h, int max);   /* racenet.c: the other racers' addresses */
 int racenet_slot_of(uint32_t ip_h);                /*   and the slot each drives (-1 none, -2 not known) */
+/* roam_game.c: free roam's friends' engines */
+void roam_game_engine_state(uint32_t car, rc_state *s);
+int  roam_game_engine_files(CPU *c, uint32_t ride, char gin[2][32], float *idle, float *most);
+void roam_game_engine_sound(const char (*gin)[32], float idle, float most, const rc_pose *P, carsfx_state *st);
+void roam_game_aieng_patch(void);
 
-static int ok(uint32_t a, uint32_t n){ return a && mem_is_committed(a) && mem_is_committed(a + n); }
-static uint32_t rd32(uint32_t a){ return ok(a, 3) ? MR32(a) : 0u; }
 static void rd3(uint32_t a, float *o){ o[0] = MRF32(a); o[1] = MRF32(a + 4u); o[2] = MRF32(a + 8u); }
 static int64_t now_us(void){
     struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -196,7 +206,7 @@ static double knob(const char *k, double def, double lo, double hi){
     double v = e && *e ? atof(e) : def;
     return v >= lo && v <= hi ? v : def;
 }
-static struct { int init, on, hz; float near_m, far_m; int64_t ghost_us, lead_us; int drive; float drive_m, drive_tau, drive_tau_r; int trace; } O;
+static struct { int init, on, hz; float near_m, far_m; int64_t ghost_us, lead_us; int drive; float drive_m, drive_tau, drive_tau_r; int trace, engines; } O;
 static void opts(void){
     if (O.init) return;
     O.init = 1;
@@ -210,6 +220,7 @@ static void opts(void){
     O.lead_us = (int64_t)(knob("NFSU2_RACE_LEAD_MS", 0, -500, 500) * 1000.0);
     O.drive = (int)knob("NFSU2_RACE_DRIVE", 0, 0, 1);
     O.trace = (int)knob("NFSU2_RACECARS_TRACE", 0, 0, 1);
+    O.engines = (int)knob("NFSU2_RACE_ENGINES", 1, 0, 1);
     O.drive_m = (float)knob("NFSU2_RACE_DRIVE_M", DRIVE_M, 0, 10000);
     O.drive_tau = (float)knob("NFSU2_RACE_DRIVE_TAU_MS", DRIVE_TAU * 1000.f, 20, 2000) / 1000.f;
     O.drive_tau_r = (float)knob("NFSU2_RACE_DRIVE_TAUR_MS", DRIVE_TAU_R * 1000.f, 20, 2000) / 1000.f;
@@ -217,28 +228,28 @@ static void opts(void){
 int racecars_on(void){ opts(); return O.on; }
 
 static int in_race(void){
-    uint32_t w = rd32(G_WORLD), rc = rd32(G_RACE);
-    return rd32(G_FLOW) == 6u && (rd32(G_NETMODE) & 0x208u) && ok(w, 0x80) && rd32(rc) == RC_RACING;
+    uint32_t w = guest_rd32(G_WORLD), rc = guest_rd32(G_RACE);
+    return guest_rd32(G_FLOW) == 6u && (guest_rd32(G_GAMEMODE) & 0x208u) && guest_ok(w, 0x80) && guest_rd32(rc) == RC_RACING;
 }
-static uint32_t my_car(void){ uint32_t pl = rd32(G_PLAYER1); return pl ? rd32(pl + 4u) : 0; }
+static uint32_t my_car(void){ uint32_t pl = guest_rd32(G_PLAYER1); return pl ? guest_rd32(pl + 4u) : 0; }
 /* the car is on the world's list */
 static int in_world(uint32_t w, uint32_t car){
-    uint32_t x = rd32(w);
-    for (int k = 0; x && x != w && k < 64 && ok(x, 0x9e0); k++, x = rd32(x)) if (x == car) return 1;
+    uint32_t x = guest_rd32(w);
+    for (int k = 0; x && x != w && k < 64 && guest_ok(x, 0x9e0); k++, x = guest_rd32(x)) if (x == car) return 1;
     return 0;
 }
 /* the world's car of a race slot (not ours) */
 static uint32_t car_of_slot(int slot){
-    uint32_t w = rd32(G_WORLD), me = my_car(), x = rd32(w);
-    for (int k = 0; x && x != w && k < 64 && ok(x, 0x9e0); k++, x = rd32(x))
+    uint32_t w = guest_rd32(G_WORLD), me = my_car(), x = guest_rd32(w);
+    for (int k = 0; x && x != w && k < 64 && guest_ok(x, 0x9e0); k++, x = guest_rd32(x))
         if (x != me && (int16_t)MR16(x + CAR_SLOT) == slot) return x;
     return 0;
 }
 static void car_name(uint32_t car, char *o){
-    int i = ok(car, 0x9e0) ? (int16_t)MR16(car + CAR_SLOT) : -1;
-    uint32_t pl = i >= 0 && i < 6 ? rd32(G_NETPLAYERS + 4u * (uint32_t)i) : 0;
+    int i = guest_ok(car, 0x9e0) ? (int16_t)MR16(car + CAR_SLOT) : -1;
+    uint32_t pl = i >= 0 && i < 6 ? guest_rd32(G_NETPLAYERS + 4u * (uint32_t)i) : 0;
     int n = 0;
-    if (ok(pl, 0x12 + 16))
+    if (guest_ok(pl, 0x12 + 16))
         for (; n < 15; n++){ uint8_t ch = MR8(pl + 0x12u + (uint32_t)n); if (ch < 0x20 || ch > 0x7e) break; o[n] = (char)ch; }
     o[n] = 0;
 }
@@ -309,6 +320,10 @@ typedef struct {
     float tp[3], tm[3]; float th; int thave;      /* NFSU2_RACECARS_TRACE: the place drawn last step, its move, the step */
     float putp[3], putv[3]; int puts;             /*   where we put it this pass, its velocity then, how often */
     float dist;
+    rc_pose eng; int eng_ok;                      /* its engine as drawn last step (eng, its volumes; eng_ok: its states carry one) */
+    char gin[2][32]; float idle, most;            /* its engine's GIN files (roam_game_engine_files) for ... */
+    uint32_t gin_car; int heard;                  /* ... this car; carsfx.c plays it (its AI engine silenced) */
+    uint32_t heard_frames;
     /* for the log */
     uint32_t n, g250, g500; int64_t gap_max;
     uint32_t steps, own_hit, own_stall, glides, snaps, near_steps, far_steps;
@@ -337,7 +352,7 @@ static Rc *rc_of_car(uint32_t car){
     for (int i = 0; i < NCARS; i++){
         Rc *r = &g_rc[i];
         if (!r->ip || r->slot < 0 || !r->mo.n) continue;
-        if (!r->car || !in_world(rd32(G_WORLD), r->car)) r->car = car_of_slot(r->slot);
+        if (!r->car || !in_world(guest_rd32(G_WORLD), r->car)) r->car = car_of_slot(r->slot);
         if (r->car == car) return t - r->rx_at <= STALE_US ? r : 0;
     }
     return 0;
@@ -357,9 +372,9 @@ static int own_state(rc_state *s, uint32_t car){
     rd3(car + CAR_POS, s->p); rd3(car + CAR_VEL, s->v); rd3(car + CAR_SPIN, s->w);
     rd3(car + CAR_ROWS, f); rd3(car + CAR_ROWS + 0x10u, l); rd3(car + CAR_ROWS + 0x20u, u);
     rc_m2q(f, l, u, s->q);
-    s->speed = MRF32(car + CAR_SPEED); s->rpm = MRF32(car + CAR_RPM); s->gear = (int8_t)MR32(car + CAR_GEAR);
-    uint32_t ctl = rd32(car + CAR_CTL);
-    if (ok(ctl, 0x220)){
+    s->speed = MRF32(car + CAR_FWD_SPEED); s->rpm = MRF32(car + CAR_RPM); s->gear = (int8_t)MR32(car + CAR_GEAR);
+    uint32_t ctl = guest_rd32(car + CAR_CTL);
+    if (guest_ok(ctl, 0x220)){
         s->throttle = MRF32(ctl + 0x20cu); s->brake = MRF32(ctl + 0x214u);
         s->steer = (float)(int16_t)MR16(ctl + 0x1e0u) / 32767.f;
         if (s->brake > 0.1f) s->bits |= RC_BIT_BRAKE;
@@ -376,11 +391,13 @@ static int own_state(rc_state *s, uint32_t car){
     if (!__builtin_isfinite(s->throttle)) s->throttle = 0;
     if (!__builtin_isfinite(s->brake)) s->brake = 0;
     if (!__builtin_isfinite(s->steer)) s->steer = 0;
+    roam_game_engine_state(car, s);               /* the engine as our game sounds it, in the extension */
+    s->ext = s->eng != 0;
     return 1;
 }
 static void send_frame(void){
     uint32_t car = my_car();
-    if (!ok(car, 0x9e0)) return;
+    if (!guest_ok(car, 0x9e0)) return;
     float wdt = MRF32(G_WORLDDT);
     float p[3]; rd3(car + CAR_POS, p);
     /* put elsewhere (the game's reset): a new epoch, the others snap instead of gliding */
@@ -403,14 +420,14 @@ static void send_frame(void){
     for (int k = 0; k < np; k++){
         uint8_t m[24 + NSTATES * (RC_STATE_BYTES + RC_STATEX_BYTES)];
         rc_w w; rc_w_init(&w, m, sizeof m);
-        rc_putb(&w, "N2RS", 4); rc_put8(&w, 1); rc_put8(&w, 0); rc_put8(&w, (uint32_t)slot); rc_put8(&w, 1);
+        rc_putb(&w, "N2RS", 4); rc_put8(&w, 1); rc_put8(&w, s.ext); rc_put8(&w, (uint32_t)slot); rc_put8(&w, 1);
         rc_put8(&w, K.epoch); rc_put8(&w, K.clock); rc_put8(&w, K.paused > 1 ? RC_ST_PAUSED : RC_ST_ROAM); rc_put8(&w, 0);
         rc_put32(&w, (uint32_t)t);
         Rc *r = rc_of_ip(peers[k], 0);
         int fresh = r && r->their_at && t - r->their_at < 2000000;
         rc_put32(&w, fresh ? r->their_tx : 0u);
         rc_put32(&w, fresh ? (uint32_t)(t - r->their_at) : 0u);
-        rc_state_put(&w, &s, 0);
+        rc_state_put(&w, &s, s.ext);
         if (w.err) continue;
         if (vlan_rt_send(HORN_PORT, peers[k], m, (int)w.n)) S.sent_err++;
         else K.ndg++;
@@ -425,7 +442,7 @@ void racecars_heard(const uint8_t *m, int n, uint32_t from){
     for (int k = 0; k < np; k++) known |= peers[k] == from;
     int slot = m[6], ns = m[7];
     uint32_t me = my_car();
-    if (!known || slot >= 6 || !ok(me, 0x9e0) || slot == (int16_t)MR16(me + CAR_SLOT) || ns < 1 || ns > 3){ S.refused++; return; }
+    if (!known || slot >= 6 || !guest_ok(me, 0x9e0) || slot == (int16_t)MR16(me + CAR_SLOT) || ns < 1 || ns > 3){ S.refused++; return; }
     /* only the slot its game drives, as the creator knows it (racenet_slot_of) */
     int want = racenet_slot_of(from);
     if (want != -2 && want != slot){ S.refused++; return; }
@@ -458,14 +475,9 @@ void racecars_heard(const uint8_t *m, int n, uint32_t from){
 }
 
 /* ---- the car drawn (racenet.c's override of the game's blend, after it, each world step) ---- */
+/* a guest function from a lifted one's override, with the return address its own caller in the game uses (guest.h) */
 static void call_game(CPU *c, uint32_t fn, uint32_t ecx, int n, const uint32_t *arg, uint32_t ret){
-    CPU save = *c;
-    c->esp = (c->esp - 512u) & ~15u;
-    for (int i = n - 1; i >= 0; i--) PUSH32(arg[i]);
-    c->ecx = ecx;
-    PUSH32(ret);
-    dispatch_indirect(c, fn);
-    *c = save;
+    guest_call_ex(c, fn, ecx, c->edx, n, arg, ret, 512u);
 }
 /* the car put where p, v, q, w say, as the game's blend puts it (0x5F8C98..0x5F8D07) */
 static void put_car(CPU *c, uint32_t ctl, uint32_t car, const float *p, const float *v, const float *q, const float *w){
@@ -482,8 +494,8 @@ static void car_now(uint32_t car, float *p, float *v, float *q, float *w){
     rc_m2q(f, l, u, q);
 }
 static void controls(uint32_t car, const rc_pose *o){
-    uint32_t in = rd32(car + CAR_CTL);
-    if (!ok(in, 0x218u)) return;
+    uint32_t in = guest_rd32(car + CAR_CTL);
+    if (!guest_ok(in, 0x218u)) return;
     MRF32(in + 0x20cu) = clampf(o->throttle, 0.f, 1.f); MRF32(in + 0x214u) = clampf(o->brake, 0.f, 1.f);
     MRF32(in + 0x210u) = o->bits & RC_BIT_HANDBRAKE ? 1.f : 0.f;
     MR16(in + 0x1e0u) = (uint16_t)(int16_t)(clampf(o->steer, -1.f, 1.f) * 32767.f);
@@ -492,7 +504,7 @@ static void controls(uint32_t car, const rc_pose *o){
  * to draw (its states come), its place, velocity, orientation and spin kept
  * (put back while it runs on its own) */
 int racecars_pre(uint32_t car){
-    if (!racecars_on() || !in_race() || !ok(car, 0x9e0)) return 0;
+    if (!racecars_on() || !in_race() || !guest_ok(car, 0x9e0)) return 0;
     Rc *r = rc_of_car(car);
     if (!r) return 0;
     car_now(car, r->sp, r->sv, r->sq, r->sw);
@@ -504,7 +516,7 @@ int racecars_pre(uint32_t car){
 int racecars_step(CPU *c, uint32_t ctl, uint32_t car){
     if (!racecars_on() || !in_race()) return 0;
     Rc *r = rc_of_car(car);
-    if (!r || !ok(ctl + CTL_BLEND, 0x50u) || !ok(car, 0x9e0)) return 0;
+    if (!r || !guest_ok(ctl + CTL_BLEND, 0x50u) || !guest_ok(car, 0x9e0)) return 0;
     const float *sp = r->sp, *sv = r->sv, *sq = r->sq, *sw = r->sw;
     if (!r->name[0]) car_name(car, r->name);
     float h = MRF32(G_WORLDDT);
@@ -520,7 +532,7 @@ int racecars_step(CPU *c, uint32_t ctl, uint32_t car){
     /* the delay by the distance from our car */
     uint32_t me = my_car();
     float mp[3] = {0}, cp[3];
-    if (ok(me, 0x9e0)) rd3(me + CAR_POS, mp);
+    if (guest_ok(me, 0x9e0)) rd3(me + CAR_POS, mp);
     rd3(car + CAR_POS, cp);
     float d[3] = { cp[0] - mp[0], cp[1] - mp[1], cp[2] - mp[2] }, dist = len3(d);
     if (!__builtin_isfinite(dist)) dist = 0.f;
@@ -542,7 +554,7 @@ int racecars_step(CPU *c, uint32_t ctl, uint32_t car){
     double age = te - newest;
     if (mo->n && mo->off_init){ r->age_sum += age; r->age_n++; if ((float)age > r->age_max) r->age_max = (float)age; }
     /* a hit here: on its own physics until a state from after it */
-    uint32_t hit = rd32(ctl + CTL_HIT);
+    uint32_t hit = guest_rd32(ctl + CTL_HIT);
     if (r->evals == 1) r->hit = hit;                  /* (one from before we drew it is not ours) */
     if (hit && hit != r->hit){ r->hit = hit; if (!r->own){ r->own = 1; r->own_from = te; r->own_hit++; } }
     /* a stall: a car is carried on along its way (a driven one follows that way on its own physics: a wall still
@@ -577,6 +589,7 @@ int racecars_step(CPU *c, uint32_t ctl, uint32_t car){
     int64_t off0 = r->mo.off_r;
     uint64_t sn0 = r->mo.n_snap;
     if (!rc_interp_eval(&r->mo, (int64_t)te, fdt, r->delay, reach ? CAP_US : CAP_FAR_US, &o)) return 0;
+    r->eng = o; r->eng_ok = o.ext && o.eng > 0.f;
     /* a correction too big for the interpolator's fade (over 5 m, or its clock offset set anew): it put the car
      * there at once; glide from where it was instead */
     if (r->mo.n_snap != sn0 && r->steps) r->glide = 1;
@@ -690,29 +703,72 @@ drawn:
         memcpy(r->tp, np, sizeof np); r->thave = 1;
     }
     controls(car, &o);
-    uint32_t drv = rd32(car + 0x28u) == 3u ? rd32(car + 0x34u) : 0, x = drv ? rd32(drv + 0x24u) : 0;
-    if (ok(x, 0x139u)){ MR8(x + 0x138u) = 1; call_game(c, FN_DRIVEN, drv, 0, 0, RET_DRIVEN); }
+    uint32_t drv = guest_rd32(car + 0x28u) == 3u ? guest_rd32(car + 0x34u) : 0, x = drv ? guest_rd32(drv + 0x24u) : 0;
+    if (guest_ok(x, 0x139u)){ MR8(x + 0x138u) = 1; call_game(c, FN_DRIVEN, drv, 0, 0, RET_DRIVEN); }
     for (uint32_t k = 0; k < 3; k++) MRF32(ctl + CTL_PREV_V + 4u * k) = MRF32(car + CAR_VEL + 4u * k);
     r->steps++;
     return 1;
 }
 
+/* ---- the other cars' engines (above): carsfx.c, heard from the camera ---- */
+static int g_sounding;                            /* carsfx.c was given cars last frame */
+static void engines_frame(CPU *c, int racing){
+    float L[3], f[3] = { 1.f, 0.f, 0.f }, v[3] = {0};
+    uint32_t cam = guest_rd32(G_VIEW1 + 0x40u), me = my_car();
+    int64_t t = now_us();
+    int any = 0;
+    for (int i = 0; i < NCARS; i++){ g_rc[i].heard = 0; any |= g_rc[i].ip && g_rc[i].eng_ok; }
+    if (!racing || !O.engines || !any || !guest_ok(cam, 0x60)){
+        if (g_sounding){ carsfx_begin(0, f, 0); carsfx_end(); g_sounding = 0; }
+        return;
+    }
+    rd3(cam + 0x40u, L); rd3(cam + 0x50u, f);
+    if (guest_ok(me, 0x9e0)) rd3(me + CAR_VEL, v);
+    carsfx_begin(L, f, v);
+    for (int i = 0; i < NCARS; i++){
+        Rc *r = &g_rc[i];
+        if (!r->ip || r->slot < 0 || !r->eng_ok || !guest_ok(r->car, 0x9e0) || t - r->rx_at > STALE_US) continue;
+        if (r->gin_car != r->car){
+            uint32_t ride = guest_rd32(r->car + 0x10u);
+            if (!guest_ok(ride, 0x300) || !roam_game_engine_files(c, ride, r->gin, &r->idle, &r->most)) r->gin[0][0] = 0;
+            r->gin_car = r->car;
+            fprintf(stderr, "[racecars] %s's engine: %s + %s\n", r->name[0] ? r->name : "?", r->gin[0][0] ? r->gin[0] : "-",
+                    r->gin[0][0] ? r->gin[1] : "- (the game's AI engine)");
+        }
+        carsfx_state st; memset(&st, 0, sizeof st);
+        roam_game_engine_sound(r->gin, r->idle, r->most, &r->eng, &st);
+        if (!st.gin[0]) continue;
+        float p[3], cv[3]; rd3(r->car + CAR_POS, p); rd3(r->car + CAR_VEL, cv);
+        carsfx_car(0x4e325253u + (uint32_t)r->slot, r->name, p, cv, &st);   /* ("N2RS" + its slot: one per car) */
+        r->heard = 1; r->heard_frames++;
+        roam_game_aieng_patch();
+    }
+    carsfx_end();
+    g_sounding = 1;
+}
+/* this car's engine is played here, at this rpm on the sound's scale (0: not; roam_game.c's aieng_update silences
+ * the game's AI engine on it; roam.c's "roam cars") */
+float racecars_engine_heard(uint32_t car){
+    for (int i = 0; car && i < NCARS; i++) if (g_rc[i].heard && g_rc[i].car == car) return g_rc[i].eng.eng;
+    return 0.f;
+}
+
 /* every frame, on the game thread (racenet.c's racenet_frame, after the world's step) */
 void racecars_frame(CPU *c){
-    (void)c;
     opts();
     int racing = O.on && in_race();
-    uint32_t w = rd32(G_WORLD);
+    uint32_t w = guest_rd32(G_WORLD);
     if (!racing || w != g_world){
         if (!racing){ memset(g_rc, 0, sizeof g_rc); S.refused = S.bad = S.sent_err = 0; }
         g_world = racing ? w : 0;
     }
     clock_frame(racing);
     if (racing) send_frame();
+    engines_frame(c, racing);
     /* NFSU2_RACECARS_TRACE: a car moved between our put (the world's step) and here (before the frame is drawn) */
     if (racing && O.trace) for (int i = 0; i < NCARS; i++){
         Rc *r = &g_rc[i];
-        if (!r->ip || !r->car || !ok(r->car, 0x9e0) || !r->mo.n) continue;
+        if (!r->ip || !r->car || !guest_ok(r->car, 0x9e0) || !r->mo.n) continue;
         float p[3], d[3], h = MRF32(G_WORLDDT); rd3(r->car + CAR_POS, p);
         for (int k = 0; k < 3; k++) d[k] = p[k] - r->putp[k] - r->putv[k] * h;
         if (!r->puts && racecars_fed(r->car))
@@ -737,11 +793,12 @@ void racecars_log(double secs){
         fprintf(stderr, "[racecars]   car %s (slot %d, %s): %u states (%.1f/s), longest wait %.0f ms, waits over 250/500 ms %u/%u; "
                 "least round trip %.0f ms; its states %.0f ms old on average (at most %.0f); drawn %u steps, %.0f %% near; "
                 "between states %llu, carried on %llu, held %llu; corrections over 5 m %llu (largest %.2f m); on its own after "
-                "%u hits, %u stalls; %u glides back (largest %.1f m), %u snaps; driven %u steps, %u put right\n",
+                "%u hits, %u stalls; %u glides back (largest %.1f m), %u snaps; driven %u steps, %u put right; its own engine heard "
+                "%u frames\n",
                 r->name[0] ? r->name : "?", r->slot, a, r->n, secs > 0 ? r->n / secs : 0., (double)r->gap_max / 1000.0, r->g250, r->g500,
                 (double)rtt_min(r) / 1000.0, r->age_n ? r->age_sum / r->age_n / 1000.0 : 0., (double)r->age_max / 1000.0,
                 r->steps, st ? 100.0 * r->near_steps / st : 0., (unsigned long long)r->mo.n_interp, (unsigned long long)r->mo.n_extrap,
                 (unsigned long long)r->mo.n_hold, (unsigned long long)r->mo.n_snap, (double)r->mo.err_max, r->own_hit, r->own_stall,
-                r->glides, (double)r->glide_max, r->snaps, r->drive_steps, r->drive_snaps);
+                r->glides, (double)r->glide_max, r->snaps, r->drive_steps, r->drive_snaps, r->heard_frames);
     }
 }

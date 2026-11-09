@@ -36,6 +36,8 @@
  *   Off unless NFSU2_DAMAGE=1 (the start page's Crash damage, off by default); NFSU2_DAMAGE_LOG=1 logs every
  *   impact. */
 #include "cpu.h"
+#include "guest.h"
+#include "game.h"
 #include "widescreen.h"           /* HOOK_SITE */
 #include "guest_span.h"           /* g_gwin_hi: the guest heap's window */
 #include <stdio.h>
@@ -186,7 +188,7 @@ float dmg_thiscall_f(uint32_t fn, uint32_t self, int n, const uint32_t *a){
 }
 uint32_t dmg_alloc(uint32_t n){ return gheap_alloc(1, n, 1); }
 void dmg_free(uint32_t p){ gheap_free(1, p); }
-int dmg_committed(uint32_t a, uint32_t n){ return a && mem_is_committed(a) && mem_is_committed(a + n - 1u); }
+int dmg_committed(uint32_t a, uint32_t n){ return guest_ok_bytes(a, n); }
 uint32_t dmg_va_free(void){ return gheap_va_free(); }
 /* the guest heap has its window above the runtime (guest_span.h: a computer's browser; not phones, tablets, Safari) */
 int dmg_big_memory(void){ return g_gwin_hi != 0; }
@@ -256,13 +258,12 @@ int damage_part_lost(uint32_t ri, int part){ return on() && dmg_part_lost(ri, pa
  * in sight has it (the game never opens a car's hood out in a race, so it never loads it: drawn black).  Not a traffic
  * car's (CarTypeInfo +0x844, its use: 2 traffic): those have no damage.  Other players' cars in free roam get it from
  * roam_game.c either way. */
-#define G_CARTYPES_D  0x008a1cccu
 #define CT_SIZE_D     0x890u
 #define CT_USE_D      0x844u
 #define N_TYPES_D     46u
 int damage_texlist_engine(uint32_t ride){
     if (!on() || !ride || !mem_is_committed(ride)) return 0;
-    uint32_t types = MR32(G_CARTYPES_D), t = MR32(ride);
+    uint32_t types = MR32(G_CARTYPES), t = MR32(ride);
     return types && t < N_TYPES_D && mem_is_committed(types + t * CT_SIZE_D + CT_USE_D) &&
            MR32(types + t * CT_SIZE_D + CT_USE_D) != 2u;
 }

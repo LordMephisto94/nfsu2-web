@@ -26,7 +26,7 @@ use super::etag;
 use crate::options::within;
 
 /// what /data/ and /data-blocks/ serve: the top-level entries of the install folder that are the game's
-pub const GAME_ENTRIES: [&str; 21] = [
+pub const GAME_ENTRIES: [&str; 22] = [
     "speed2.exe",
     "server.dll",
     "server.cfg",
@@ -34,6 +34,7 @@ pub const GAME_ENTRIES: [&str; 21] = [
     "credits",
     "frontend",
     "global",
+    "hqvinyls",  // the HQ vinyls' pictures (tools/hqvinyls.py), if the folder has them
     "langpacks", // the language packs (tools/langpacks.py), if the folder has them
     "languages",
     "memcard",

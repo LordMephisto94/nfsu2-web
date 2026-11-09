@@ -36,12 +36,13 @@
  * All four functions are reached only through pointers (the screen table, the
  * screens' vtables): dispatch_patch, no change to the lift. */
 #include "cpu.h"
+#include "guest.h"
+#include "game.h"
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
 
 void dispatch_patch(uint32_t a, void (*f)(CPU *));
-void dispatch_indirect(CPU *c, uint32_t addr);
 long autotest_frame(void);
 void sub_00563cf0(CPU *c);                     /* the lifted ones the patches run */
 void sub_0056c420(CPU *c);
@@ -55,12 +56,8 @@ void sub_00560550(CPU *c);
 #define FN_ATTR         0x0061b500u   /* thiscall part (hash, default) -> attribute */
 #define FN_LIST_SELECT  0x005386a0u   /* thiscall list (item) */
 #define FN_HUD_SHOW     0x00548d20u   /* thiscall gauge screen (): the current item's labels and preview */
-#define FN_HIDE         0x0050ca00u   /* cdecl (object) */
-#define FN_SHOW         0x0050ca50u   /* cdecl (object) */
 #define FN_PART_FIRST   0x0061ba30u   /* thiscall parts (car type, slot, 0, -1): the slot's first part */
-#define G_PARTS         0x008a2b68u   /* the car part database */
 #define G_HUD_STAGE     0x00838560u
-#define G_FE_RIDE       0x008392c0u   /* the front end's ride of the car: +0 car type, +0x590 + 4 x slot its parts */
 #define G_COL_BACKING   0x00839c24u   /* the gauge screen's colours: slot 164 */
 #define G_COL_CHAR      0x00839c28u   /* ... 166 */
 #define G_COL_NEEDLE    0x00839c2cu   /* ... 165 */
@@ -85,24 +82,9 @@ void sub_00560550(CPU *c);
 #define I_PART          0x2cu         /* a list item: its part (the node is the item +4) */
 #define ICE_ITEM        0x58u         /* UI_ICEMAIN screen: the category shown (+0x48 its slot) */
 
-static int ok(uint32_t a, uint32_t n){ return a && mem_is_committed(a) && mem_is_committed(a + n - 1u); }
-
-/* a guest function with ecx and stack arguments, the CPU as it was after */
-static uint32_t gcall(CPU *c, uint32_t fn, uint32_t ecx, int n, const uint32_t *arg){
-    CPU save = *c;
-    c->esp = (c->esp - 256u) & ~15u;
-    for (int i = n - 1; i >= 0; i--) PUSH32(arg[i]);
-    c->ecx = ecx;
-    PUSH32(fn);                                  /* the callee's ret pops it */
-    dispatch_indirect(c, fn);
-    uint32_t r = c->eax;
-    *c = save;
-    return r;
-}
-
 static int pkg_is(uint32_t s, const char *name){
     size_t n = strlen(name);
-    if (!ok(s, (uint32_t)n + 1u)) return 0;
+    if (!guest_ok_bytes(s, (uint32_t)n + 1u)) return 0;
     for (size_t i = 0; i < n; i++) if ((MR8(s + i) | 0x20) != (name[i] | 0x20)) return 0;
     return MR8(s + n) == 0;
 }
@@ -111,10 +93,10 @@ static int pkg_is(uint32_t s, const char *name){
 /* the gauge screen's current item, when it is a style without colours (Stock) */
 static uint32_t stock_item(CPU *c, uint32_t scr){
     uint32_t cat = MR32(scr + S_CATEGORY), item = MR32(scr + S_LIST + 0xcu);
-    if (!ok(scr, 0x130u) || MR32(scr + S_LIST + 4u) == scr + S_LIST + 4u || !ok(cat, 0x50u) || MR32(cat + 0x48u) != SLOT_HUD) return 0;
-    if (!ok(item, I_PART + 4u)) return 0;
+    if (!guest_ok_bytes(scr, 0x130u) || MR32(scr + S_LIST + 4u) == scr + S_LIST + 4u || !guest_ok_bytes(cat, 0x50u) || MR32(cat + 0x48u) != SLOT_HUD) return 0;
+    if (!guest_ok_bytes(item, I_PART + 4u)) return 0;
     uint32_t part = MR32(item + I_PART), a[2] = { ATTR_STYLE, 0 };
-    if (!ok(part, 14u)) return 0;
+    if (!guest_ok_bytes(part, 14u)) return 0;
     return gcall(c, FN_ATTR, part, 2, a) == 0 ? part : 0;
 }
 
@@ -122,9 +104,9 @@ static uint32_t stock_item(CPU *c, uint32_t scr){
  * what a car has in them before its gauges are changed */
 static uint32_t first_part(CPU *c, uint32_t type, uint32_t slot){
     uint32_t a[4] = { type, slot, 0, 0xffffffffu };
-    return gcall(c, FN_PART_FIRST, G_PARTS, 4, a);
+    return gcall(c, FN_PART_FIRST, G_CARPARTDB, 4, a);
 }
-static uint32_t key_of(uint32_t part){ return ok(part, 4u) ? MR32(part) : 0u; }
+static uint32_t key_of(uint32_t part){ return guest_ok_bytes(part, 4u) ? MR32(part) : 0u; }
 
 static void hud_msg(CPU *c){
     uint32_t scr = c->ecx, msg = MR32(c->esp + 4u), stage = MR32(G_HUD_STAGE);
@@ -153,20 +135,20 @@ static void hud_new(CPU *c){
     fprintf(stderr, "[shop] f=%ld Custom Gauges: fitted %08x, colours %08x %08x %08x\n", autotest_frame(), key_of(fitted),
             key_of(MR32(G_FE_RIDE + RIDE_PARTS + 4u * SLOT_BACKING)), key_of(MR32(G_FE_RIDE + RIDE_PARTS + 4u * SLOT_NEEDLE)),
             key_of(MR32(G_FE_RIDE + RIDE_PARTS + 4u * SLOT_CHAR)));
-    if (!fitted || !ok(scr, 0x130u) || !ok(cat, 0x50u) || MR32(cat + 0x48u) != SLOT_HUD) return;
+    if (!fitted || !guest_ok_bytes(scr, 0x130u) || !guest_ok_bytes(cat, 0x50u) || MR32(cat + 0x48u) != SLOT_HUD) return;
     uint32_t head = scr + S_LIST + 4u, node = MR32(head), item = 0;
-    for (int k = 0; node && node != head && k < 64 && ok(node, 8u); k++, node = MR32(node))
-        if (ok(node - 4u, I_PART + 4u) && MR32(node - 4u + I_PART) == fitted){ item = node - 4u; break; }
+    for (int k = 0; node && node != head && k < 64 && guest_ok_bytes(node, 8u); k++, node = MR32(node))
+        if (guest_ok_bytes(node - 4u, I_PART + 4u) && MR32(node - 4u + I_PART) == fitted){ item = node - 4u; break; }
     if (!item || item == MR32(scr + S_LIST + 0xcu)) return;
     gcall(c, FN_LIST_SELECT, scr + S_LIST, 1, &item);
     MR32(cat + 0x4cu) = fitted;
     gcall(c, FN_HUD_SHOW, scr, 0, 0);
     uint32_t up = MR32(scr + S_UP), down = MR32(scr + S_DOWN);
     uint32_t first = MR32(scr + S_LIST + 4u) - 4u, last = MR32(scr + S_LIST + 8u) - 4u;
-    gcall(c, FN_SHOW, 0, 1, &up);
-    gcall(c, FN_SHOW, 0, 1, &down);
-    if (item == first) gcall(c, FN_HIDE, 0, 1, &up);
-    else if (item == last) gcall(c, FN_HIDE, 0, 1, &down);
+    gcall(c, FN_FE_SHOW, 0, 1, &up);
+    gcall(c, FN_FE_SHOW, 0, 1, &down);
+    if (item == first) gcall(c, FN_FE_HIDE, 0, 1, &up);
+    else if (item == last) gcall(c, FN_FE_HIDE, 0, 1, &down);
     fprintf(stderr, "[shop] f=%ld Custom Gauges: the list on the gauge fitted\n", autotest_frame());
 }
 
@@ -175,8 +157,8 @@ static struct { int state; uint32_t at, kind; } g_trunk;   /* 1: opened from the
 
 static void ice_msg(CPU *c){
     uint32_t scr = c->ecx, msg = MR32(c->esp + 4u), it = MR32(scr + ICE_ITEM);
-    if (msg == MSG_BUTTON && g_trunk.state != 2 && ok(scr, 0x170u) && pkg_is(MR32(scr + 4u), "UI_ICEMAIN.fng")){
-        if (ok(it, 0x4cu) && MR32(it + 0x48u) == SLOT_TRUNK){
+    if (msg == MSG_BUTTON && g_trunk.state != 2 && guest_ok_bytes(scr, 0x170u) && pkg_is(MR32(scr + 4u), "UI_ICEMAIN.fng")){
+        if (guest_ok_bytes(it, 0x4cu) && MR32(it + 0x48u) == SLOT_TRUNK){
             g_trunk.state = 1; g_trunk.at = MR32(ROW_ICE_PLACE); g_trunk.kind = MR32(G_LIST_KIND);
             fprintf(stderr, "[shop] f=%ld Trunk Audio from the list's place %u (list kind %u)\n", autotest_frame(), g_trunk.at, g_trunk.kind);
         } else g_trunk.state = 0;

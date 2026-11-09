@@ -32,9 +32,7 @@
 #include <math.h>
 #include <time.h>
 #include <stdatomic.h>
-
-#define ENVC(nm_) ({ static const char *_ev_; static int _ei_; \
-                     if (!_ei_){ _ei_ = 1; _ev_ = getenv(nm_); } _ev_; })
+#include "setting.h"      /* ENVC */
 
 void guest_wait_begin(void);     /* win32_ext.c: release the guest lock around a host wait */
 void guest_wait_end(void);
@@ -290,9 +288,10 @@ static unsigned tex_new(unsigned w, unsigned h, unsigned levels, unsigned f, uns
     g_tex_created++;
     GwCmd *c = rq_begin(GW_TEX_CREATE, 0);
     if (c){ c->a[0] = id; c->a[1] = w; c->a[2] = h; c->a[3] = levels; c->a[4] = f;
-            c->a[5] = (rt ? GW_TF_RT : 0) | (cube ? GW_TF_CUBE : 0); rq_commit(c); }
+            c->a[5] = (rt ? GW_TF_RT : 0) | ((rt & 2u) && !cube ? GW_TF_MS : 0) | (cube ? GW_TF_CUBE : 0); rq_commit(c); }
     return id;
 }
+/* is_rt: 1 a render target, 3 one drawn at 4 samples (GW_TF_MS: com.c MULTISAMPLING) */
 unsigned metal_create_texture_ex(unsigned w, unsigned h, unsigned levels, unsigned f, unsigned is_rt){
     return tex_new(w, h, levels, f, is_rt, 0);
 }
@@ -406,6 +405,12 @@ void metal_z_forget(unsigned zid){
     gw_init();
     GwCmd *c = rq_begin(GW_Z_FORGET, 0);
     if (c){ c->a[0] = zid; rq_commit(c); }
+}
+/* the back buffer's samples (1 or 4) from the next frame on (com.c bb_multisample) */
+void metal_set_bb_samples(unsigned n){
+    gw_init();
+    GwCmd *c = rq_begin(GW_BB_SAMPLES, 0);
+    if (c){ c->a[0] = n == 4u ? 4u : 1u; rq_commit(c); }
 }
 
 /* ---- the persistent vertex/index mirror pool ----------------------------
@@ -561,6 +566,24 @@ static void shader_put(int op, int id, const char *src){
     if (!c) return;
     c->a[0] = (uint32_t)id; c->a[1] = n;
     memcpy((uint8_t *)c + GW_CMD_HDR, src, n);
+    rq_commit(c);
+}
+/* ---- HQ vinyls (runtime/hqvinyls.c) ---------------------------------------
+ * The page paints a skin again at 1024 (web/src/gpu/hqskin.ts) when it says it
+ * can (GW_FEAT_HQSKIN: a PC with BC compression).  The recipe, then the
+ * 512x512 alpha planes its layers without REMAP need, in one record. */
+int gw_hqskin_ok(void){
+    return g_on && g_ctl && (g_ctl->features & GW_FEAT_HQSKIN) != 0;
+}
+void gw_skin_hq(unsigned id, const GwSkinHq *r, const uint8_t *const *planes, unsigned nplanes){
+    if (!gw_hqskin_ok() || !id) return;
+    const uint32_t plane = GW_SKIN_HQ_SIDE * GW_SKIN_HQ_SIDE;
+    GwCmd *c = rq_begin(GW_SKIN_HQ, (uint32_t)sizeof *r + nplanes * plane);
+    if (!c) return;
+    c->a[0] = id; c->a[1] = (uint32_t)sizeof *r; c->a[2] = nplanes;
+    uint8_t *p = (uint8_t *)c + GW_CMD_HDR;
+    memcpy(p, r, sizeof *r);
+    for (unsigned k = 0; k < nplanes; k++) memcpy(p + sizeof *r + k * plane, planes[k], plane);
     rq_commit(c);
 }
 void metal_register_vs(int id, const char *src){

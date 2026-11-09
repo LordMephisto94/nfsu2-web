@@ -31,21 +31,21 @@
  * the vinyls the car has no picture of stay out of it: for the call their
  * category byte names none (0x1F), then it is put back. */
 #include "cpu.h"
+#include "guest.h"
+#include "game.h"
 #include "widescreen.h"           /* HOOK_SITE */
+#include "featurelist.h"
 #include <stdio.h>
 #include <string.h>
 
-void dispatch_indirect(CPU *c, uint32_t addr);
 uint32_t language_add_text(const char *name, const char *text);
 void language_game_letters(const char *utf8, char *out, size_t n);
 const char *language_name(void);
-void language_texts_frame(CPU *c);
 uint32_t language_text(uint32_t hash);
 
 #define FN_ADD_CAT     0x00545920u   /* thiscall screen (category, icon, label) */
 #define FN_PART_FIRST  0x0061ba30u   /* thiscall parts (car, slot, 0, -1): the car's first part of the slot */
 #define FN_PART_NEXT   0x0061ba50u   /* thiscall parts (part, car, slot, 0, -1): the next one */
-#define G_PARTS        0x008a2b68u   /* the car part database */
 #define G_FECAR        0x008389acu   /* the front end's car: vtbl[1] its car type */
 #define G_SLOT_KIND    0x00802960u   /* per slot: the kind its parts' byte +4 has (0x60FEE0) */
 #define SLOT_VINYL     0x40u
@@ -57,7 +57,6 @@ uint32_t language_text(uint32_t hash);
 #define CAT_NONE       0x1fu
 #define LEFT_OUT       "DEBUG VINYL"
 #define NOUT           16
-#define G_CARTYPES     0x008a1cccu   /* CarTypeInfo[] (0x890 each): +0 the type's name, as CARS/<name>/ has it */
 #define CARTYPES_N     46u
 
 /* the vinyls whose pictures only some cars' VINYLS.BIN have (by the type's name; the texture's name after the car's) */
@@ -71,21 +70,6 @@ static const struct { const char *vinyl, *cars; } ONLY[] = {
 };
 
 static uint32_t g_label;
-
-/* a guest function with ecx and stack arguments, the CPU as it was after */
-static uint32_t gcall(CPU *c, uint32_t fn, uint32_t ecx, int n, const uint32_t *arg){
-    CPU save = *c;
-    c->esp = (c->esp - 256u) & ~15u;
-    for (int i = n - 1; i >= 0; i--) PUSH32(arg[i]);
-    c->ecx = ecx;
-    PUSH32(fn);                                  /* the callee's ret pops it */
-    dispatch_indirect(c, fn);
-    uint32_t r = c->eax;
-    *c = save;
-    return r;
-}
-
-static int ok(uint32_t a, uint32_t n){ return a && mem_is_committed(a) && mem_is_committed(a + n - 1u); }
 
 /* the label, in the game's language: "Special", in each Latin-script language as a vinyl category's word (not the
  * word its Unique category has: Turkish "Ozel" and Hungarian "Kulonleges" are those); Russian, Ukrainian and Korean
@@ -106,8 +90,8 @@ static uint32_t label(void){
     if (!strcmp(l, "russian") || !strcmp(l, "ukrainian") || !strcmp(l, "korean")){
         uint32_t g = language_text(0x06f8e5bfu);
         size_t n = 0;
-        if (g && ok(g, 1u)) while (n + 1 < sizeof s && ok(g + n, 1u) && MR8(g + n) && MR8(g + n) != ' ') n++;
-        if (n && ok(g + n, 1u) && MR8(g + n) == ' '){ memcpy(s, g_mem + g, n); s[n] = 0; }
+        if (g && guest_ok_bytes(g, 1u)) while (n + 1 < sizeof s && guest_ok_bytes(g + n, 1u) && MR8(g + n) && MR8(g + n) != ' ') n++;
+        if (n && guest_ok_bytes(g + n, 1u) && MR8(g + n) == ' '){ memcpy(s, g_mem + g, n); s[n] = 0; }
     }
     g_label = language_add_text("VINYL_CATEGORY_SPECIAL_N2", s);
     return g_label;
@@ -118,7 +102,7 @@ static void type_name(uint32_t car, char *out, size_t n){
     uint32_t tab = MR32(G_CARTYPES);
     size_t o = 0;
     out[0] = 0;
-    if (car >= CARTYPES_N || !ok(tab, CARTYPES_N * 0x890u)) return;
+    if (car >= CARTYPES_N || !guest_ok_bytes(tab, CARTYPES_N * 0x890u)) return;
     for (uint32_t i = 0; i < 0x20u && o + 1 < n; i++){
         uint8_t ch = MR8(tab + car * 0x890u + i);
         if (!ch) break;
@@ -144,14 +128,14 @@ static int hidden_vinyls(CPU *c, uint32_t car, uint32_t *out, int *nout){
     char tn[40];
     type_name(car, tn, sizeof tn);
     uint32_t kind = MR32(G_SLOT_KIND + 4u * SLOT_VINYL), a[5] = { car, SLOT_VINYL, 0, 0xffffffffu, 0 };
-    uint32_t p = gcall(c, FN_PART_FIRST, G_PARTS, 4, a);
+    uint32_t p = gcall(c, FN_PART_FIRST, G_CARPARTDB, 4, a);
     int n = 0, guard = 0;
     char list[640]; size_t o = 0; list[0] = 0;
-    while (p && ok(p, 14u) && guard++ < 4096){
+    while (p && guest_ok_bytes(p, 14u) && guard++ < 4096){
         if ((int32_t)(int8_t)MR8(p + P_KIND) == (int32_t)kind && (MR8(p + P_CAT) & 0x1fu) == CAT_HIDDEN){
             char nm[32] = {0};
             uint32_t s = gcall(c, FN_PART_NAME, p, 0, 0);
-            for (size_t i = 0; s && i + 1 < sizeof nm && ok(s + i, 1u) && MR8(s + i); i++) nm[i] = (char)MR8(s + i);
+            for (size_t i = 0; s && i + 1 < sizeof nm && guest_ok_bytes(s + i, 1u) && MR8(s + i); i++) nm[i] = (char)MR8(s + i);
             int drop = !strcmp(nm, LEFT_OUT) || not_this_car(nm, tn);
             if (drop){ if (*nout < NOUT) out[(*nout)++] = p; else drop = 0; }
             if (!drop) n++;
@@ -160,7 +144,7 @@ static int hidden_vinyls(CPU *c, uint32_t car, uint32_t *out, int *nout){
                                       !drop ? "" : strcmp(nm, LEFT_OUT) ? " (not this car's)" : " (left out)");
         }
         uint32_t b[5] = { p, car, SLOT_VINYL, 0, 0xffffffffu };
-        p = gcall(c, FN_PART_NEXT, G_PARTS, 5, b);
+        p = gcall(c, FN_PART_NEXT, G_CARPARTDB, 5, b);
     }
     if (logged != car){
         logged = car;
@@ -172,7 +156,7 @@ static int hidden_vinyls(CPU *c, uint32_t car, uint32_t *out, int *nout){
 int vinylcat_hook(CPU *c, uint32_t ip){
     if (ip != HOOK_SITE(0x0054625c)) return 0;   /* mov eax, [esi+4]: the categories are in */
     uint32_t fe = MR32(G_FECAR);
-    if (!ok(fe, 4u) || !ok(MR32(fe), 8u)) return 1;
+    if (!guest_ok_bytes(fe, 4u) || !guest_ok_bytes(MR32(fe), 8u)) return 1;
     uint32_t car = gcall(c, MR32(MR32(fe) + 4u), fe, 0, 0);
     uint32_t out[NOUT]; uint8_t was[NOUT]; int nout = 0;
     if (hidden_vinyls(c, car, out, &nout) <= 0) return 1;

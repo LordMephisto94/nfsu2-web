@@ -25,13 +25,14 @@
  * back (opened already: the message's own flag +5 says so).  A message whose
  * body is ours is not added again (the profile has it from an earlier game). */
 #include "cpu.h"
+#include "guest.h"
+#include "game.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 #include <time.h>
 
-void dispatch_indirect(CPU *c, uint32_t addr);
 uint32_t language_add_text(const char *name, const char *text);
 uint32_t language_text(uint32_t hash);
 void language_game_letters(const char *utf8, char *out, size_t n);
@@ -45,10 +46,6 @@ int mprace_owns_input(void);
 #define G_SMS_N       0x00838450u
 #define G_POOL        0x00838428u   /* the career data's names */
 #define FN_SMS_ADD    0x00529670u   /* thiscall inbox (entry, body, subject, %s) -> the message, 0: full */
-#define FN_NEW        0x00575620u   /* cdecl (size): operator new */
-#define G_FLOW        0x008654a4u   /* 6: in the world */
-#define G_GAMEMODE    0x00850078u   /* 1: career */
-#define G_CAREER_RACE 0x00863470u   /* the career race being run, 0: free roam */
 #define G_ENGAGE      0x008900d8u   /* the engage manager: [it] 4 = free to engage (what 0x529750 waits for too) */
 #define FREE_S        3             /* this long in free roam first */
 #define FROM          "nfsu2.xyz"
@@ -241,18 +238,6 @@ static double now_s(void){
     struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
     return (double)ts.tv_sec + ts.tv_nsec * 1e-9;
 }
-/* a guest function with ecx and stack arguments, from the main-loop hook */
-static uint32_t gcall(CPU *c, uint32_t fn, uint32_t ecx, int n, const uint32_t *arg){
-    CPU save = *c;
-    c->esp = (c->esp - 256u) & ~15u;
-    for (int i = n - 1; i >= 0; i--) PUSH32(arg[i]);
-    c->ecx = ecx;
-    PUSH32(0x00581475u);                        /* the hook's return address: the callee's ret pops it */
-    dispatch_indirect(c, fn);
-    uint32_t r = c->eax;
-    *c = save;
-    return r;
-}
 
 /* our texts into the game's language table, in its language's letters */
 static void init(void){
@@ -289,7 +274,7 @@ static uint32_t entry(CPU *c){
     for (uint32_t i = 0; i < n; i++){
         uint32_t nm = pool + MR16(tab + 20u*i);
         if (!mem_is_committed(nm) || !mem_is_committed(nm + 15u) || memcmp(g_mem + nm, "SMS_INSTRUCTION", 16)) continue;
-        uint32_t size = 20u, e = gcall(c, FN_NEW, 0, 1, &size);
+        uint32_t size = 20u, e = gcall_main(c, FN_NEW, 0, 1, &size);
         if (!e) return 0;
         memcpy(g_mem + e, g_mem + tab + 20u*i, 20);
         MR8(e + 4u) = 1;
@@ -337,7 +322,7 @@ void sms_frame(CPU *c){
     uint32_t e = entry(c);
     if (!e){ g_next = t + RETRY_S; return; }
     uint32_t a[4] = { e, g_body[m], g_subject[m], 0 };
-    uint32_t msg = gcall(c, FN_SMS_ADD, G_INBOX, 4, a);
+    uint32_t msg = gcall_main(c, FN_SMS_ADD, G_INBOX, 4, a);
     if (!msg){
         fprintf(stderr, "[sms] message %d: the inbox is full (%u), again in %d s\n", ask, n, RETRY_S);
         g_next = t + RETRY_S;

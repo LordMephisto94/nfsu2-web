@@ -32,28 +32,24 @@
  * goes in only where the package has them for the list's last entry too,
  * which ours makes one more. */
 #include "cpu.h"
+#include "guest.h"
+#include "game.h"
 #include "widescreen.h"           /* HOOK_SITE */
 #include <stdio.h>
 #include <string.h>
 
 void dispatch_patch(uint32_t a, void (*f)(CPU *));
-void dispatch_indirect(CPU *c, uint32_t addr);
 int  win32_reg_get_dword(const char *nm, uint32_t *out);
 void win32_reg_put_dword(const char *nm, uint32_t v);
 const char *language_name(void);
 
 #define REG_NAME      "PowerUnits"
 #define A_KMH         0x0083aa1au   /* byte: Speedometer Units, 1 = km/h */
-#define FN_NEW        0x00575620u   /* cdecl (size): operator new */
 #define FN_TOGGLE     0x0051e230u   /* thiscall (screen +0xFC, +0x10C, +0x114, +0x11C, 1): a toggle entry */
 #define FN_ADD        0x0054ef30u   /* thiscall screen (entry, 1): Options > Gameplay's list takes a toggle */
 #define FN_ADD_PAUSE  0x0054f170u   /* thiscall screen (entry, 1): the pause menu's */
 #define FN_MODE       0x005026f0u   /* thiscall 0x83AAB4: the game mode (2: the pause menu has no Explore Map Mode) */
 #define FN_FE_STRING  0x0050c900u   /* cdecl (string object, hash): its text, in the game's language */
-#define FN_FE_SETSTR  0x00535fe0u   /* thiscall string object (char*): its text */
-#define FN_FE_HASH    0x00505450u   /* cdecl (name) -> hash */
-#define FN_FE_PACKAGE 0x0052cef0u   /* cdecl (package name) -> FEPackage* */
-#define FN_PKG_FIND   0x00517f80u   /* thiscall package (hash) -> its object, 0: none */
 #define VT_SPEEDO     0x00791c90u   /* Speedometer Units' class */
 #define VT_N          18
 #define M_ACT         0x0049aed8u   /* our methods 1 and 3 */
@@ -71,24 +67,6 @@ const char *language_name(void);
 static int g_installed;
 static int g_hp = -1;                            /* 1: bhp, 0: kW, -1: as the speedometer */
 static uint32_t g_vt, g_scr;                     /* guest memory: our vtable, then scratch for strings */
-
-/* a guest function with ecx and stack arguments, the CPU as it was after */
-static uint32_t gcall(CPU *c, uint32_t fn, uint32_t ecx, int n, const uint32_t *arg){
-    CPU save = *c;
-    c->esp = (c->esp - 256u) & ~15u;
-    for (int i = n - 1; i >= 0; i--) PUSH32(arg[i]);
-    c->ecx = ecx;
-    PUSH32(fn);                                  /* the callee's ret pops it */
-    dispatch_indirect(c, fn);
-    uint32_t r = c->eax;
-    *c = save;
-    return r;
-}
-static void gstr(uint32_t a, const char *s, uint32_t cap){
-    uint32_t i = 0;
-    for (; s[i] && i + 1 < cap; i++) MR8(a + i) = (uint8_t)s[i];
-    MR8(a + i) = 0;
-}
 
 static int bhp(void){ return g_hp >= 0 ? g_hp : MR8(A_KMH) != 1; }
 
@@ -129,7 +107,7 @@ static void pu_act(CPU *c){
 static void pu_label(CPU *c){
     uint32_t self = c->ecx, obj = MR32(self + W_LABEL);
     if (obj && g_scr){
-        gstr(g_scr, label(), 64);
+        guest_write_str(g_scr, label(), 64);
         gcall(c, FN_FE_SETSTR, obj, 1, &g_scr);
         MR32(obj + 0x1cu) |= 2u;                 /* a text of its own, as FEPrintf leaves it (0x537B30) */
     }
@@ -157,7 +135,7 @@ static uint32_t part(CPU *c, uint32_t pk, uint32_t base, uint32_t n, char *nm, s
     int k = 0;
     for (; k < 32 && MR8(base + (uint32_t)k); k++) nm[k] = (char)MR8(base + (uint32_t)k);
     snprintf(nm + k, cap - (size_t)k, "%u", n);
-    gstr(g_scr, nm, 48);
+    guest_write_str(g_scr, nm, 48);
     uint32_t h = gcall(c, FN_FE_HASH, 0, 1, &g_scr);
     return gcall(c, FN_PKG_FIND, pk, 1, &h);
 }

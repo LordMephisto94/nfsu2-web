@@ -14,7 +14,7 @@
 // noted and ignored, so a typo never silently selects something else.
 //
 // This module is pure (no DOM, no OPFS) so it can be checked under node.
-import { blockedName } from './names.mjs';
+import { blockedName, blockedPlate } from './names.mjs';
 import { onlineName } from './claim';
 import { crewsOk, rgbsOk } from './crews';
 import { groupsOk, phrasesOk } from './phrases';
@@ -197,32 +197,41 @@ export const KEYS: readonly KeyDef[] = [
   // (runtime/catchup.c).  Not in bundle.m's table: there a lower-case key, so it reaches the runtime as NFSU2_CATCHUP
   // all the same
   { key: 'catchup', env: 'NFSU2_CATCHUP', kind: 'enum', vals: 'original|noboost|off', scope: 'web' },
-  // The rims are out for now (mods.ts): these two keys come back with their lines in TEMPLATE, after catchup's:
+  // The rims are out for now (mods.ts): this key comes back with its lines in TEMPLATE, after catchup's:
   //   # New rim brands in the rim shop: Blitz.  Everyone's game has their rims,
   //   # so a friend's car with them looks the same either way, and rims already
   //   # on your car stay.  off = the shops offer only the original game's.
   //   # [NFSU2_MOD_RIMS]
   //   #mod_rims = off
-  //
-  //   # Other players' cars: shown = with the mods' parts they have (rims of a
-  //   # mod's on above), as they see them; original = with parts of the original
-  //   # game in their place (a look-alike rim of the same size, else the stock
-  //   # part).  Your own car keeps its own either way.  [NFSU2_OTHERS_MOD_PARTS]
-  //   #others_mod_parts = shown
   // the new rim brands in the rim shop (runtime/modpacks.c; everyone's game has them, so a friend's car shows them either
   // way).  Not in bundle.m's table: there a lower-case key, so it reaches the runtime as NFSU2_MOD_RIMS all the same
   // { key: 'mod_rims', env: 'NFSU2_MOD_RIMS', kind: 'bool', scope: 'web' },
-  // other players' cars with the mods' parts or with the game's in their place (runtime/modpacks.c: the parts'
-  // look-alikes, else the stock ones; free roam's cars and the race's).  Not in bundle.m's table: there a lower-case
-  // key, so it reaches the runtime as NFSU2_OTHERS_MOD_PARTS all the same
-  // { key: 'others_mod_parts', env: 'NFSU2_OTHERS_MOD_PARTS', kind: 'enum', vals: 'shown|original', scope: 'web' },
+  // each car's stance, set in the garage's Body Shop (runtime/stance.c: the Stance entry, the car drawn with it, sent to
+  // friends in free roam; kept in MODPARTS.DAT by runtime/modpacks.c).  Not in bundle.m's table: there a lower-case key,
+  // so it reaches the runtime as NFSU2_STANCE all the same
+  { key: 'stance', env: 'NFSU2_STANCE', kind: 'bool', scope: 'web' },
+  // other players' cars with the mods' looks or as the original game draws them (runtime/stance.c: their stance;
+  // runtime/modpacks.c: a mod's parts, their look-alikes, else the stock ones, in free roam's cars and the race's).  Not
+  // in bundle.m's table: there a lower-case key, so it reaches the runtime as NFSU2_OTHERS_MOD_PARTS all the same
+  { key: 'others_mod_parts', env: 'NFSU2_OTHERS_MOD_PARTS', kind: 'enum', vals: 'shown|original', scope: 'web' },
   // each local player's gearbox whine over the game's sound, as ropi's Underground 2 Transmission Whine (runtime/whine.c;
   // its sounds from the game folder's MODPACKS/WHINE, read only when on: tools/whinepack.py).  Not in bundle.m's
   // table: there a lower-case key, so it reaches the runtime as NFSU2_GEARBOX_WHINE all the same
   { key: 'gearbox_whine', env: 'NFSU2_GEARBOX_WHINE', kind: 'bool', scope: 'web' },
+  // the cars' skins painted again at 1024 from AdrienShadow's HQ Vinyls & Doorlines (runtime/hqvinyls.c, the page's
+  // gpu/hqskin.ts; its pictures from the game folder's HQVINYLS/, read as cars are seen: tools/hqvinyls.py); on for
+  // computers (device.ts deviceDefaults), the runtime's own default off.  Not in
+  // bundle.m's table: there a lower-case key, so it reaches the runtime as NFSU2_HQ_VINYLS all the same
+  { key: 'hq_vinyls', env: 'NFSU2_HQ_VINYLS', kind: 'bool', scope: 'web' },
   // the game's own textures without smoothing (only the page's renderer reads it: subsystems.ts, gpu/encoder.ts
   // pointTex).  Not in bundle.m's table
   { key: 'pixelated_textures', env: 'NFSU2_PIXELATED_TEXTURES', kind: 'bool', scope: 'web' },
+  // the game's Full Scene Anti-Aliasing offered, at 4 samples (runtime/com.c MULTISAMPLING; phones off: device.ts).  Not
+  // in bundle.m's table: the Mac's MSAA is msaa's
+  { key: 'fsaa', env: 'NFSU2_FSAA', kind: 'bool', scope: 'web', device: true },
+  // anisotropic filtering where the game asks for it (only the page's renderer reads it: subsystems.ts, gpu/encoder.ts
+  // aniso; phones and tablets off: device.ts).  Not in bundle.m's table: the Mac's is texture_filtering
+  { key: 'anisotropic', env: 'NFSU2_ANISOTROPIC', kind: 'bool', scope: 'web', device: true },
   // free roam's world map: the other players marked at most (runtime/roam_game.c map_update; phones 2048: device.ts).
   // Not in bundle.m's table: the Mac's free roam has no hub
   { key: 'roam_map_max', env: 'NFSU2_ROAM_MAP_MAX', kind: 'int', vals: '0..4096', ic: true, scope: 'web', device: true },
@@ -364,6 +373,19 @@ export const TEMPLATE = `# NFSU2 settings, read at every launch.
 # [NFSU2_DAMAGE]
 #crash_damage = off
 
+# Each car's stance, as Archie's Stance Mod has it, set in the garage's
+# Body Shop (Stance, after Rims): the camber front and rear, how far the
+# wheels stand out and how wide the tires are.  Only what is seen: the car
+# drives as before.  Other players see your car's stance in free roam.
+# off = the original game (the values stay for when it is on again).
+# [NFSU2_STANCE]
+#stance = off
+
+# Other players' cars: shown = with the looks they chose with the mods
+# (their stance), as they see them; original = as the original game draws
+# them.  Your own car keeps its own either way.  [NFSU2_OTHERS_MOD_PARTS]
+#others_mod_parts = shown
+
 # The career's rubberbanding (Mods: Rubberbanding).  In a career race the
 # game slows opponents who are ahead of you and gives ones behind you more
 # power, grip and top speed (up to 37% more when they are 320 m behind).
@@ -381,6 +403,13 @@ export const TEMPLATE = `# NFSU2 settings, read at every launch.
 # off = the original game.
 # [NFSU2_GEARBOX_WHINE]
 #gearbox_whine = off
+
+# The cars' vinyls and doorlines at 1024x1024, as AdrienShadow's High
+# Quality Vinyls & Doorlines has them: the game's designs and colours,
+# sharper up close.  On a computer only, where it starts on; each car's
+# pictures download as it is seen, about 100 KB.  off = the original game.
+# [NFSU2_HQ_VINYLS]
+#hq_vinyls = on
 
 # What the game does while this tab is hidden or another window is active:
 # "pause" freezes it and pauses its sound, like alt-tab on Windows; "run"
@@ -460,6 +489,16 @@ export const TEMPLATE = `# NFSU2 settings, read at every launch.
 # Textures without smoothing (point sampling), blocky like early PC games;
 # on overrides the game's Texture Filtering.  [NFSU2_PIXELATED_TEXTURES]
 #pixelated_textures = off
+# The game's own Full Scene Anti-Aliasing (Options > Display > Customize
+# Display Settings), drawn at 4 samples: smoother edges for more of the
+# graphics' work; a new player on a computer starts with it on.  off = not
+# offered (the option stays greyed out).  Phones, and computers with AMD
+# Vega (GCN-5) or Qualcomm graphics: off.  [NFSU2_FSAA]
+#fsaa = on
+# Sharper textures in the distance (roads, their lines, building fronts):
+# anisotropic filtering where the game asks for it, which the original
+# game never got.  Phones and tablets: off.  [NFSU2_ANISOTROPIC]
+#anisotropic = on
 
 # ---- Frame rate ----------------------------------------------------------
 
@@ -941,7 +980,7 @@ export function checkSetting(key: string, val: string): Checked | Refused | null
     case 'plate':
       out = plateUpper(val);
       if (!plateValid(out)) return refuse(N('"{value}" is not a license plate (letters A to Z and digits, at most 8)'), val);
-      if (blockedName(out)) return refuse(N('"{value}" is not a license plate (it reads as a slur)'), val);
+      if (blockedPlate(out)) return refuse(N('"{value}" is not a license plate (it reads as a slur)'), val);
       break;
     case 'room':
       if (!valueOk('text', val)) return refuse(N('"{value}" is not {kind}'), val, { kind: KIND_TEXT.text! });
@@ -1169,6 +1208,55 @@ export function settingsPut(text: string | null, key: string, value: string | nu
     if (value === null) return text ?? TEMPLATE;   // nothing to reset
     if (lines.length && lines[lines.length - 1] === '') lines.splice(lines.length - 1, 0, nl); else lines.push(nl);
   }
+  return lines.join('\n');
+}
+
+/**
+ * settingsPut, and then the key's variable really is what the row asked for: a line that sets the same
+ * variable by its own name (NFSU2_ROAM = 1 for roam) and comes first would still win at Play (the first line
+ * that sets a variable does), so it goes too.  Lines are found by their line in the file, not by the pieces
+ * bundle.m reads a long line in (a long line before them shifted the piece numbers: the audit review's PAGE-2
+ * finding, which removed the wrong line).  removed: how many such lines went.
+ */
+export function putKey(text: string, key: string, value: string | null): { text: string; removed: number } {
+  let next = settingsPut(text, key, value), removed = 0;
+  const d = keyDef(key);
+  for (let i = 0; d && i < 64; i++) {
+    const by = resolveEnv(next, {}, {}).byEnv[d.env];
+    if (!by || keyDef(by.key)?.key === d.key) break;
+    const lines = next.split('\n'); lines.splice(by.phys - 1, 1); next = lines.join('\n'); removed++;
+  }
+  return { text: next, removed };
+}
+
+/** What "Reset all settings" keeps: the name, flag and license plate the other players know you by, your crews, and the
+ *  language (this page's too). */
+const RESET_KEEPS = ['roam_name', 'roam_flag', 'license_plate', 'roam_crew', 'roam_crew_colours', 'language'];
+
+/** "Reset all settings": the template, with the kept settings as the file has them (by their own key, also where
+ *  the file sets the variable by its name, if the key reads the value the same).  One the file does not set, or
+ *  refuses, is the default. */
+export function resetAll(text: string | null): string {
+  const r = resolveEnv(text, {}, {});
+  let next = TEMPLATE;
+  for (const key of RESET_KEEPS) {
+    const env = keyDef(key)!.env, v = r.env[env], c = checkSetting(key, v ?? '');
+    if (r.source[env] === 'settings.ini' && c?.ok && c.value === v) next = settingsPut(next, key, v);
+  }
+  return next;
+}
+
+/** A line the panel has no row for back to the default, by its line in the file (1-based): an option of the
+ *  template gets the template's commented-out line in its place, any other line (a variable by its own name, the
+ *  Mac app's options) goes. */
+export function resetLine(text: string, phys: number): string {
+  const lines = text.split('\n');
+  const l = (lines[phys - 1] ?? '').trim();
+  const eq = l.indexOf('=');
+  if (eq < 0 || l[0] === '#' || l[0] === ';') return text;          // not a setting's line: nothing to reset
+  const d = keyDef(l.slice(0, eq).trim());
+  if (d && DEFAULTS.has(d.key)) lines[phys - 1] = `#${d.key} = ${DEFAULTS.get(d.key)}`.replace(/ = $/, ' =');
+  else lines.splice(phys - 1, 1);
   return lines.join('\n');
 }
 

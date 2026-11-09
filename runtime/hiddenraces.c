@@ -24,12 +24,12 @@
  * the same in memory, once the tables are loaded (a profile keeps none of it:
  * with the setting off again a career is as it was; races open stay open). */
 #include "cpu.h"
+#include "game.h"
+#include "setting.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <strings.h>
 
-#define G_RACES         0x008383e0u   /* the races, RACE_SZ each, [G_NRACES] of them */
-#define G_NRACES        0x008383e4u
 #define G_STAGES        0x0083841cu   /* the stages, STAGE_SZ each, [G_NSTAGES] of them */
 #define G_NSTAGES       0x00838418u
 #define RACE_SZ         0x88u
@@ -46,8 +46,7 @@ static int committed(uint32_t a, uint32_t n){ return a && n && mem_is_committed(
 /* every frame (roam.c's main-loop hook): once, when the tables are there */
 void hiddenraces_frame(void){
     if (g_on < 0){       /* the page writes 1 or 0; the Mac app passes the line's own on/off */
-        const char *e = getenv("NFSU2_SHOW_HIDDEN_RACES");
-        g_on = e && *e && *e != '0' && strcasecmp(e, "off") && strcasecmp(e, "no") && strcasecmp(e, "false");
+        g_on = setting_bool("NFSU2_SHOW_HIDDEN_RACES", 0);
     }
     if (!g_on) return;
     uint32_t races = MR32(G_RACES), nr = MR32(G_NRACES), stages = MR32(G_STAGES), ns = MR32(G_NSTAGES);

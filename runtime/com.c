@@ -4,20 +4,14 @@
 #include <time.h>
 #include <stdatomic.h>
 #include "cpu.h"
+#include "game.h"
 #include "d3d9_tables.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <math.h>
 
-/* getenv() SCANS the environment array and takes a lock on every call.  On
- * per-draw paths (for example the "PDLIST" check in
- * SetVertexShaderConstantF was the FIRST term of an && chain) that has a
- * measurable cost: in the profile getenv+__findenv_locked ate 3% of the
- * guest thread.  Environment variables do not change during a run ->
- * resolve once, keep. */
-#define ENVC(nm_) ({ static const char *_ev_; static int _ei_; \
-                     if (!_ei_){ _ei_ = 1; _ev_ = getenv(nm_); } _ev_; })
+#include "setting.h"      /* ENVC: getenv once per call site (per-draw paths) */
 
 
 void mem_commit(uint32_t,uint32_t);
@@ -490,6 +484,7 @@ enum {
     MID_GetAdapterDisplayMode,
     MID_GetAdapterIdentifier,
     MID_GetDeviceCaps,
+    MID_CheckDeviceMultiSampleType,
     MID_CreateDevice,
     MID_TestCooperativeLevel,
     MID_GetAvailableTextureMem,
@@ -621,6 +616,7 @@ static const char *const g_midname[MID__count] = {
     "GetAdapterDisplayMode",
     "GetAdapterIdentifier",
     "GetDeviceCaps",
+    "CheckDeviceMultiSampleType",
     "CreateDevice",
     "TestCooperativeLevel",
     "GetAvailableTextureMem",
@@ -793,6 +789,53 @@ static uint64_t g_rt_set=0, g_rt_screen=0;
 static uint64_t g_rt_tex=0;
 static uint32_t g_bb_w = 1280, g_bb_h = 720;   /* back buffer size */
 void com_backbuffer_size(unsigned *w, unsigned *h){ *w = g_bb_w; *h = g_bb_h; }
+/* MULTISAMPLING (the game's Full Scene Anti-Aliasing option, browser only).
+ * The game asks CheckDeviceMultiSampleType(A8R8G8B8, NONMASKABLE) when it
+ * makes the device (0x5D24D0) and keeps quality levels - 1 as the option's
+ * maximum [0x876520] (0x5BE690 clamps g_FSAALevel 0x870D08 to it; the
+ * presets of 0x5BE870 set 1 at Level Of Detail 5).  With FSAA above 0 it
+ * creates the device and Resets it with MultiSampleType NONMASKABLE and
+ * MultiSampleQuality = the level (0x5B9A60: present parameters 0x86F870),
+ * and makes a render target of its view's size with the same (0x5BB840:
+ * 0x86F2E0).  A traced race frame with it on: the scene in the screen's
+ * passes, then the glows and light trails in that target, tested against
+ * the implicit Z, and StretchRect from it into the post passes' texture
+ * (with it off they are drawn into that texture straight).  WebGPU
+ * guarantees one count above 1: 4 samples.  So NONMASKABLE has 2 quality
+ * levels (the option is off or on) and 4_SAMPLES its one, on the colour and
+ * depth formats; a device, Reset or render target with one of them is drawn
+ * at 4 samples (the page's GW_BB_SAMPLES and GW_TF_MS: a 4-sample twin
+ * resolved into the target at the end of every pass).  Anything else has 1
+ * sample, as before.  NFSU2_FSAA = off (phones: the page's device default)
+ * offers none: the option keeps its maximum of -1, as it always had here.
+ * The Mac renderer has no 4-sample targets: none offered there. */
+static uint32_t g_bb_ms = 0, g_bb_msq = 0;     /* the device's MultiSampleType and quality, as drawn */
+static int fsaa_offered(void){
+#ifdef __wasm__
+    static int v = -1;
+    if (v < 0) v = setting_bool("NFSU2_FSAA", 1);
+    return v;
+#else
+    return 0;
+#endif
+}
+static int fmt_ms_colour(uint32_t f){ return f == 21u || f == 22u; }          /* A8R8G8B8, X8R8G8B8 */
+static int fmt_ms_depth(uint32_t f){ return f == 75u || f == 77u || f == 79u || f == 80u; }  /* D24S8 D24X8 D24X4S4 D16 */
+/* a MultiSampleType and quality drawn at 4 samples: NONMASKABLE below quality 2, 4_SAMPLES with 0 */
+static int ms_offered(uint32_t ty, uint32_t q){ return fsaa_offered() && ((ty == 1u && q < 2u) || (ty == 4u && q == 0u)); }
+/* the present parameters' MultiSampleType and MultiSampleQuality (pp + 16, + 20), at CreateDevice and Reset */
+static void bb_multisample(uint32_t pp){
+    uint32_t ty = 0, q = 0;
+    if (pp && mem_is_committed(pp + 23u)){ ty = MR32(pp + 16u); q = MR32(pp + 20u); }
+    if (!ms_offered(ty, q)){
+        if (ty) fprintf(stderr, "com: multisample type %u quality %u not offered: the back buffer has 1 sample\n", ty, q);
+        ty = q = 0;
+    }
+    if (ty != g_bb_ms || q != g_bb_msq)
+        fprintf(stderr, "com: back buffer multisampling %s (type %u, quality %u)\n", ty ? "4 samples" : "off", ty, q);
+    g_bb_ms = ty; g_bb_msq = q;
+    if (fsaa_offered() && metal_available()){ void metal_set_bb_samples(unsigned); metal_set_bb_samples(ty ? 4u : 1u); }
+}
 /* Cube textures share the IDirect3DTexture9 vtable.  v12na: the cube
  * flag lives in the object header (CF_CUBE).  The old address bitmap was
  * only valid while COM memory was never reused, and that table had to be
@@ -2413,6 +2456,17 @@ int com_call(CPU *c, uint32_t magic){
                    MR32(p+1076) = 0xA1u; MR32(p+1096) = 1u; }
             r=0; }
         else if (MID(GetDeviceCaps)){ uint32_t pc=A(c,3); if(pc) fill_caps(pc); r=0; }
+        else if (MID(CheckDeviceMultiSampleType)){
+            /* (this, Adapter, DeviceType, SurfaceFormat, Windowed, MultiSampleType, pQualityLevels): NONE with its
+             * one quality level; with FSAA offered (see MULTISAMPLING) NONMASKABLE with 2 and 4_SAMPLES with 1 on
+             * the colour and depth formats; every other type D3DERR_NOTAVAILABLE with none */
+            uint32_t q = A(c,6), ty = A(c,5), f = A(c,3), lv = ty == 0u ? 1u : 0u;
+            if (fsaa_offered() && (fmt_ms_colour(f) || fmt_ms_depth(f))){
+                if (ty == 1u) lv = 2u;
+                else if (ty == 4u) lv = 1u;
+            }
+            if (q){ mem_commit(q,4); MR32(q) = lv; }
+            r = lv ? 0u : 0x8876086Au; }
         else if (MID(CreateDevice)){
             if(!g_dev){ g_dev=com_new(IF_DEV,256); CH_FLAGS(g_dev) |= CF_DEVICE; }
             /* (this, Adapter, DeviceType, hFocusWindow, BehaviorFlags,
@@ -2461,6 +2515,7 @@ int com_call(CPU *c, uint32_t magic){
                                             metal_resize(w4,h4); }
                 }
             }
+            bb_multisample(ppp);
             /* RESSCAN=1: find the game's OWN resolution table in guest memory.
              * The table is not stored plainly in the EXE but built at run
              * time; patching it is the only clean way to carry 1080p into
@@ -3254,7 +3309,7 @@ int com_call(CPU *c, uint32_t magic){
                     fprintf(stderr,"  [flow] frame %u: %s  flag(865498)=%u (8654a4)=%u\n",
                             g_present_no, cur,
                             mem_is_committed(0x00865498u)?MR8(0x00865498u):999u,
-                            mem_is_committed(0x008654a4u)?MR32(0x008654a4u):999u);
+                            mem_is_committed(G_FLOW)?MR32(G_FLOW):999u);
                 }
             }
             /* PRESENTBT: work out the structure of the main loop. */
@@ -3529,6 +3584,7 @@ int com_call(CPU *c, uint32_t magic){
                     if (metal_available()){ void metal_resize(unsigned,unsigned);
                                             metal_resize(w3,h3); } }
             }
+            bb_multisample(pp3);
             g_resets++;
             /* The game must have released every render target before Reset
              * (D3D9 rule); release them on the Metal side too, otherwise every
@@ -3691,9 +3747,18 @@ int com_call(CPU *c, uint32_t magic){
         else if (MID(CreateRenderTarget)){
             /* (this,W,H,Format,MultiSample,MSQuality,Lockable,ppSurface,pShared) */
             uint32_t w2=A(c,1), h2=A(c,2), f2=A(c,3), pp=A(c,7);
+            /* the size the game believes the screen has (its FSAA target, 0x5BBA7E: the view size 0x870980): the
+             * device's, as CreateTexture's full-screen targets.  Its passes test against the implicit Z, the screen's
+             * size; at the game's 4:3 size their 4-sample Z was another, empty one (glows and the neon drawn
+             * through the cars) */
+            if (g_req_w && w2 == g_req_w && h2 == g_req_h){ w2 = g_bb_w; h2 = g_bb_h; }
             uint32_t sf=com_new(IF_SURF,64);
             MR32(sf+4)=w2; MR32(sf+8)=h2; MR32(sf+20)=f2; MR32(sf+40)=3;
-            if (metal_available()) MR32(sf+28)=metal_create_texture_ex(w2,h2,1,f2,1);
+            /* a type offered is drawn at 4 samples (see MULTISAMPLING: is_rt 3 = GW_TF_MS) */
+            uint32_t ms2 = ms_offered(A(c,4), A(c,5)) && fmt_ms_colour(f2);
+            if (A(c,4) && !ms2) fprintf(stderr, "com: CreateRenderTarget %ux%u multisample type %u quality %u: drawn with 1 sample\n",
+                                        w2, h2, A(c,4), A(c,5));
+            if (metal_available()) MR32(sf+28)=metal_create_texture_ex(w2,h2,1,f2,ms2 ? 3u : 1u);
             if(pp) MR32(pp)=sf; r=0; }
         else if (MID(CreateDepthStencilSurface)){
             uint32_t pp=A(c,7); uint32_t sf=com_new(IF_SURF,64);
@@ -4893,7 +4958,9 @@ void com_report(void){
 }
 
 static void fill_caps(uint32_t p){
-    mem_commit(p,0x150); memset(g_mem+p,0,0x150);
+    /* sizeof(D3DCAPS9) = 0x130 (its last field, MaxPixelShader30InstructionSlots, is at 0x12C): clearing
+     * more wrote over whatever the caller keeps after its copy */
+    mem_commit(p,0x130); memset(g_mem+p,0,0x130);
     MR32(p+0x00)=1; MR32(p+0x08)=0x00020000; MR32(p+0x0C)=0x00000002;
     MR32(p+0x10)=0x00000020; MR32(p+0x14)=0x80000001; MR32(p+0x18)=1;
     MR32(p+0x1C)=0x001BBEF0; MR32(p+0x20)=0x0000033F; MR32(p+0x24)=0x0F730191;
