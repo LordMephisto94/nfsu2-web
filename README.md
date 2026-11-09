@@ -1,20 +1,18 @@
-# Need for Speed: Underground 2 in the browser
+# Need for Speed: Underground 2 in the browser: IronWing Networks Australia
 
-> [!IMPORTANT]
-> This repository is archived. nfsu2.xyz keeps running and getting updates, but from 9 November 2026 development
-> continues privately.
+> [!NOTE]
+> **This is the IronWing Networks Australia version of NFSU2-Web**, the code behind the Australian-hosted community
+> instance at **[nfsu2.ironwingnetworks.com.au](https://nfsu2.ironwingnetworks.com.au/)**. It is maintained by
+> [LordMephisto94](https://github.com/LordMephisto94) for [IronWing Networks](https://ironwingnetworks.com.au/).
 >
-> With how development works now I don't have the time and energy to also run this as an open-source project and
-> properly review all outside contributions. I've also seen people present this work and my updates as their own, and
-> I want to build future updates and projects on this code without them being copied the same way.
+> IronWing provides the hosting and keeps this fork running. It does not claim authorship of the game or of the
+> projects it is built on. NFSU2-Web was created by [th0mk](https://github.com/th0mk/nfsu2-web) and builds on
+> Talha Müderrisoğlu's [NFSU2Recomp](https://github.com/TalhaMudo/NFSU2Recomp). The credits below are kept as the
+> original project wrote them. The original repository was archived on 9 November 2026. This fork carries its last
+> public code, plus IronWing's branding and hosting changes.
 >
-> The code here stays available under the MIT license: you're free to use, change and share it. Please keep the
-> license notices and credit this project, the projects it's based on (NFSU2Recomp in particular) and the authors of
-> the included mods and translations, all listed in the README.
->
-> Issues and pull requests stay readable here but won't get replies. Thanks to everyone who contributed translations,
-> fixes and features. Questions, bug reports, suggestions and new translations:
-> [Discord](https://discord.gg/25zXmQ2Ua9).
+> For questions, bug reports and suggestions about the IronWing server, join the
+> [IronWing Discord](https://discord.gg/4dbDQHa2pz). Please don't contact the original author about this instance.
 
 A fan project that runs the PC game *Need for Speed: Underground 2* (2004) in Google Chrome and Firefox. The game's
 x86 code is translated to C ahead of time and compiled to WebAssembly. Direct3D 9 runs on WebGPU and the sound on
