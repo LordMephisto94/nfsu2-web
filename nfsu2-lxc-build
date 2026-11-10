@@ -128,6 +128,16 @@ printf '%s\n' "$DLL_SHA" > "$PACKAGE/BUILD_SERVER_DLL_SHA256"
 printf '%s\n' 'web lan-wasm rust browser-settings quickrace' > "$PACKAGE/BUILD_TESTED"
 (cd "$PACKAGE" && find . -type f ! -name SHA256SUMS -print0 | LC_ALL=C sort -z | xargs -0 sha256sum > SHA256SUMS && sha256sum --quiet -c SHA256SUMS)
 mv -T "$PACKAGE" "$OUTPUT"
+# Keep this PC's build folders from piling up: the newest 3 work folders (sources, logs, screenshots) and 5 releases.
+prune_dirs() {
+  local dir="$1" keep="$2" old
+  find "$dir" -mindepth 1 -maxdepth 1 -type d ! -name '.*' -printf '%T@ %p\n' | sort -rn | tail -n +"$((keep + 1))" | cut -d' ' -f2- |
+    while IFS= read -r old; do
+      case "$old" in "$dir"/*) rm -rf -- "$old" && echo "Pruned $old";; esac
+    done
+}
+prune_dirs "$BUILDS/work" 3 || echo 'Warning: old work folders were not pruned.' >&2
+prune_dirs "$BUILDS/releases" 5 || echo 'Warning: old releases were not pruned.' >&2
 echo "Built and tested revision $SHORT."
 echo "Release: $OUTPUT"
 echo "To copy it to the LXC without restarting: ./nfsu2-lxc-stage $OUTPUT"

@@ -112,6 +112,37 @@ class ActivationTest(unittest.TestCase):
         self.assertNotIn(('stop', 'nfsu2.service'), self.events)
         self.assertFalse((self.root / 'backups').exists())
 
+    def test_prune_keeps_the_newest_backups_and_releases_and_the_live_ones(self):
+        import os
+        backups = self.root / 'backups'
+        backups.mkdir()
+        made = []
+        for i in range(6):
+            for folder, name in ((backups, f'pre-{i:08d}-x'), (backups, f'failed-release-{i}'), (self.releases, f'rel{i}')):
+                (folder / name).mkdir()
+                os.utime(folder / name, (1000 + i, 1000 + i))
+                made.append(folder / name)
+        for i, path in enumerate((self.old, self.new)):
+            os.utime(path, (10 + i, 10 + i))           # the live and previous releases are the oldest of all
+        (self.releases / 'link').symlink_to('rel0')
+        module.prune(keep_releases={self.old, self.new})
+        self.assertEqual(sorted(p.name for p in backups.glob('pre-*')), ['pre-00000003-x', 'pre-00000004-x', 'pre-00000005-x'])
+        self.assertEqual(sorted(p.name for p in backups.glob('failed-release-*')), ['failed-release-4', 'failed-release-5'])
+        self.assertEqual(sorted(p.name for p in self.releases.iterdir()),
+                         ['link', 'new', 'old', 'rel1', 'rel2', 'rel3', 'rel4', 'rel5'])
+
+    def test_success_prunes_and_keeps_the_previous_release(self):
+        import os
+        for i in range(8):
+            (self.releases / f'rel{i}').mkdir()
+            os.utime(self.releases / f'rel{i}', (2000 + i, 2000 + i))
+        os.utime(self.old, (5, 5))
+        module.activate(self.new, 'newrev', 'new')
+        names = {p.name for p in self.releases.iterdir()}
+        self.assertIn('old', names)
+        self.assertIn('new', names)
+        self.assertEqual(len(names), module.KEEP_RELEASES + 1)   # the new one is among the newest; the old one is kept beyond them
+
 
 if __name__ == '__main__':
     unittest.main()

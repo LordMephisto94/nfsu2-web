@@ -24,6 +24,10 @@ RELEASES = ROOT / 'releases'
 STATE = ROOT / 'state'
 GAME = ROOT / 'game'
 HOST = 'nfsu2.ironwingnetworks.com.au'
+# what a successful activation keeps (prune): each backup is a whole copy of the state (~650 MB), each release ~100 MB
+KEEP_BACKUPS = 3
+KEEP_FAILED = 2
+KEEP_RELEASES = 5
 SERVICE = 'nfsu2.service'
 TUNNEL = 'nfsu2-tunnel.service'
 OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -229,6 +233,34 @@ def activate(release, expected_rev, key):
             raise RuntimeError(f'automatic rollback failed; manual recovery required; backup {backup}: {rollback_error}') from error
         raise RuntimeError('activation failed and the previous release was restored') from error
     print(f'Activated {expected_rev}; state backup: {backup}', flush=True)
+    try:
+        prune(keep_releases={(ROOT / 'current').resolve(), (RELEASES / old_target.split('/', 1)[-1]).resolve()})
+    except Exception as e:
+        print(f'Warning: old releases and backups were not pruned: {e}', file=sys.stderr, flush=True)
+
+
+def prune(keep_releases=frozenset()):
+    """After a successful activation: the newest KEEP_BACKUPS state backups and KEEP_FAILED failed-release copies,
+    and the newest KEEP_RELEASES releases plus every one in keep_releases (the live one and the one before it).
+    Only real directories directly inside backups/ and releases/ are removed, never a link or what one points at."""
+    def newest_first(folder, match):
+        if not folder.is_dir():
+            return []
+        found = [e for e in folder.iterdir() if match(e.name) and e.is_dir() and not e.is_symlink()]
+        return sorted(found, key=lambda e: e.stat().st_mtime, reverse=True)
+    def remove(path, parent):
+        if path.is_symlink() or path.resolve().parent != parent.resolve():
+            raise RuntimeError(f'refusing to remove {path}')
+        shutil.rmtree(path)
+        print(f'Pruned {path}', flush=True)
+    backups = ROOT / 'backups'
+    for prefix, keep in (('pre-', KEEP_BACKUPS), ('failed-release-', KEEP_FAILED)):
+        for old in newest_first(backups, lambda n: n.startswith(prefix))[keep:]:
+            remove(old, backups)
+    keep = {k.resolve() for k in keep_releases}
+    for old in newest_first(RELEASES, lambda n: not n.startswith('.'))[KEEP_RELEASES:]:
+        if old.resolve() not in keep:
+            remove(old, RELEASES)
 
 
 def main():
