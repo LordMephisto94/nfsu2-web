@@ -56,6 +56,9 @@ export { allPads };
 
 export interface PadSnapshot { connected: boolean; buttons: number; axes: number[]; family: number; name: string; index: number; wheel?: boolean }
 
+/** IronWing: how many raw lines (rawLog) a controller gets in one game's log */
+const RAW_LINES = 80;
+
 // standard mapping: buttons[i] -> PAD_* (6 and 7 are the analog triggers)
 const BUTTON_OF: (number | -1)[] = [PAD_A, PAD_B, PAD_X, PAD_Y, PAD_LB, PAD_RB, -1, -1, PAD_BACK, PAD_START,
   PAD_LS, PAD_RS, PAD_DUP, PAD_DDOWN, PAD_DLEFT, PAD_DRIGHT, PAD_HOME];
@@ -358,6 +361,35 @@ export class PadPoller {
   /** the touch controls' virtual controller, merged with a real one (null: none) */
   setTouch(t: TouchPad | null) { this.touch = t; this.poll(); }
 
+  // IronWing: the driving controller's raw buttons and axes as the browser gives them, each time what is held changes
+  // (at most RAW_LINES a controller a game), for controllers whose buttons come out in the wrong places: the Xbox
+  // Series X|S pad on Bluetooth under Chrome on Windows (045e 0b13, "HID-compliant game controller": RT as Start, LT
+  // as Back, nfsu2.xyz Discord 7-9 November 2026).  A button reads "i=value" (a fraction: an analog one, a trigger), an
+  // axis "i=value" once it is more than half its range off where it rests.
+  private raw = new Map<string, { rest: number[]; lines: number; last: string }>();
+  private rawLog(g: Gamepad) {
+    const key = `${g.index}|${g.id}`;
+    let r = this.raw.get(key);
+    if (!r) {
+      if (this.raw.size >= 8) this.raw.clear();
+      // a stick rests in the middle (Chrome may first show a controller with one pushed); what rests at -1 (a trigger,
+      // a pedal) or outside -1..1 (a D-pad as one axis) rests where it is
+      this.raw.set(key, r = { rest: Array.from(g.axes, v => v <= -0.9 || Math.abs(v) > 1.01 ? v : 0), lines: 0, last: '' });
+      this.log(`[pad] raw ${g.id}: mapping "${g.mapping}", ${g.buttons.length} buttons, ${g.axes.length} axes resting at [${r.rest.map(v => v.toFixed(2)).join(' ')}]`);
+    }
+    if (r.lines >= RAW_LINES) return;
+    const b: number[] = [], a: number[] = [];
+    g.buttons.forEach((x, i) => { if (x.pressed || x.value > 0.1) b.push(i); });
+    g.axes.forEach((v, i) => { if (Math.abs(v - (r.rest[i] ?? 0)) > 0.5) a.push(i * Math.sign(v - (r.rest[i] ?? 0))); });
+    const held = `${b.join(',')}|${a.join(',')}`;
+    if (held === r.last) return;
+    r.last = held;
+    if (!b.length && !a.length) return;
+    r.lines++;
+    this.log(`[pad] raw: buttons ${b.map(i => `${i}=${g.buttons[i].value.toFixed(2)}`).join(' ') || '-'}; axes ${g.axes.map((v, i) => Math.abs(v - (r.rest[i] ?? 0)) > 0.5 ? `${i}=${v.toFixed(2)}` : '').filter(Boolean).join(' ') || '-'}` +
+      (r.lines === RAW_LINES ? ` (the last raw line for this controller in this game)` : ''));
+  }
+
   poll() {
     if (!this.h) return;
     const pads = allPads();
@@ -376,6 +408,7 @@ export class PadPoller {
     // pedals on their own are no controller (released, a stick of theirs is pushed all the way)
     if (pick === undefined) pick = this.order.find(i => !kept.has(i) && !isPedals(byIndex(i)?.id ?? ''));
     const g = pick === undefined ? null : byIndex(pick);
+    if (g) this.rawLog(g);
     if (g?.index !== driver?.index || g?.id !== driver?.id) {
       if (g && driver) this.log(`[pad] ${g.id} drives now${this.chosen ? ' (a button pressed on it)' : ''}`);
       driver = g && { index: g.index, id: g.id };
