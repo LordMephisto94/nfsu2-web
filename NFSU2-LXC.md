@@ -56,7 +56,7 @@ Staging alone does **not** restart the live server. To preflight a staged releas
 - Live state and encrypted cloud saves: `/srv/nfsu2/state`, accessible to the dedicated `nfsu2` account.
 - Current release: `/srv/nfsu2/current` (a symlink into `/srv/nfsu2/releases`).
 - Before each activation, the live state is backed up under `/srv/nfsu2/backups`; these backups contain private server state.
-- Pruning (after a successful activation, `nfsu2-lxc-activate-remote.py`): the newest 3 `pre-*` backups, 2 `failed-release-*` copies and 5 releases are kept, plus the live release and the one before it. A pruning error is only a warning. On the PC, `nfsu2-lxc-build` keeps its newest 3 work folders and 5 releases. Change `KEEP_BACKUPS`, `KEEP_FAILED` and `KEEP_RELEASES` there to keep more.
+- Pruning (after a successful activation, `nfsu2-lxc-activate-remote.py`): only the last two deployments are kept: the newest 2 `pre-*` backups, 1 `failed-release-*` copy and 2 releases, plus the live release and the one before it (the disk is kept for players' saves). A pruning error is only a warning. On the PC, `nfsu2-lxc-build` keeps its newest 3 work folders and 5 releases. Change `KEEP_BACKUPS`, `KEEP_FAILED` and `KEEP_RELEASES` there to keep more.
 - Tunnel configuration: `/etc/cloudflared/nfsu2.yml`; its tunnel-specific credential is restricted to the tunnel service account.
 - Final PC state backup from migration: `out/lxc-migration-20261106/state-backup` on this PC. It is a snapshot, not a live backup.
 - The old shared Cloudflare tunnel route is retained for rollback, but the public DNS record points to the new dedicated tunnel.

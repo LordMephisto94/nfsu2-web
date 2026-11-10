@@ -126,10 +126,10 @@ class ActivationTest(unittest.TestCase):
             os.utime(path, (10 + i, 10 + i))           # the live and previous releases are the oldest of all
         (self.releases / 'link').symlink_to('rel0')
         module.prune(keep_releases={self.old, self.new})
-        self.assertEqual(sorted(p.name for p in backups.glob('pre-*')), ['pre-00000003-x', 'pre-00000004-x', 'pre-00000005-x'])
-        self.assertEqual(sorted(p.name for p in backups.glob('failed-release-*')), ['failed-release-4', 'failed-release-5'])
+        self.assertEqual(sorted(p.name for p in backups.glob('pre-*')), ['pre-00000004-x', 'pre-00000005-x'])
+        self.assertEqual(sorted(p.name for p in backups.glob('failed-release-*')), ['failed-release-5'])
         self.assertEqual(sorted(p.name for p in self.releases.iterdir()),
-                         ['link', 'new', 'old', 'rel1', 'rel2', 'rel3', 'rel4', 'rel5'])
+                         ['link', 'new', 'old', 'rel4', 'rel5'])
 
     def test_success_prunes_and_keeps_the_previous_release(self):
         import os

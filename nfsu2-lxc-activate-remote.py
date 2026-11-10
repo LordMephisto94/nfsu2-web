@@ -25,9 +25,10 @@ STATE = ROOT / 'state'
 GAME = ROOT / 'game'
 HOST = 'nfsu2.ironwingnetworks.com.au'
 # what a successful activation keeps (prune): each backup is a whole copy of the state (~650 MB), each release ~100 MB
-KEEP_BACKUPS = 3
-KEEP_FAILED = 2
-KEEP_RELEASES = 5
+# (the LXC's disk is kept for players' saves and the server's data: only the last two deployments, the user's call of 10 Nov 2026)
+KEEP_BACKUPS = 2
+KEEP_FAILED = 1
+KEEP_RELEASES = 2
 SERVICE = 'nfsu2.service'
 TUNNEL = 'nfsu2-tunnel.service'
 OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
