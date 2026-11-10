@@ -11,6 +11,23 @@ first, then under `### Fixes` what was broken and works now, which the popup kee
 insides, the forum bot, logs, tests, docs and cheat checks. A change that may or may not belong here is asked about
 before the release, not guessed.
 
+IronWing Networks: releases after 8 November 2026 that this fork makes itself are marked `by IronWing Networks` after
+the commit (`## <date> (<commit>) by IronWing Networks`), and the popup shows "By IronWing Networks" under their date.
+A section without it is the original project's (th0mk/nfsu2-web), merged here.
+
+## 2026-11-10 (b56908dc) by IronWing Networks
+
+- **Mods:** Crash Damage is off on this server for now: with it on, the game froze when cars hit. It comes back once that is fixed.
+
+## 2026-11-09 (9e023021)
+
+- **Friends:** a friend on a race track shows that track, in the notice and on the start page, and Join takes you there.
+
+### Fixes
+
+- **Graphics:** with anti-aliasing on, the game no longer stops on AMD Ryzen (Vega) graphics or shows scrambled blocks on Snapdragon laptops: it stays off there.
+- **Tracks:** the outrun tuners stay in the city, off the race tracks.
+
 ## 2026-11-08 (314555b)
 
 - **Free roam:** your own license plate (up to 8 letters and digits, Settings, Online), seen by everyone in free roam.

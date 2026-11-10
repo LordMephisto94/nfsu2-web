@@ -7,7 +7,8 @@ import { dateLocale, onLanguage, t, tn } from './i18n';
 
 type Change = [area: string, text: string];
 /** one release: its date (yyyy-mm-dd), the last commit it brings, its new things and its fixes ('' area: none) */
-type Release = { date: string; commit: string; changes: Change[]; fixes: Change[] };
+type Release = { date: string; commit: string; by?: string; changes: Change[]; fixes: Change[] };
+// (by: who made the release when it is not the original project: IronWing Networks' own, after 8 November 2026)
 
 function list(changes: Change[]) {
   const ul = Object.assign(document.createElement('ul'), { lang: 'en' });
@@ -30,6 +31,7 @@ export function changelog(button: HTMLElement, dialog: HTMLDialogElement, body: 
         textContent: d.toLocaleDateString(dateLocale(), { day: 'numeric', month: 'long', timeZone: 'UTC', ...(d.getUTCFullYear() === year ? {} : { year: 'numeric' }) }),
       });
       const out: HTMLElement[] = [h];
+      if (r.by) out.push(Object.assign(document.createElement('p'), { className: 'hint changelog-by', lang: 'en', textContent: `By ${r.by}` }));
       if (r.changes.length) out.push(list(r.changes));
       if (r.fixes.length) {
         const fixes = document.createElement('details');

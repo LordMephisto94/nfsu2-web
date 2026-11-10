@@ -1632,6 +1632,8 @@ body {
   .iw-original-credit { padding-left: 0; }
   .iw-game-logo { max-height: 120px; }
 }
+/* the changelog's releases made by IronWing Networks (changelog.ts: a release's by) */
+#changelog-body .changelog-by { margin: -4px 0 8px; color: var(--lime); font-weight: 700; }
 /* END IRONWING NFSU2 THEME */
 
 /* IronWing About tabs: BEGIN */

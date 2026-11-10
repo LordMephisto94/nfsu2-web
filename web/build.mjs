@@ -102,7 +102,7 @@ function flagSheet(bin, src) {
     chunk('IDAT', zlib.deflateSync(raw, { level: 9 })), chunk('IEND', Buffer.alloc(0))]);
 }
 // the changelog (CHANGELOG.md at the top of the repo): /changelog.json, fetched when a player opens it (changelog.ts):
-// [{ date, commit, changes: [[area, text]], fixes: [[area, text]] }], newest first, one release a day, its fixes the
+// [{ date, commit, by?, changes: [[area, text]], fixes: [[area, text]] }], newest first, one release a day, its fixes the
 // lines under its "### Fixes".  A line that looks like a release or a change but is neither stops the build, so a typo
 // never reaches the page as a missing release; so does a day twice
 fs.writeFileSync(path.join(DIST, 'changelog.json'), JSON.stringify(changelog(fs.readFileSync('../CHANGELOG.md', 'utf8'))));
@@ -112,9 +112,10 @@ function changelog(md) {
   md.split(/\r?\n/).forEach((line, i) => {
     const bad = what => { throw new Error(`CHANGELOG.md:${i + 1}: ${what}: ${line}`); };
     let m;
-    if ((m = /^## (\d{4}-\d{2}-\d{2}) \(([0-9a-f]{7,40})\)$/.exec(line))) {
+    // IronWing: "## <date> (<commit>) by <who>" names who made that release (the popup shows it under the date)
+    if ((m = /^## (\d{4}-\d{2}-\d{2}) \(([0-9a-f]{7,40})\)(?: by (\S.*))?$/.exec(line))) {
       if (out.some(r => r.date === m[1])) bad("a day's releases share one section");
-      out.push({ date: m[1], commit: m[2], changes: [], fixes: [] });
+      out.push({ date: m[1], commit: m[2], ...(m[3] ? { by: m[3] } : {}), changes: [], fixes: [] });
       list = out.at(-1).changes;
     }
     else if (line === '### Fixes') {
