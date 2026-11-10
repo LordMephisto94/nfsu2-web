@@ -54,5 +54,6 @@ test('the preload fetches the crash damage\'s scratches only with it on, the oth
   assert.deepEqual(ahead(false), ['MODPACKS/PARTS.BIN', 'TRACKS/L4RA.BUN']);
   assert.deepEqual(ahead(undefined), ['MODPACKS/PARTS.BIN', 'TRACKS/L4RA.BUN'], 'a page of before: none');
   assert.deepEqual(ahead(true), ['MODPACKS/DAMAGE/SCRATCHES.TPK', 'MODPACKS/PARTS.BIN', 'TRACKS/L4RA.BUN']);
-  assert.equal(S.resolveEnv('crash_damage = on\n', {}, {}).env.NFSU2_DAMAGE, '1', 'the setting the page reads');
+  // IronWing: Crash Damage is out for now (mods.ts, settings.ts), so a settings.ini line no longer turns it on
+  assert.equal(S.resolveEnv('crash_damage = on\n', {}, {}).env.NFSU2_DAMAGE, undefined, 'the setting is out for now');
 });

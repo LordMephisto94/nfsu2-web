@@ -259,9 +259,20 @@ export const KEYS: readonly KeyDef[] = [
   { key: 'button_horn', env: 'NFSU2_BUTTON_HORN', kind: 'enum', vals: 'ls|rs|off', scope: 'web', device: true },
   { key: 'button_chat', env: 'NFSU2_BUTTON_CHAT', kind: 'enum', vals: 'rs|ls|off', scope: 'web', device: true },
   { key: 'button_look', env: 'NFSU2_BUTTON_LOOK', kind: 'enum', vals: 'auto|off', scope: 'web', device: true },
+  // IronWing: Crash Damage is out for now (mods.ts), so a settings.ini line can't turn it on: this key comes back
+  // with its lines in TEMPLATE, after visual_rep_remover's:
+  //   # Crash damage, as FRS Mods' Crashing Foreign Cars has it: the racers' cars
+  //   # (yours and the AI's) dent where they are hit, scratch, lose their bumpers,
+  //   # mirrors, hood, trunk lid and doors, and break their lights.  Only what is
+  //   # seen: the engine, the suspension and the handling are as before, and the
+  //   # game's own repair (a race's start, the garage) takes the damage away.
+  //   # In free roam other players who have it on see the damage of your car;
+  //   # off, you see every car undamaged.  off (the default) = the original game.
+  //   # [NFSU2_DAMAGE]
+  //   #crash_damage = off
   // the racers' visual crash damage, FRS Mods' Crashing Foreign Cars (runtime/damage.c), off unless asked for.  Not in
   // bundle.m's table
-  { key: 'crash_damage', env: 'NFSU2_DAMAGE', kind: 'bool', scope: 'web' },
+  // { key: 'crash_damage', env: 'NFSU2_DAMAGE', kind: 'bool', scope: 'web' },
 ];
 
 /** strcasecmp's and toupper's folding: ASCII letters only (String.toLowerCase would also fold the Kelvin sign to 'k') */
@@ -362,16 +373,6 @@ export const TEMPLATE = `# NFSU2 settings, read at every launch.
 # off = the original game.
 # [NFSU2_VISUAL_REP_REMOVER]
 #visual_rep_remover = off
-
-# Crash damage, as FRS Mods' Crashing Foreign Cars has it: the racers' cars
-# (yours and the AI's) dent where they are hit, scratch, lose their bumpers,
-# mirrors, hood, trunk lid and doors, and break their lights.  Only what is
-# seen: the engine, the suspension and the handling are as before, and the
-# game's own repair (a race's start, the garage) takes the damage away.
-# In free roam other players who have it on see the damage of your car;
-# off, you see every car undamaged.  off (the default) = the original game.
-# [NFSU2_DAMAGE]
-#crash_damage = off
 
 # Each car's stance, as Archie's Stance Mod has it, set in the garage's
 # Body Shop (Stance, after Rims): the camber front and rear, how far the

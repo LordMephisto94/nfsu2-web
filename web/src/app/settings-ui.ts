@@ -82,7 +82,7 @@ export const MOD_CONTROLS: Record<string, Control> = {
   show_hidden_races: { t: 'switch' },
   visual_rep_remover: { t: 'switch' },
   stance: { t: 'switch' },
-  crash_damage: { t: 'switch' },
+  // crash_damage: { t: 'switch' },   (IronWing: out for now, mods.ts)
   catchup: { t: 'seg', opts: [['original', N('Original')], ['noboost', N('No boost')], ['off', N('Off')]] },
   gearbox_whine: { t: 'switch' },
   hq_vinyls: { t: 'switch' },

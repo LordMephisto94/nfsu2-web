@@ -229,15 +229,17 @@ export const MODS: readonly Mod[] = [
     details: 'Each car\'s camber front and rear, how far its wheels stand out and how wide its tires are; only the look changes, the car drives as in the original game. To use it: turn it on, go to the garage\'s Body Shop and pick Stance (after Rims), choose a slider with up and down, move it with left and right, and Back keeps it for that car. In free roam other players see your car\'s stance, unless they set Mods on other cars to Original. Your saves still work in the original game: the stance is kept beside the profile, and stays there while this is off.',
     online: 'seen', files: ['runtime/stance.c', 'runtime/stance.h'],
   },
-  {
-    id: 'crash-damage', name: 'Crash Damage', mod: 'Crashing Foreign Cars', authors: [{ name: 'Chrystian Farias (FRS Mods)' }],
-    links: { page: 'https://streetsmodz.com.br/mods/underground-2/crashing-foreign-cars' },
-    kind: 'shared', uses: 'code', ownPort: true, control: { setting: 'crash_damage' },
-    line: N('Dents, loose parts and scratches.'),
-    details: 'The racers\' cars, yours and the AI\'s, dent where they are hit, scratch, break their lights and lose their bumpers, mirrors, hood, trunk lid and doors, which lie on the road for a while. Only what is seen: the car drives as in the original game. In free roam, other players who have it on see your car\'s damage; with it off you see every car undamaged. The game\'s own repair, at a race\'s start or in the garage, takes it away.',
-    online: 'seen', sizeMB: 1, files: ['runtime/damage.c', 'runtime/damagecore.cpp', 'runtime/damage/Dent.h',
-      'runtime/damage/Tessellate.h', 'runtime/damage_none.c', 'tools/damagepack.py', 'tools/damage/scratches.tpk'],
-  },
+  // IronWing: Crash Damage is out for now (with settings.ts's crash_damage and settings-ui.ts's row): players report
+  // freezes when cars hit, worse after a long free roam (nfsu2.xyz Discord, 9-10 November 2026). Back once fixed:
+  // {
+  //   id: 'crash-damage', name: 'Crash Damage', mod: 'Crashing Foreign Cars', authors: [{ name: 'Chrystian Farias (FRS Mods)' }],
+  //   links: { page: 'https://streetsmodz.com.br/mods/underground-2/crashing-foreign-cars' },
+  //   kind: 'shared', uses: 'code', ownPort: true, control: { setting: 'crash_damage' },
+  //   line: N('Dents, loose parts and scratches.'),
+  //   details: 'The racers\' cars, yours and the AI\'s, dent where they are hit, scratch, break their lights and lose their bumpers, mirrors, hood, trunk lid and doors, which lie on the road for a while. Only what is seen: the car drives as in the original game. In free roam, other players who have it on see your car\'s damage; with it off you see every car undamaged. The game\'s own repair, at a race\'s start or in the garage, takes it away.',
+  //   online: 'seen', sizeMB: 1, files: ['runtime/damage.c', 'runtime/damagecore.cpp', 'runtime/damage/Dent.h',
+  //     'runtime/damage/Tessellate.h', 'runtime/damage_none.c', 'tools/damagepack.py', 'tools/damage/scratches.tpk'],
+  // },
   // The rims are out for now (with settings.ts's mod_rims and others_mod_parts, settings-ui.ts's rows and
   // runtime/modpacks.c's shop switch); back with their makers' names and link:
   // {
