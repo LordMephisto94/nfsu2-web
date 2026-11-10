@@ -30,6 +30,8 @@ class ActivationTest(unittest.TestCase):
         self.state = self.root / 'state'
         self.state.mkdir()
         (self.state / 'save').write_text('original')
+        (self.state / 'blocks').mkdir()
+        (self.state / 'blocks' / 'kept').write_text('cache')
         self.sock = socket.socket(socket.AF_UNIX)
         self.sock.bind(str(self.state / 'control.sock'))
         self.events = []
@@ -76,6 +78,8 @@ class ActivationTest(unittest.TestCase):
         self.assertEqual(len(backups), 1)
         self.assertEqual((backups[0] / 'save').read_text(), 'original')
         self.assertFalse((backups[0] / 'control.sock').exists())
+        self.assertFalse((backups[0] / 'blocks').exists())          # the cache is not backed up
+        self.assertEqual((self.state / 'blocks' / 'kept').read_text(), 'cache')
 
     def test_failed_new_release_restores_state_and_previous_release(self):
         self.fail_new = True
@@ -83,6 +87,7 @@ class ActivationTest(unittest.TestCase):
             module.activate(self.new, 'newrev', 'new')
         self.assertEqual((self.root / 'current').resolve(), self.old)
         self.assertEqual((self.state / 'save').read_text(), 'original')
+        self.assertEqual((self.state / 'blocks' / 'kept').read_text(), 'cache')   # a rollback keeps the cache
         failed = list((self.root / 'backups').glob('failed-release-*'))
         self.assertEqual((failed[0] / 'save').read_text(), 'modified-by-failed-release')
 

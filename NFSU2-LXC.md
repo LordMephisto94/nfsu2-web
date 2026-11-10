@@ -55,7 +55,7 @@ Staging alone does **not** restart the live server. To preflight a staged releas
 - Game files: `/srv/nfsu2/game` on the LXC.
 - Live state and encrypted cloud saves: `/srv/nfsu2/state`, accessible to the dedicated `nfsu2` account.
 - Current release: `/srv/nfsu2/current` (a symlink into `/srv/nfsu2/releases`).
-- Before each activation, the live state is backed up under `/srv/nfsu2/backups`; these backups contain private server state.
+- Before each activation, the live state is backed up under `/srv/nfsu2/backups`; these backups contain private server state. The compressed game-data cache (`state/blocks`, ~650 MB, rebuilt by the server from the game files) is left out of backups and left in place on a rollback.
 - Pruning (after a successful activation, `nfsu2-lxc-activate-remote.py`): only the last two deployments are kept: the newest 2 `pre-*` backups, 1 `failed-release-*` copy and 2 releases, plus the live release and the one before it (the disk is kept for players' saves). A pruning error is only a warning. On the PC, `nfsu2-lxc-build` keeps its newest 3 work folders and 5 releases. Change `KEEP_BACKUPS`, `KEEP_FAILED` and `KEEP_RELEASES` there to keep more.
 - Tunnel configuration: `/etc/cloudflared/nfsu2.yml`; its tunnel-specific credential is restricted to the tunnel service account.
 - Final PC state backup from migration: `out/lxc-migration-20261106/state-backup` on this PC. It is a snapshot, not a live backup.

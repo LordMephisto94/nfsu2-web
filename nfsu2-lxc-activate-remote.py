@@ -98,7 +98,10 @@ def wait_http(port, rev, proc=None, *, game_data=False):
 
 
 def sync(source, dest):
-    run(['rsync', '-a', '--delete', '--exclude=/control.sock', str(source) + '/', str(dest) + '/'])
+    # blocks/ is the server's cache of the game data compressed (kept.rs: files named by the game file and block, the
+    # same for every release): left out of the backups (it was 99 % of each, ~650 MB) and left in place when a backup
+    # is put back (rsync keeps what it excludes), so a rollback keeps the cache too
+    run(['rsync', '-a', '--delete', '--exclude=/control.sock', '--exclude=/blocks/', str(source) + '/', str(dest) + '/'])
 
 
 def replace_current(target):
@@ -191,7 +194,7 @@ def activate(release, expected_rev, key):
         return
     players = json.loads(request(8080, '/players')).get('players', 'unknown')
     print(f'Connected players before restart: {players}.', flush=True)
-    state_bytes = int(run(['du', '-sk', str(STATE)], capture_output=True, text=True).stdout.split()[0]) * 1024
+    state_bytes = int(run(['du', '-sk', '--exclude=./blocks', '.'], cwd=STATE, capture_output=True, text=True).stdout.split()[0]) * 1024
     if shutil.disk_usage(ROOT).free < 2 * state_bytes + 512 * 1024 * 1024:
         raise RuntimeError('not enough free disk space for state backup and rollback')
     backups = ROOT / 'backups'
