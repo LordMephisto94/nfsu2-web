@@ -11,6 +11,21 @@ first, then under `### Fixes` what was broken and works now, which the popup kee
 insides, the forum bot, logs, tests, docs and cheat checks. A change that may or may not belong here is asked about
 before the release, not guessed.
 
+## 2026-11-11 (d10d0d5)
+
+- **Split screen:** players join one at a time by pressing Start on their own controller, then choose their cars independently.
+- **Split screen:** support for keyboard and gamepad combinations
+- **Split screen:** either player can pause a race, while Player 1 controls the pause menu and Quit to Menu.
+
+### Fixes
+
+- **Split screen:** Player 1 is asked to press Start before choosing a car instead of entering car selection immediately.
+- **Split screen:** returning to car selection after a race starts with Player 1 again, instead of skipping to Player 2 or the last player.
+- **Split screen:** old Start presses no longer automatically join a player when the Press Start screen appears.
+- **Split screen:** holding Start through a menu transition no longer counts as a fresh press.
+- **Split screen:** controller assignments are kept between races, so players can rejoin with their own controllers.
+- **Split screen:** Player 2 can no longer take control of Player 1's pause menu.
+
 ## 2026-11-08 (314555b)
 
 - **Free roam:** your own license plate (up to 8 letters and digits, Settings, Online), seen by everyone in free roam.
