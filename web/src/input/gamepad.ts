@@ -333,7 +333,7 @@ export class PadPoller {
               private onPress: () => void, private log: (s: string) => void, private onUse?: () => void,
               private page?: PadPage) {
     this.h = h; this.u8 = u8;
-    this.localPads = new LocalPadWriter(u8.buffer, base);
+    this.localPads = new LocalPadWriter(u8.buffer, base, this.log);
     addEventListener('gamepadconnected', this.onConnect);
     addEventListener('gamepaddisconnected', this.onDisconnect);
     addEventListener(WHEEL_MAP_EVENT, this.onWheelMap);
@@ -364,6 +364,9 @@ export class PadPoller {
     const live = new Set<number>();
     for (const g of pads) if (g && g.connected) { live.add(g.index); if (!this.order.includes(g.index)) this.order.push(g.index); }
     this.order = this.order.filter(i => live.has(i));
+    // Resolve physical START claims before the global single-pad selector.
+    // Otherwise the global selector can consume the edge and change driver first.
+    this.localPads?.poll(pads, this.readLocal, !!globalThis.document?.hidden || !!this.page?.dialog());
     const kept = this.localPads?.reserved() ?? new Set<number>();
     const byIndex = (i: number) => kept.has(i) ? null : pads[i] ?? null;
     this.choose(pads, kept);
@@ -390,7 +393,6 @@ export class PadPoller {
     const both = this.touch ? withTouch(s, this.touch) : s;
     if (this.touch && !g) this.buzz();
     const out = this.page ? this.forPage(both, pressed) : both;
-    this.localPads?.poll(pads, this.readLocal, !!globalThis.document?.hidden || !!this.page?.dialog());
     if (this.same(out)) return;
     this.publish(out, !this.last || this.last.connected !== out.connected || this.last.index !== out.index || this.last.name !== out.name);
     this.last = out;

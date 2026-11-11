@@ -72,3 +72,41 @@ test('all six states occupy independent records; disconnect and page dialogs cle
   writer.poll(pads, mapStandard, true);
   for (let seat = 0; seat < 6; seat++) assert.equal(words[offset(seat, P.IM_LOCAL_BUTTONS)], 0);
 });
+
+test('new Press Start claim transfers player 1 from controller A to B', () => {
+  const seats = new LocalSeats(), a = pad(0), b = pad(1);
+  seats.poll([a,b], 0);
+  start(a, true); seats.poll([a,b], 0);
+  start(a, false); seats.poll([a,b], -1);
+  assert.equal(seats.owners[0]?.index, 0);
+  seats.poll([a,b], 0);
+  start(b, true); seats.poll([a,b], 0);
+  assert.equal(seats.owners[0]?.index, 1);
+  assert.equal(seats.owners.filter(o => o?.index === 1).length, 1);
+  assert.equal(seats.joins[0], 2);
+});
+
+test('a held Start before a claim cannot accidentally join', () => {
+  const seats = new LocalSeats(), a = pad(0);
+  start(a, true); seats.poll([a], -1);
+  seats.poll([a], 0);
+  assert.equal(seats.joins[0], 1);
+  start(a, false); seats.poll([a], 0);
+  start(a, true); seats.poll([a], 0);
+  assert.equal(seats.joins[0], 2);
+});
+
+
+test('unclaimed controller cannot silently occupy player 2', () => {
+  const seats = new LocalSeats(), a = pad(0), b = pad(1);
+  seats.poll([a,b], 0);
+  start(a, true); seats.poll([a,b], 0);
+  start(a, false); seats.poll([a,b], -1);
+  start(b, true); seats.poll([a,b], -1);
+  assert.equal(seats.owners[1], null);
+  assert.equal(seats.joins[1], 0);
+  start(b, false); seats.poll([a,b], 0);
+  start(b, true); seats.poll([a,b], 0);
+  assert.equal(seats.owners[0]?.index, 1);
+  assert.equal(seats.joins[0], 2);
+});

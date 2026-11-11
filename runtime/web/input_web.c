@@ -1069,6 +1069,9 @@ void gamepad_local_coop(int seat){
     for (unsigned k = 0; k < INPUT_LOCAL_PADS; ++k)
         atomic_store_explicit(g_mb.local_pad[k] + IM_LOCAL_COOP, (int)k == seat ? 1u : 0u, memory_order_release);
 }
+void gamepad_local_claim(unsigned seat, int active){
+    if (seat < INPUT_LOCAL_PADS) atomic_store_explicit(g_mb.local_pad[seat] + IM_LOCAL_CLAIM, active ? 1u : 0u, memory_order_release);
+}
 uint32_t gamepad_local_join_stamp(unsigned seat){
     return seat < INPUT_LOCAL_PADS ? atomic_load_explicit(g_mb.local_pad[seat] + IM_LOCAL_JOIN, memory_order_acquire) : 0;
 }

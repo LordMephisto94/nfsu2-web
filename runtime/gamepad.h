@@ -46,6 +46,7 @@ int  gamepad_read(PadState *s);
  * pad. Returns neutral input on disconnect or an inconsistent mailbox read. */
 int gamepad_read_local(unsigned seat, PadState *s);
 uint32_t gamepad_local_join_stamp(unsigned seat);
+void gamepad_local_claim(unsigned seat, int active);
 /* co-op free roam: the local seat whose controller is player 2's (-1 none) */
 void gamepad_local_coop(int seat);
 /* Autotest only: control one seat without changing any other seat. key -1

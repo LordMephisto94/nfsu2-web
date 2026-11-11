@@ -78,6 +78,33 @@ static int split_return_count;
 static uint32_t split_cars[6], split_ports[6];
 static uint8_t split_gears[6], split_picked[6];
 static int split_joined[6], split_release_pad;
+/* Frames since the native Press Start handler last ran. Escape can recreate
+ * the overlay without calling the car-selection entry function. */
+static unsigned split_pressstart_gap = 100;
+static int split_kb_of(unsigned seat);
+static unsigned split_pad_of(unsigned seat);
+static int split_keyboard_armed[2], split_keyboard_previous[2];
+/* Expose the seat currently awaiting Start to the browser.  The browser can
+ * then replace its previous controller on that seat, but never steal another
+ * player's controller.  Word 29 is reserved for this in each local pad. */
+static void split_claim_sync(void){
+#ifdef __wasm__
+    static int previous = -2;
+    int requested = -1;
+    if (split_carsel_active && MR32(G_GAMEMODE) == 4 && !split_joined[split_seat] &&
+        split_kb_of((unsigned)split_seat) < 0)
+        requested = (int)split_pad_of((unsigned)split_seat);
+    /* Do not briefly clear the active claim every frame. The browser can
+     * otherwise poll between clear and set, losing the Start event. */
+    if (requested == previous) return;
+    if (previous >= 0) gamepad_local_claim((unsigned)previous, 0);
+    if (requested >= 0) gamepad_local_claim((unsigned)requested, 1);
+    fprintf(stderr, "[split-debug] claim %d -> %d (player %d, active %d, joined %d)\n",
+            previous, requested, split_seat+1, split_carsel_active, split_joined[split_seat]);
+    previous = requested;
+#endif
+}
+
 /* The keyboard takes up to two local seats: Enter one, Space another.  A lone keyboard player drives on the
  * whole keyboard (arrows or WASD); with two, Enter's player has the arrows' side and Space's WASD's.  Controller
  * ownership remains in connection/Start order; a keyboard seat does not consume a pad. */
@@ -173,6 +200,8 @@ int split_read_local(unsigned seat, PadState *pad){
 #endif
 }
 static uint32_t split_join_stamp;
+/* A prompt must observe a released START after becoming ready before joining. */
+static unsigned char split_start_armed[6];
 static uint32_t split_join_counter(unsigned seat){
 #ifdef __wasm__
     if (split_kb_of(seat) >= 0) return 0;
@@ -198,6 +227,9 @@ static int split_requested(void){
     return 0;
 }
 static int split_pause_port = -1, split_pause_seen, split_pause_released;
+/* Diagnostic only: edge-triggered so race logs stay readable. */
+static unsigned split_trace_start[6], split_trace_escape;
+static unsigned split_trace_race_polls;
 /* The browser exposes one virtual frontend device. Any local player can
  * lend it their own pad while they own the pause menu. */
 void sub_0050d2d0_orig(CPU *c);
@@ -205,10 +237,14 @@ void sub_0050d2d0(CPU *c){
     if ((split_requested() || ((coop_in() || coop_racing_together()) && MR32(G_GAMEMODE) != 4)) && MR32(c->esp) == 0x4eb46eu){
         unsigned port = MR32(c->esp + 4);
         if (port < 6){
-            split_pause_port = (int)port;
+            /* The pause UI is global, even when a second player's racing port
+             * triggered it. Route its frontend controller to player one's
+             * physical seat; keyboard Escape remains handled by the game. */
+            split_pause_port = split_requested() ? 0 : (int)port;
             split_pause_seen = split_pause_released = 0;
             MR32(c->esp + 4) = 0;
-            fprintf(stderr, "[split] pause owner P%u, frontend slot 0\n", port + 1);
+            fprintf(stderr, "[split] pause requested by P%u; menu controlled by P%d (frontend slot 0)\n",
+                    port + 1, split_pause_port + 1);
         }
     }
     sub_0050d2d0_orig(c);
@@ -231,6 +267,8 @@ static void split_pause_refresh(CPU *c){
 }
 int split_menu_pad(PadState *pad){
 #ifdef __wasm__
+    if (split_pressstart_gap < 1000) ++split_pressstart_gap;
+    split_claim_sync();
     if (split_carsel_active && MR32(G_GAMEMODE) == 4 && MR32(G_FLOW) != 6){
         if (!split_joined[split_seat]){
             if (split_seat) split_read_local((unsigned)split_seat-1, pad);
@@ -924,8 +962,11 @@ static void split_switch_seat(CPU *c, uint32_t carsel, int seat){
     split_seat = seat;
     split_carsel_active = 1;
     split_joined[seat] = 0;
+    split_start_armed[seat] = 0;
     split_release_pad = 1;
     split_join_stamp = split_join_counter((unsigned)seat);
+    memset(split_keyboard_armed, 0, sizeof split_keyboard_armed);
+    memset(split_keyboard_previous, 0, sizeof split_keyboard_previous);
     uint32_t arg = seat & 1;
     /* Bypass the wrapper: this is our seat, not another native transition. */
     CPU saved = *c;
@@ -965,6 +1006,8 @@ void sub_004fa2a0(CPU *c){
         split_joined[split_seat] = 0;
         split_release_pad = 1;
         split_join_stamp = split_join_counter((unsigned)split_seat);
+        memset(split_keyboard_armed, 0, sizeof split_keyboard_armed);
+    memset(split_keyboard_previous, 0, sizeof split_keyboard_previous);
     }
 #endif
     sub_004fa2a0_orig(c);
@@ -1181,7 +1224,25 @@ void sub_005f4250(CPU *c){
      * Race menu it is player 1 again, as in single player: the questions there (Quit to Main Menu?) listen to it.
      * The car select is over: its last messages (while the race loaded) set split_carsel_active again, and it
      * would keep the front end's controller to B on the Split-Screen Mode Select the race goes back to. */
-    if (n){ MR32(0x85ad28u) = 0; split_carsel_active = 0; }
+    if (n){
+        MR32(0x85ad28u) = 0;
+        split_carsel_active = 0;
+        /* A new race must start its car-selection sequence at P1. The
+         * previous race leaves split_seat pointing at its final player;
+         * unlike initial mode entry, returning to race selection does not
+         * pass through the split_entering initialization path. Preserve
+         * physical pad/keyboard assignments, but discard per-race claims. */
+        split_seat = 0;
+        memset(split_joined, 0, sizeof split_joined);
+        memset(split_start_armed, 0, sizeof split_start_armed);
+        memset(split_picked, 0, sizeof split_picked);
+        split_release_pad = 1;
+        split_join_stamp = split_join_counter(0);
+        memset(split_keyboard_armed, 0, sizeof split_keyboard_armed);
+        memset(split_keyboard_previous, 0, sizeof split_keyboard_previous);
+        fprintf(stderr, "[split] new race: reset car selection to P1 (%d players)\n", n);
+        split_claim_sync();
+    }
     if (MR32(0x89e7c0u) != 2) return;
     for (unsigned index = 2; index < (unsigned)n; ++index){
         uint32_t racer = gcall(c, 0x5ed920u, G_RACEPARAMS, 1, &index);
@@ -1482,6 +1543,15 @@ static void split_poll(CPU *c){
         MR32(cur + 12) = MR32(0x86eafcu);
         if (!record || !copy || !MR32(0x870988u)) continue;
         uint8_t state[0x110], saved_live[0x110], saved_copy[0x110];
+        PadState trace_pad;
+        int trace_connected = split_read_local(seat, &trace_pad);
+        unsigned trace_start = trace_connected && !!(trace_pad.buttons & (1u << PAD_START));
+        if (trace_start != split_trace_start[seat]){
+            split_trace_start[seat] = trace_start;
+            fprintf(stderr, "[split-pause-trace] P%u START %s; connected=%d mode=%u flow=%u\n",
+                    seat + 1, trace_start ? "down" : "up", trace_connected,
+                    MR32(G_GAMEMODE), MR32(G_FLOW));
+        }
         if (!dipad_local_state(seat, state)) continue;
         memcpy(g_mem + SPLIT_INPUT_RECORD, g_mem + record, 0x370);
         MR32(SPLIT_INPUT_RECORD + 0x33cu) = 0; /* never capture a binding */
@@ -1495,6 +1565,9 @@ static void split_poll(CPU *c){
         MR32(cur) = MR32(SPLIT_INPUT_RECORD + 8);
         MR32(cur + 4) = MR32(SPLIT_INPUT_RECORD + 12);
         MR32(cur + 8) = MR32(SPLIT_INPUT_RECORD + 16);
+        if (trace_start && (split_trace_race_polls++ < 8))
+            fprintf(stderr, "[split-pause-trace] P%u converted actions=%08x/%08x axis=%08x record=%08x\n",
+                    seat + 1, MR32(cur), MR32(cur + 4), MR32(cur + 8), record);
     }
 }
 #endif
@@ -1543,9 +1616,32 @@ void sub_005cfd60(CPU *c){
         static uint32_t port_type;
         if (!port){
             split_pause_refresh(c);
+            uint8_t keys[256];
+            kbd_state(keys, sizeof keys);
+            unsigned esc = !!keys[0x01];
+            if (esc != split_trace_escape){
+                split_trace_escape = esc;
+                fprintf(stderr, "[split-pause-trace] Escape %s in split race; pause_owner=%d\n",
+                        esc ? "down" : "up", split_pause_port);
+            }
             sub_005cfd60_orig(c); /* polls real devices and frontend input once */
+            /* The native frontend contains the keyboard's race pause action.
+             * split_poll builds independent driving records from gamepads and
+             * loses this global keyboard action. Preserve ONLY that action
+             * for P1, not the frontend's other driving/menu actions. */
+            uint32_t native_input = c->eax;
+            uint32_t native_pause = native_input ? (MR32(native_input) & 0x1000u) : 0x1000u;
             port_type = type ? MR32(type) : 0;
             split_poll(c);
+            MR32(SPLIT_INPUT_CURRENT) &= (native_pause | ~0x1000u);
+            if (esc && split_trace_race_polls++ < 12)
+                fprintf(stderr, "[split-pause-v10] native=%08x P1=%08x pause=%s\n",
+                        native_input ? MR32(native_input) : 0,
+                        MR32(SPLIT_INPUT_CURRENT), native_pause ? "released" : "pressed");
+            if (esc && split_trace_race_polls++ < 8)
+                fprintf(stderr, "[split-pause-trace] Escape original frontend=%08x/%08x; P1 converted=%08x/%08x\n",
+                        c->eax ? MR32(c->eax) : 0, c->eax ? MR32(c->eax+4) : 0,
+                        MR32(SPLIT_INPUT_CURRENT), MR32(SPLIT_INPUT_CURRENT+4));
             /* While paused the original frontend device already contains
              * the owner's routed pad. Do not replace it with player one's
              * racing buffer, which would lock out owners on ports 2..5. */
@@ -1866,12 +1962,39 @@ int splitscreen_hook(CPU *c, uint32_t ip){
         uint32_t player = MR32(0x85ad28u), msg = MR32(c->esp + 4);
         if (player < 2){
             static uint32_t held[6];
+            static uint32_t debug_stamp[6] = { UINT32_MAX, UINT32_MAX, UINT32_MAX, UINT32_MAX, UINT32_MAX, UINT32_MAX };
             unsigned seat = (unsigned)split_seat;
             if (msg == 0xc98356bau){
+                /* A returning Press Start overlay is not necessarily a new
+                 * sub_004fa2a0 call. Its absence for several frames marks
+                 * the end of the previous join session. Reopen the claim
+                 * before reading input, so any controller can take P1. */
+                if (split_joined[seat] && split_pressstart_gap > 2){
+                    split_joined[seat] = 0;
+                    split_start_armed[seat] = 0;
+                    split_release_pad = 1;
+                    for (int k = 0; k < 2; ++k)
+                        if (split_kb_seat[k] == (int)seat) split_kb_seat[k] = -1;
+                    split_join_stamp = split_join_counter(split_pad_of(seat));
+                    memset(split_keyboard_armed, 0, sizeof split_keyboard_armed);
+                    memset(split_keyboard_previous, 0, sizeof split_keyboard_previous);
+                    held[seat] = 0;
+                    fprintf(stderr, "[split-debug] P%u Press Start re-entered after %u frames; claim reopened (baseline %u)\n",
+                            seat+1, split_pressstart_gap, split_join_stamp);
+                    split_claim_sync();
+                }
+                split_pressstart_gap = 0;
                 split_seat_title(c);
                 if (MR8(c->ecx + 0x4c) && split_kb_of(seat) < 0){
-                    int side = split_kb_seat[SPLIT_KB_ENTER] < 0 && (kbd_key_down(0x1c) || kbd_key_down(0x9c)) ? SPLIT_KB_ENTER
-                             : split_kb_seat[SPLIT_KB_SPACE] < 0 && kbd_key_down(0x39) ? SPLIT_KB_SPACE : -1;
+                    int down[2] = { kbd_key_down(0x1c) || kbd_key_down(0x9c), kbd_key_down(0x39) };
+                    for (int k = 0; k < 2; ++k) if (!down[k]) split_keyboard_armed[k] = 1;
+                    int side = -1;
+                    for (int k = 0; k < 2; ++k){
+                        if (split_kb_seat[k] < 0 && split_keyboard_armed[k] && down[k] && !split_keyboard_previous[k]){
+                            side = k; break;
+                        }
+                    }
+                    for (int k = 0; k < 2; ++k) split_keyboard_previous[k] = down[k];
                     if (side >= 0){
                         split_kb_seat[side] = (int)seat;
                         fprintf(stderr, "[split] keyboard (%s) assigned to player %u\n", side ? "Space" : "Enter", seat + 1);
@@ -1881,13 +2004,35 @@ int splitscreen_hook(CPU *c, uint32_t ip){
                 split_read_local(seat, &pad);
                 uint32_t start = pad.buttons & (1u << PAD_START);
                 uint32_t stamp = split_join_counter(seat);
-                if (MR8(c->ecx + 0x4c) && ((start && !held[seat]) || (pad.connected && stamp != split_join_stamp))){
+                split_claim_sync();
+                /* Log only meaningful input edges/counter changes. */
+                if ((start && !held[seat]) || (stamp != split_join_stamp && stamp != debug_stamp[seat])){
+                    debug_stamp[seat] = stamp;
+                    fprintf(stderr, "[split-debug] P%u start=%u held=%u stamp=%u baseline=%u ready=%u pad=%u\n",
+                            seat+1, !!start, !!held[seat], stamp, split_join_stamp,
+                            !!MR8(c->ecx + 0x4c), split_pad_of(seat));
+                }
+                /* Discard any START stamps accumulated during the previous race,
+                 * loading screens or while this prompt was not yet ready. The
+                 * first ready/released observation arms a fresh press. */
+                int ready = !!MR8(c->ecx + 0x4c);
+                if (!ready){
+                    split_start_armed[seat] = 0;
+                    split_join_stamp = stamp;
+                } else if (!split_start_armed[seat]){
+                    split_join_stamp = stamp;
+                    if (!start) split_start_armed[seat] = 1;
+                }
+                if (ready && split_start_armed[seat] &&
+                    ((start && !held[seat]) || (stamp != split_join_stamp && stamp != 0))){
                     MR32(c->esp + 4) = 0xb5af2461u;
                     MR32(c->esp + 12) = 1u << player;
                     split_joined[seat] = 1;
+                    split_start_armed[seat] = 0;
                     split_release_pad = 1;
                     split_join_stamp = stamp;
-                    fprintf(stderr, "[split] player %u joined\n", seat+1);
+                    fprintf(stderr, "[split] player %u joined (local pad %u, stamp %u)\n", seat+1, split_pad_of(seat), stamp);
+                    split_claim_sync();
                 }
                 held[seat] = start;
             } else if (msg == 0xb5af2461u || msg == 0x0c407210u || msg == 0x9803f6e2u){
@@ -1931,8 +2076,10 @@ int splitscreen_hook(CPU *c, uint32_t ip){
             split_kb_seat[0] = split_kb_seat[1] = -1;
             memset(split_picked, 0, sizeof split_picked);
             memset(split_joined, 0, sizeof split_joined);
+            split_claim_sync();
         } else {
             split_menu_players = 0; split_carsel_active = 0;
+            split_claim_sync();
             MR32(0x85ad28u) = 0;
             MR32(0x7f4454u) = MR32(0x7f4458u) = 0xffffffffu;
             for (unsigned i = 0; i < 13; ++i) MR8(0x83aac4u + i * 0x14u) = 1;
