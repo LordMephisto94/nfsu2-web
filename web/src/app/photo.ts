@@ -340,8 +340,32 @@ export class PhotoMode {
     this.kept.spin = 0; this.sl.spin.value = '0';
     this.sendCamera(); this.keep();
   }
-  /** Reset: the camera back behind the car, and turning by itself no more */
-  private reset() { this.send(PH_RESET); this.unturn(); }
+  /** Reset the camera and all Picture-tab options to their defaults. */
+  private reset() {
+    this.send(PH_RESET);
+    this.unturn();
+    const k = this.kept, d = KEPT0;
+    k.blur = d.blur; k.shutter = d.shutter; k.size = d.size;
+    k.shiftX = d.shiftX; k.shiftY = d.shiftY; k.lens = d.lens;
+    k.exposure = d.exposure; k.vignette = d.vignette;
+    k.filter = d.filter; k.crop = d.crop; k.grid = d.grid;
+
+    this.sl.blur.value = String(k.blur);
+    this.sl.shiftX.value = String(k.shiftX); this.sl.shiftY.value = String(k.shiftY);
+    this.sl.exposure.value = String(k.exposure); this.sl.vignette.value = String(k.vignette);
+    this.pk.shutter.value = String(k.shutter); this.pk.size.value = String(k.size);
+    this.pk.lens.value = String(k.lens); this.pk.filter.value = k.filter; this.pk.crop.value = k.crop;
+    this.ck.grid.checked = k.grid;
+    this.ck.mark.checked = true;
+    localStore.remove(PHOTO_MARK);
+
+    this.send(PH_FOCUS, -1); // follow the car again
+    this.sendPicture();
+    this.lookSent = '';
+    this.sendLook();
+    this.greyed();
+    this.keep();
+  }
   private sendScene() {
     const k = this.kept;
     this.send(PH_FREEZE, k.freeze ? 1 : 0); this.send(PH_SHOW, k.show); this.send(PH_LIGHTS, k.lights ? 1 : 0);
