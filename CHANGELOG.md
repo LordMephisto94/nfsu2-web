@@ -11,7 +11,7 @@ first, then under `### Fixes` what was broken and works now, which the popup kee
 insides, the forum bot, logs, tests, docs and cheat checks. A change that may or may not belong here is asked about
 before the release, not guessed.
 
-## 2026-11-11 ()
+## 2026-11-11 (89b92e7b)
 
 - **Achievements:** added the achievement system from PR #97, with progress tracking, unlock notifications and an Achievements tab.
 - **Achievements:** race results now count towards achievement progress.
