@@ -13,6 +13,9 @@ before the release, not guessed.
 
 ## 2026-11-11 (d10d0d5)
 
+- **Achievements:** added the achievement system from PR #97, with progress tracking, unlock notifications and an Achievements tab.
+- **Achievements:** race results now count towards achievement progress.
+- **Achievements:** added translations for achievement names, descriptions and interface text.
 - **Split screen:** players join one at a time by pressing Start on their own controller, then choose their cars independently.
 - **Split screen:** support for keyboard and gamepad combinations
 - **Split screen:** either player can pause a race, while Player 1 controls the pause menu and Quit to Menu.
@@ -25,6 +28,7 @@ before the release, not guessed.
 - **Split screen:** holding Start through a menu transition no longer counts as a fresh press.
 - **Split screen:** controller assignments are kept between races, so players can rejoin with their own controllers.
 - **Split screen:** Player 2 can no longer take control of Player 1's pause menu.
+- **Photo Mode:** Reset now restores the picture settings and returns the camera to following the car.
 
 ## 2026-11-08 (314555b)
 
