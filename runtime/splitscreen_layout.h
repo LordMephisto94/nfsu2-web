@@ -14,15 +14,18 @@ static inline SplitCell split_layout_cell(int count, int seat, int w, int h, int
     if (count < 1 || count > SPLIT_MAX_PLAYERS || seat < 0 || seat >= count || w <= 0 || h <= 0)
         return (SplitCell){0, 0, 0, 0};
     if (count == 1) return (SplitCell){0, 0, w, h};
-    if (count == 2) return vertical ? (SplitCell){seat * (w / 2), 0, w / 2, h}
-                                   : (SplitCell){0, seat * (h / 2), w, h / 2};
+    if (count == 2) return vertical ? (SplitCell){seat * (w / 2), 0, seat ? w - w / 2 : w / 2, h}
+                                   : (SplitCell){0, seat * (h / 2), w, seat ? h - h / 2 : h / 2};
     if (count <= 4){
-        SplitCell c = {(seat & 1) * (w / 2), (seat >> 1) * (h / 2), w / 2, h / 2};
+        SplitCell c = {(seat & 1) * (w / 2), (seat >> 1) * (h / 2),
+                       (seat & 1) ? w - w / 2 : w / 2,
+                       (seat >> 1) ? h - h / 2 : h / 2};
         if (count == 3 && seat == 2) c.x = w / 4;
         return c;
     }
     int row = seat / 3, col = seat % 3;
-    SplitCell c = {col * w / 3, row * (h / 2), (col + 1) * w / 3 - col * w / 3, h / 2};
+    SplitCell c = {col * w / 3, row * (h / 2), (col + 1) * w / 3 - col * w / 3,
+                   row ? h - h / 2 : h / 2};
     if (count == 5 && row == 1) c.x += w / 6;
     return c;
 }

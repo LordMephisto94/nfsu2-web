@@ -54,7 +54,9 @@ int modpacks_others_original(void);
 int plates_fe_ours(void);
 const char *plates_fe_screen(void);
 void sub_00566490(CPU *c);                       /* the lifted ones the patches run: the Body Shop list's messages */
-void sub_0049c690(CPU *c);                       /* ... the Options screen's */
+void sub_0049c690(CPU *c);
+int split_ai_native_fill(CPU *c);
+int split_ai_native_message(CPU *c);                       /* ... the Options screen's */
 
 /* the car's drawing */
 #define G_CAMBER_F     0x007a6750u   /* float: the camber's factor where not 0 (the game: 0, the parts decide) */
@@ -551,6 +553,7 @@ static void fill_page(CPU *c){
 /* the Options screen's messages while it is ours: its Back to the Body Shop */
 static void options_msg(CPU *c){
     uint32_t scr = c->ecx, msg = MR32(c->esp + 4u);
+    if (split_ai_native_message(c)) return;
     if (!M.open){ sub_0049c690(c); return; }
     if (msg == MSG_DEFAULTS || msg == MSG_ACCEPT2){ swallow(c); return; }
     if (msg == MSG_FADE_DONE && guest_ok_bytes(scr, O_BACK + 4u) && MR32(scr + O_BACK) == MSG_BACK_DONE){
@@ -673,7 +676,7 @@ void stance_frame(CPU *c){
 int stance_hook(CPU *c, uint32_t ip){
     switch (ip){
     case HOOK_SITE(0x00545c4b): if (stance_on()) add_entry(c); return 1;
-    case HOOK_SITE(0x004b85ed): if (M.open && MR32(G_OPT_PAGE) == PAGE_STANCE) fill_page(c); return 1;
+    case HOOK_SITE(0x004b85ed): if (split_ai_native_fill(c)) return 1; if (M.open && MR32(G_OPT_PAGE) == PAGE_STANCE) fill_page(c); return 1;
     }
     return 0;
 }

@@ -201,6 +201,51 @@ static void log_cars(const char *why, int expect){
  * Log who creates and destroys cars, with the guest return address. */
 static int g_probe = -1;
 static int probe(void){ if (g_probe < 0){ const char *e = getenv("NFSU2_ROAM_PROBE"); g_probe = e && atoi(e); } return g_probe; }
+/* Repair a single duplicated starting slot only in the 2-human/4-AI
+ * split-screen configuration.  Preserve all valid assignments and let the
+ * original game routine perform normal car creation. */
+static void split_repair_duplicate_grid_slot(void){
+    uint32_t base=MR32(0x0089e810u), count=MR32(0x0089e814u);
+    if (!base || count < 6u || count > 128u ||
+        !guest_ok(base, count*0x940u)) return;
+    unsigned slots[7]={0}, human=0, ai=0, participants=0;
+    uint32_t duplicate_rec=0;
+    for(uint32_t i=0;i<count;i++){
+        uint32_t rec=base+i*0x940u;
+        int flag=(int8_t)MR8(rec), slot=(int8_t)MR8(rec+3u);
+        uint32_t kind=MR32(rec+4u);
+        if(flag>0 || (kind!=1u && kind!=2u)) continue;
+        /* An invalid position is a different failure mode; do not guess. */
+        if(slot<1 || slot>6) return;
+        participants++;
+        if(kind==1u) human++; else ai++;
+        if (++slots[slot]==2u) duplicate_rec=rec;
+        else if(slots[slot]>2u) return;
+    }
+    if (participants!=6u || human!=2u || ai!=4u || !duplicate_rec) return;
+    unsigned missing=0, dup=0;
+    for(unsigned slot=1;slot<=6;slot++){
+        if(slots[slot]==0u){if(missing) return; missing=slot;}
+        if(slots[slot]==2u){if(dup) return; dup=slot;}
+    }
+    if(!missing || !dup) return;
+    /* Keep the human slot when a human and AI collide, otherwise keep the
+     * first record. This prevents silently moving Player 1 or Player 2. */
+    uint32_t target=0;
+    for(uint32_t i=0;i<count;i++){
+        uint32_t rec=base+i*0x940u;
+        if((int8_t)MR8(rec)>0 || (int8_t)MR8(rec+3u)!=(int)dup) continue;
+        uint32_t kind=MR32(rec+4u);
+        if(kind==2u) target=rec;
+    }
+    if(!target) return; /* never reassign a human */
+    MR8(target+3u)=(uint8_t)missing;
+}
+void sub_006065b0_orig(CPU *c);
+void sub_006065b0(CPU *c){
+    split_repair_duplicate_grid_slot();
+    sub_006065b0_orig(c);
+}
 void sub_00606480_orig(CPU *c);   /* CreateCar(ecx = setup, edx = racer record, driver type, ...) */
 void sub_00606480(CPU *c){
     uint32_t ret = MR32(c->esp), ecx = c->ecx, edx = c->edx, a1 = MR32(c->esp + 4u), a2 = MR32(c->esp + 8u);

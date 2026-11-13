@@ -11,9 +11,11 @@ void garage_split_keep(CPU *c);            /* garage.c: slots 6-10 aside for the
 #include <stdio.h>
 #include <strings.h>
 #include "splitscreen_layout.h"
+#include "splitscreen_ai.h"
 #include "gamepad.h"
 #include "kbd.h"
 #include "coop.h"
+#include "optslider.h"
 
 /* the labels shown (split_label_text: in the game's language) */
 enum { SL_SPLIT, SL_PLAYERS, SL_PLAYER, SL_PLAYER_UP, SL_JOIN, SL_JOIN_KB, SL_JOIN_SP, SL_N };
@@ -66,7 +68,14 @@ static SplitCell split_cell(int seat){
     unsigned width, height;
     void com_backbuffer_size(unsigned *, unsigned *);
     com_backbuffer_size(&width, &height);
-    return split_layout_cell(split_render_limit(), seat, width, height, 0);
+    /* Match upstream VerticalSplit for two-player races.  Keep the original
+     * top/bottom arrangement unless explicitly requested by the host. */
+    static int vertical = -1;
+    if (vertical < 0){
+        const char *value = getenv("NFSU2_SPLIT_VERTICAL");
+        vertical = value && atoi(value) != 0;
+    }
+    return split_layout_cell(split_render_limit(), seat, width, height, vertical);
 }
 
 static int split_menu_players, split_entering, split_seat, split_carsel_active;
@@ -99,8 +108,6 @@ static void split_claim_sync(void){
     if (requested == previous) return;
     if (previous >= 0) gamepad_local_claim((unsigned)previous, 0);
     if (requested >= 0) gamepad_local_claim((unsigned)requested, 1);
-    fprintf(stderr, "[split-debug] claim %d -> %d (player %d, active %d, joined %d)\n",
-            previous, requested, split_seat+1, split_carsel_active, split_joined[split_seat]);
     previous = requested;
 #endif
 }
@@ -227,9 +234,6 @@ static int split_requested(void){
     return 0;
 }
 static int split_pause_port = -1, split_pause_seen, split_pause_released;
-/* Diagnostic only: edge-triggered so race logs stay readable. */
-static unsigned split_trace_start[6], split_trace_escape;
-static unsigned split_trace_race_polls;
 /* The browser exposes one virtual frontend device. Any local player can
  * lend it their own pad while they own the pause menu. */
 void sub_0050d2d0_orig(CPU *c);
@@ -237,14 +241,12 @@ void sub_0050d2d0(CPU *c){
     if ((split_requested() || ((coop_in() || coop_racing_together()) && MR32(G_GAMEMODE) != 4)) && MR32(c->esp) == 0x4eb46eu){
         unsigned port = MR32(c->esp + 4);
         if (port < 6){
-            /* The pause UI is global, even when a second player's racing port
-             * triggered it. Route its frontend controller to player one's
-             * physical seat; keyboard Escape remains handled by the game. */
-            split_pause_port = split_requested() ? 0 : (int)port;
+            /* The pause UI is global, but its controls belong to the player
+             * who opened it. The frontend still uses virtual port zero;
+             * split_menu_pad lends that port the initiating player's input. */
+            split_pause_port = (int)port;
             split_pause_seen = split_pause_released = 0;
             MR32(c->esp + 4) = 0;
-            fprintf(stderr, "[split] pause requested by P%u; menu controlled by P%d (frontend slot 0)\n",
-                    port + 1, split_pause_port + 1);
         }
     }
     sub_0050d2d0_orig(c);
@@ -261,7 +263,6 @@ static void split_pause_refresh(CPU *c){
     }
     if (active) split_pause_seen = 1;
     else if (split_pause_seen || !(split_racing() || coop_in() || coop_racing_together())){
-        fprintf(stderr, "[split] pause closed P%d\n", split_pause_port + 1);
         split_pause_port = -1;
     }
 }
@@ -271,6 +272,9 @@ int split_menu_pad(PadState *pad){
     split_claim_sync();
     if (split_carsel_active && MR32(G_GAMEMODE) == 4 && MR32(G_FLOW) != 6){
         if (!split_joined[split_seat]){
+            /* P1 has no preceding seat. Never inspect an uninitialized
+             * PadState while its Press Start prompt is awaiting a device. */
+            memset(pad, 0, sizeof *pad);
             if (split_seat) split_read_local((unsigned)split_seat-1, pad);
             pad->buttons &= 1u << PAD_B;
             memset(pad->axis, 0, sizeof pad->axis);
@@ -389,6 +393,36 @@ void sub_00431f10(CPU *c){
         MR32(ctx) = 4;
     }
 }
+/* Experimental upstream AI racer count. The browser has not yet ported the
+ * Opponents/Difficulty frontend rows, so this is an opt-in runtime setting.
+ * Never exceed the game's six-racer capacity, and only enable race types
+ * whose upstream split-screen implementation supports opponents. */
+/* Keep the AI setting deterministic across race restarts. Reject malformed values
+ * rather than silently interpreting a partial number (e.g. "2cars"). */
+static unsigned split_ai_menu_count;
+/* Split-screen AI skill is the game's per-mode Quick Race difficulty byte.
+ * 0/1/2 correspond to Easy/Medium/Hard in the original row. Keep the
+ * selection local until race creation, so browsing the menu cannot change
+ * ordinary Quick Race preferences. */
+
+#define SPLIT_QR_SETTINGS 0x0083aab4u
+static uint32_t split_qr_difficulty_addr(void){
+    uint32_t m=MR32(SPLIT_QR_SETTINGS);
+    return m==0xcu ? SPLIT_QR_SETTINGS+0x102u : SPLIT_QR_SETTINGS+0x12u+m*20u;
+}
+
+static unsigned split_ai_requested(void){
+    return split_ai_menu_count ? split_ai_menu_count - 1 : split_ai_parse_count(getenv("NFSU2_SPLIT_AI_OPPONENTS"));
+}
+
+static unsigned split_ai_opponents(int humans){
+    if (humans < 2 || humans >= 6) return 0;
+    /* Match the upstream supported quick-race modes. Drift (3) needs the
+     * sprint-drift track metadata check before it can safely be enabled. */
+    if (!split_ai_supported_mode(MR32(0x83aab4u))) return 0;
+    return split_ai_cap(split_ai_requested(), (unsigned)humans);
+}
+
 static unsigned split_racer_shift;
 static void split_restore_seat(int seat);
 static int split_hud_owner = -1;
@@ -407,8 +441,18 @@ void sub_00525ed0_orig(CPU *c);
 void split_create_humans(CPU *c){
     split_uncount_results();
     uint32_t args[3] = {MR32(c->esp + 4), MR32(c->esp + 8), MR32(c->esp + 12)};
-    sub_00525ed0_orig(c);
     int n = split_requested();
+    /* Reset the starter's AI count on every split race, including a full
+     * six-human grid and modes where AI is unsupported.  Otherwise the
+     * previous race's count can leak into the next race. */
+    if (args[0] == 2 && n >= 2){
+        unsigned ai = split_ai_opponents(n);
+        MR32(0x89e7c4u) = ai;
+        /* Do not overwrite the player's persistent Quick Race options here.
+         * The upstream split mod sets the live AI_COUNT at race creation;
+         * writing the per-mode option would also affect non-split races. */
+    }
+    sub_00525ed0_orig(c);
     if (args[0] != 2 || n <= 2) return;
     CPU saved = *c;
     for (unsigned shift = 2; shift < (unsigned)n; shift += 2){
@@ -426,7 +470,6 @@ void split_create_humans(CPU *c){
         *c = saved;
     }
     split_restore_seat(0); split_restore_seat(1);
-    fprintf(stderr, "[split] created %d human racers; race entries=%u\n", n, MR32(0x89e814u));
 }
 
 void sub_006373e0_orig(CPU *c);
@@ -455,10 +498,154 @@ void sub_004f98b0(CPU *c);
 void sub_004fc050_orig(CPU *c);
 static uint32_t split_main_menu;
 static uint8_t split_main_carousel[0xe8];
-static uint32_t split_count_options[3];
-static uint32_t split_menu_buttons;
+static uint32_t split_count_options[5];
 static unsigned split_menu_open_pending;
+static int split_ai_stage; /* 0: player count; AI settings use the native Options screen */
+/* A dedicated Options page, distinct from Stance's page 4.  The Options
+ * screen's own Back transition is used to return to the split setup. */
+#define SPLIT_AI_PAGE 5u
+#define SPLIT_OPT_PAGE 0x0083aa04u
+#define SPLIT_FN_SWITCH 0x00537980u
+#define SPLIT_FN_TEXT 0x00495460u
+#define SPLIT_FN_OPT_ADD 0x0054f410u
+#define SPLIT_OPTIONS_PKG 0x0078fa50u
+#define SPLIT_OPTIONS_TITLE 0x42adb44cu
+static int split_ai_native_open;
+static uint32_t split_ai_old_page, split_ai_parent_pkg, split_ai_title_hash;
+uint32_t language_add_text(const char *, const char *);
+/* Native Laps-style numeric rows, adapted from mihaits/NFSU2-SplitScreen.
+ * No slider or carousel is used in the unified setup. */
+#define SPLIT_ROW_CTOR 0x0051e230u
+#define SPLIT_ROW_VT 0x007910b8u
+#define SPLIT_ROW_PRINTF 0x00537be0u
+#define SPLIT_ROW_LEFT 0x9120409eu
+#define SPLIT_ROW_RIGHT 0xb5971bf1u
+#define SPLIT_ROW_ACT 0x0049a948u
+#define SPLIT_ROW_DRAW 0x0049a949u
+#define SPLIT_FN_NEW 0x00575620u
+#define SPLIT_FN_QR_ADD_ROW 0x0054f170u
+static uint32_t split_rows_vt[2], split_rows_strings[2][3];
+static int split_row_kind(uint32_t row){
+    uint32_t vt=MR32(row);
+    return vt==split_rows_vt[0] ? 0 : vt==split_rows_vt[1] ? 1 : -1;
+}
+static void split_row_draw(CPU *c){
+    uint32_t row=c->ecx; int kind=split_row_kind(row);
+    if(kind>=0){
+        char value[24];
+        snprintf(value,sizeof value,"%u",kind ? split_ai_requested() : (unsigned)split_menu_players);
+        guest_write_str(split_rows_strings[kind][2],value,24);
+        uint32_t args1[3]={MR32(row+0x2cu),split_rows_strings[kind][0],split_rows_strings[kind][1]};
+        gcall(c,SPLIT_ROW_PRINTF,0,3,args1);
+        args1[0]=MR32(row+0x30u); args1[2]=split_rows_strings[kind][2];
+        gcall(c,SPLIT_ROW_PRINTF,0,3,args1);
+    }
+    POP32(c->eip);
+}
+static void split_row_act(CPU *c){
+    uint32_t row=c->ecx, msg=MR32(c->esp+8u);
+    int kind=split_row_kind(row);
+    if(kind>=0 && (msg==SPLIT_ROW_LEFT || msg==SPLIT_ROW_RIGHT)){
+        int delta=msg==SPLIT_ROW_RIGHT ? 1 : -1;
+        if(!kind){
+            int n=split_menu_players+delta;
+            if(n<2)n=4; if(n>4)n=2;
+            split_menu_players=n;
+            split_ai_menu_count=split_ai_cap(split_ai_requested(),(unsigned)n)+1;
+        }else{
+            int max=6-split_menu_players, n=(int)split_ai_requested()+delta;
+            if(n<0)n=max; if(n>max)n=0;
+            split_ai_menu_count=(unsigned)n+1;
+        }
+        /* Use the original row's change-message and redraw methods. */
+        uint32_t a=msg;
+        gcall(c,MR32(MR32(row)+0x40u),row,1,&a);
+        gcall(c,SPLIT_ROW_DRAW,row,0,0);
+    }
+    POP32(c->eip); c->esp+=8u;
+}
+static void split_add_numeric_row(CPU *c,uint32_t scr,int kind){
+    if(!split_rows_vt[kind]){
+        uint32_t sz=18u*4u, vt=gcall(c,SPLIT_FN_NEW,0,1,&sz);
+        if(!vt)return;
+        for(unsigned i=0;i<18;i++)MR32(vt+i*4u)=MR32(SPLIT_ROW_VT+i*4u);
+        MR32(vt+4u)=SPLIT_ROW_ACT; MR32(vt+12u)=SPLIT_ROW_DRAW;
+        split_rows_vt[kind]=vt;
+        uint32_t n=64;
+        for(int j=0;j<3;j++)split_rows_strings[kind][j]=gcall(c,SPLIT_FN_NEW,0,1,&n);
+        guest_write_str(split_rows_strings[kind][0],"%s",64);
+        guest_write_str(split_rows_strings[kind][1],kind?"AI Opponents":"Players",64);
+        dispatch_patch(SPLIT_ROW_ACT,split_row_act);
+        dispatch_patch(SPLIT_ROW_DRAW,split_row_draw);
+    }
+    uint32_t sz=0x54u,row=gcall(c,SPLIT_FN_NEW,0,1,&sz);
+    if(!row)return;
+    uint32_t a[5]={scr+0xfcu,scr+0x10cu,scr+0x114u,scr+0x11cu,1u};
+    gcall(c,SPLIT_ROW_CTOR,row,5,a);
+    MR32(row)=split_rows_vt[kind];
+    uint32_t b[2]={row,1u};
+    gcall(c,SPLIT_FN_QR_ADD_ROW,scr,2,b);
+}
+/* The original split-screen mod uses the game's real Quick Race Difficulty
+ * option row (0x4B3930), not an Options slider. The v24 second slider was
+ * being inserted into a layout that has no second usable slider row. */
+#define SPLIT_FN_DIFFICULTY_CTOR 0x004b3930u
+#define SPLIT_FN_QR_ADD_ROW 0x0054f170u
+#define SPLIT_FN_NEW 0x00575620u
+static void split_add_difficulty_row(CPU *c, uint32_t scr){
+    uint32_t size=0x54u;
+    uint32_t row=gcall(c,SPLIT_FN_NEW,0,1,&size);
+    if(!row){ fprintf(stderr,"[split] difficulty row allocation failed\n"); return; }
+    uint32_t a[5]={scr+0xfcu,scr+0x10cu,scr+0x114u,scr+0x11cu,1u};
+    gcall(c,SPLIT_FN_DIFFICULTY_CTOR,row,5,a);
+    uint32_t b[2]={row,1u};
+    gcall(c,SPLIT_FN_QR_ADD_ROW,scr,2,b);
+}
 
+/* Called by Stance's already-installed Options screen hooks. */
+int split_ai_native_fill(CPU *c){
+    if(!split_ai_native_open || MR32(SPLIT_OPT_PAGE)!=SPLIT_AI_PAGE) return 0;
+    if(!split_ai_title_hash) split_ai_title_hash=language_add_text("SPLIT_AI_SETTINGS","Split Screen Setup");
+    /* The six-car grid includes human players. Do not present unavailable AI slots. */
+    uint32_t a[3]={MR32(c->esi+4),SPLIT_OPTIONS_TITLE,split_ai_title_hash};
+    gcall(c,SPLIT_FN_TEXT,0,3,a);
+    split_add_numeric_row(c,c->esi,0);
+    split_add_numeric_row(c,c->esi,1);
+    split_add_difficulty_row(c,c->esi);
+    return 1;
+}
+/* Return from the Options package to the split-screen parent.  Accept on
+ * our only slider means Continue; the ordinary Options Back means Cancel.
+ * Keep the parent React responsible for entering Quick Race, as it already
+ * owns split_option_args and the frontend's selection state. */
+static void split_ai_native_leave(CPU *c, uint32_t scr, int launch){
+    split_ai_native_open=0;
+    MR32(SPLIT_OPT_PAGE)=split_ai_old_page;
+    split_menu_open_pending=launch ? 3u : 0u;
+    uint32_t a[3]={MR32(scr+4),split_ai_parent_pkg,0};
+    gcall(c,SPLIT_FN_SWITCH,0,3,a);
+}
+int split_ai_native_message(CPU *c){
+    if(!split_ai_native_open) return 0;
+    uint32_t scr=c->ecx, msg=MR32(c->esp+4);
+    /* The Options screen has no Continue row. Confirm on a selected row
+     * continues; Back retains its native meaning. */
+    if(msg==0x0c407210u || msg==0x406415e3u){
+        split_ai_native_leave(c,scr,1);
+        c->eax=1; POP32(c->eip); c->esp+=0x10u;
+        return 1;
+    }
+    if(msg==0xe1fde1d1u && guest_ok_bytes(scr,0x13cu) && MR32(scr+0x138u)==0x911ab364u){
+        split_ai_native_leave(c,scr,0);
+        c->eax=1; POP32(c->eip); c->esp+=0x10u;
+        return 1;
+    }
+    return 0;
+}
+
+/* Keep player selection separate from the native Quick Race options. */
+
+static uint32_t split_menu_buttons;
 static int split_menu_escape;
 /* Match IconScrollerMenu::React's native event/style sound lookup. */
 static void split_menu_sound(CPU *c, unsigned event){
@@ -517,7 +704,6 @@ static void split_menu_fade_in(CPU *c){
     gcall(c, 0x537c00u, 0, 4, a);
     if (getenv("NFSU2_SPLIT_MENU_LOG")){
         uint32_t group=gcall(c,0x5379c0u,0,2,a), anim=group?MR32(group+0x54):0;
-        fprintf(stderr,"[split fade] INIT active=%x\n",anim?MR32(anim+0x30):0);
     }
 }
 static uint32_t split_title_obj, split_logo_obj, split_title_align, split_logo_hidden;
@@ -634,11 +820,11 @@ static void split_count_close(CPU *c){
     uint32_t text = split_title_hash ? split_lang_text(c, split_title_hash) : 0;
     if (text){ uint32_t a[] = {MR32(menu+4), 0x42adb44cu, text}; gcall(c, 0x537b80u, 0, 3, a); }
     else split_menu_title(c,"Main Menu");
-    fprintf(stderr,"[split] main menu heading %08x back: %.40s\n", split_title_hash, text ? (char *)g_mem + text : "(English)");
     split_menu_fade_in(c);
     split_count_bar(c);
 }
 static void split_count_open(CPU *c, unsigned players){
+    unsigned entries = split_ai_stage ? 5u : 3u;
     uint32_t menu=split_main_menu;
     if(!split_bar_own){
         uint32_t a[]={MR32(menu+4),0x42adb44cu}, title=gcall(c,0x537a10u,0,2,a);
@@ -650,42 +836,42 @@ static void split_count_open(CPU *c, unsigned players){
     /* Borrow the first three native icon objects and their spacing. Keeping
      * the existing widget preserves its panel, highlight and animations. */
     uint32_t source=MR32(menu+0x50), head=menu+0x50;
-    for(unsigned k=0;k<3;k++){
+    for(unsigned k=0;k<entries;k++){
         uint32_t p=split_count_options[k];
         if(!p) p=split_alloc(c,0x48);
         memcpy(g_mem+p,g_mem+source-4,0x48);
         source=MR32(source);
         MR32(p)=0x790c30u; MR32(p+0xc)=0x883e25d6u;
-        MR32(p+0x2c)=SPLIT_CHOOSE+2+k; MR8(p+0x20)=MR8(p+0x22)=0;
+        MR32(p+0x2c)=split_ai_stage ? SPLIT_CHOOSE+16+k : SPLIT_CHOOSE+2+k; MR8(p+0x20)=MR8(p+0x22)=0;
         split_count_options[k]=p;
         uint32_t image=MR32(p+0x10);
         MR32(image+0x24)=0x883e25d6u; MR32(image+0x1c)|=0x400000u;
     }
-    for(unsigned k=0;k<3;k++){
+    for(unsigned k=0;k<entries;k++){
         uint32_t p=split_count_options[k];
-        MR32(p+4)=k<2 ? split_count_options[k+1]+4 : head;
+        MR32(p+4)=k+1<entries ? split_count_options[k+1]+4 : head;
         MR32(p+8)=k ? split_count_options[k-1]+4 : head;
     }
-    MR32(head)=split_count_options[0]+4; MR32(head+4)=split_count_options[2]+4;
-    MR32(menu+0x58)=split_count_options[0]; MR32(menu+0x74)=3;
+    MR32(head)=split_count_options[0]+4; MR32(head+4)=split_count_options[entries-1]+4;
+    MR32(menu+0x58)=split_count_options[0]; MR32(menu+0x74)=entries;
     MRF32(menu+0x4c+0xd8)-=16.f; /* native carousel icon baseline */
-    uint32_t selected=players>=2 && players<=4 ? players-1 : 1;
+    uint32_t selected=split_ai_stage ? split_ai_requested()+1 : (players>=2 && players<=4 ? players-1 : 1);
     gcall(c,0x538a30u,menu+0x4c,1,&selected);
     gcall(c,0x538ca0u,menu,0,0);
     gcall(c,0x50da50u,menu,0,0);
     split_count_dialog=1;
     PadState pad; gamepad_read(&pad); split_menu_buttons=pad.buttons;
     uint8_t keys[256]; kbd_state(keys, sizeof keys); split_menu_escape=!!keys[1];
-    { char s[96]; split_label_text(SL_SPLIT, 0, s, sizeof s); split_menu_title(c, s); }
+    if(split_ai_stage) split_menu_title(c,"AI Opponents");
+    else { char s[96]; split_label_text(SL_SPLIT, 0, s, sizeof s); split_menu_title(c, s); }
     split_count_scheme(c,1);
     /* Hide unused shared icons before the first animated frame. */
     uint32_t node; memcpy(&node,split_main_carousel+4,4);
     for(unsigned k=0;node && node!=menu+0x50 && k<32;k++,node=MR32(node)){
-        if(k>=3){ uint32_t image=MR32(node-4+0x10); if(image) gcall(c,FN_FE_HIDE,0,1,&image); }
+        if(k>=entries){ uint32_t image=MR32(node-4+0x10); if(image) gcall(c,FN_FE_HIDE,0,1,&image); }
     }
     split_menu_fade_in(c);
     split_count_bar(c);
-    fprintf(stderr,"[split] player count carousel opened\n");
 }
 static void split_main_react(CPU *c){
     uint32_t msg=MR32(c->esp+4), menu=c->ecx;
@@ -698,29 +884,58 @@ static void split_main_react(CPU *c){
             int escape = keys[1] && !split_menu_escape;
             split_menu_escape = !!keys[1];
             if(escape || (edge & (1u<<PAD_B))){
-                split_menu_sound(c,10); split_count_close(c); POP32(c->eip); c->esp+=16; return;
+                split_menu_sound(c,10); split_count_close(c);
+                if(split_ai_stage){ split_ai_stage=0; split_count_open(c,split_menu_players); }
+                POP32(c->eip); c->esp+=16; return;
             }
         }
         if(split_count_dialog && msg==0x911ab364u){
-            split_menu_sound(c,10); split_count_close(c); POP32(c->eip); c->esp+=16; return;
+            split_menu_sound(c,10); split_count_close(c);
+            if(split_ai_stage){ split_ai_stage=0; split_count_open(c,split_menu_players); }
+            POP32(c->eip); c->esp+=16; return;
         }
         if(msg==0x0c407210u){
             uint32_t option=MR32(menu+0x58);
             if(!split_count_dialog && option==split_option){
                 split_option_args[0]=MR32(menu+4); split_option_args[1]=msg;
                 for(unsigned k=2;k<5;k++) split_option_args[k]=MR32(c->esp+k*4);
-                split_menu_sound(c,8); split_menu_open_pending=2; POP32(c->eip); c->esp+=16; return;
+                split_menu_sound(c,8);
+                if(split_menu_players<2 || split_menu_players>4)split_menu_players=2;
+                split_ai_menu_count=split_ai_cap(split_ai_requested(),(unsigned)split_menu_players)+1;
+                split_ai_old_page=MR32(SPLIT_OPT_PAGE);
+                split_ai_parent_pkg=MR32(menu+4);
+                MR32(SPLIT_OPT_PAGE)=SPLIT_AI_PAGE;
+                split_ai_native_open=1;
+                uint32_t a[3]={split_ai_parent_pkg,SPLIT_OPTIONS_PKG,0};
+                gcall(c,SPLIT_FN_SWITCH,0,3,a);
+                POP32(c->eip); c->esp+=16; return;
             }
             if(split_count_dialog){
-                for(unsigned k=0;k<3;k++) if(option==split_count_options[k]){
+                for(unsigned k=0;k<(split_ai_stage ? 5u : 3u);k++) if(option==split_count_options[k]){
                     split_menu_sound(c,8);
-                    split_menu_players=2+k;
-                    split_count_close(c);
-                    split_return_count=1;
-                    split_entering=1;
-                    gcall(c,0x4fc050u,split_option,5,split_option_args);
-                    split_entering=0;
-                    fprintf(stderr,"[split] menu selected %d players\n",split_menu_players);
+                    if(!split_ai_stage){
+                        split_menu_players=2+k;
+                        split_option_args[0]=MR32(menu+4); split_option_args[1]=msg;
+                        for(unsigned j=2;j<5;j++) split_option_args[j]=MR32(c->esp+j*4);
+                        split_ai_stage=0;
+                        split_count_close(c);
+                        /* Keep the existing choice, but clamp it for this player count. */
+                        split_ai_menu_count=split_ai_cap(split_ai_requested(),(unsigned)split_menu_players)+1;
+                        split_ai_old_page=MR32(SPLIT_OPT_PAGE);
+                        split_ai_parent_pkg=MR32(menu+4);
+                        MR32(SPLIT_OPT_PAGE)=SPLIT_AI_PAGE;
+                        split_ai_native_open=1;
+                        uint32_t a[3]={split_ai_parent_pkg,SPLIT_OPTIONS_PKG,0};
+                        gcall(c,SPLIT_FN_SWITCH,0,3,a);
+                    } else {
+                        split_ai_menu_count=k+1; /* encoded: zero opponents is 1 */
+                        split_ai_stage=0;
+                        split_count_close(c);
+                        split_return_count=1;
+                        split_entering=1;
+                        gcall(c,0x4fc050u,split_option,5,split_option_args);
+                        split_entering=0;
+                    }
                     break;
                 }
                 POP32(c->eip); c->esp+=16; return;
@@ -732,13 +947,21 @@ static void split_main_react(CPU *c){
      * Keep that cleanup, then restore the actual split-screen parent screen. */
     if(menu==split_main_menu && msg==0xc98356bau && split_return_count && !MR32(0x836340u)){
         split_return_count=0;
-        split_count_open(c, split_menu_players);
+        split_ai_stage=0; split_count_open(c, split_menu_players);
     }
     /* Accept queues the native parent exit after React returns. Prepare the
      * replacement and start its entrance together on the following tick. */
     if(menu==split_main_menu && msg==0xc98356bau && split_menu_open_pending){
         unsigned players=split_menu_open_pending; split_menu_open_pending=0;
-        split_count_open(c, players);
+        if(players==3u){
+            split_return_count=1;
+            split_entering=1;
+            gcall(c,0x4fc050u,split_option,5,split_option_args);
+            split_entering=0;
+        } else {
+            split_ai_stage=0;
+            /* Back from unified setup returns to the main menu. */
+        }
     }
     if(menu==split_main_menu && split_count_dialog) split_count_scheme(c,0);
     if(menu==split_main_menu && split_bar_own) split_count_bar(c);
@@ -887,9 +1110,11 @@ void sub_004ff9d0_orig(CPU *c);
 void sub_004ff9d0(CPU *c){
 #ifdef __wasm__
     uint32_t h = c->edx;
-    if (h == 0x6a2b93ebu || (h >= SPLIT_CHOOSE + 2 && h <= SPLIT_CHOOSE + 4)){
-        uint32_t p = SPLIT_FE_TEXT + (h == 0x6a2b93ebu ? 0 : (h - SPLIT_CHOOSE) * 32);
+    if (h == 0x6a2b93ebu || (h >= SPLIT_CHOOSE + 2 && h <= SPLIT_CHOOSE + 4) ||
+        (h >= SPLIT_CHOOSE + 16 && h <= SPLIT_CHOOSE + 20)){
+        uint32_t p = SPLIT_FE_TEXT + (h == 0x6a2b93ebu ? 0 : h >= SPLIT_CHOOSE+16 ? 512+(h-SPLIT_CHOOSE-16)*32 : (h - SPLIT_CHOOSE) * 32);
         if (h == 0x6a2b93ebu) split_label_text(SL_SPLIT, 0, (char *)g_mem + p, 64);
+        else if(h>=SPLIT_CHOOSE+16) snprintf((char *)g_mem+p,32,"%u AI Opponents",h-SPLIT_CHOOSE-16);
         else split_label_text(SL_PLAYERS, h - SPLIT_CHOOSE, (char *)g_mem + p, 32);
         c->eax = p; POP32(c->eip); return;
     }
@@ -909,7 +1134,9 @@ static void split_add_menu(CPU *c, uint32_t menu){
     gcall(c, MR32(MR32(menu) + 0x18), menu, 1, &p);
     split_carsel_active = 0;
 }
-void sub_004fc050(CPU *c){ sub_004fc050_orig(c); }
+void sub_004fc050(CPU *c){
+    sub_004fc050_orig(c);
+}
 void sub_0055b5c0_orig(CPU *c);
 void sub_0055b5c0(CPU *c){ sub_0055b5c0_orig(c); }
 static void split_save_seat(int seat){
@@ -918,7 +1145,6 @@ static void split_save_seat(int seat){
     split_ports[seat] = MR32(0x83a9d8u + twin * 4);
     split_gears[seat] = MR8(0x83aa79u + twin * 0x28);
     split_picked[seat] = 1;
-    fprintf(stderr, "[split] player %d picked car %08x gearbox %u\n", seat+1, split_cars[seat], split_gears[seat]);
 }
 static void split_restore_seat(int seat){
     if (!split_picked[seat]) return;
@@ -974,7 +1200,6 @@ static void split_switch_seat(CPU *c, uint32_t carsel, int seat){
     PUSH32(arg); PUSH32(0x4fa2a0u); c->ecx = carsel;
     sub_004fa2a0_orig(c); *c = saved;
     split_seat_title(c);
-    fprintf(stderr, "[split] select car for player %d\n", seat+1);
 }
 void sub_0053fc20_orig(CPU *c);
 static void split_start_selected(CPU *c){
@@ -1240,7 +1465,6 @@ void sub_005f4250(CPU *c){
         split_join_stamp = split_join_counter(0);
         memset(split_keyboard_armed, 0, sizeof split_keyboard_armed);
         memset(split_keyboard_previous, 0, sizeof split_keyboard_previous);
-        fprintf(stderr, "[split] new race: reset car selection to P1 (%d players)\n", n);
         split_claim_sync();
     }
     if (MR32(0x89e7c0u) != 2) return;
@@ -1262,7 +1486,6 @@ void sub_005f4250(CPU *c){
         split_init_view(c, index);
         MR32(player + 0x18) = split_view_id(index); MR32(player + 0x1c) = 0;
         gcall(c, 0x5f3e10u, player, 1, &car);
-        fprintf(stderr, "[split] P%u player=%08x car=%08x view=%d\n", index + 1, player, car, split_view_id(index));
     }
 }
 
@@ -1543,15 +1766,6 @@ static void split_poll(CPU *c){
         MR32(cur + 12) = MR32(0x86eafcu);
         if (!record || !copy || !MR32(0x870988u)) continue;
         uint8_t state[0x110], saved_live[0x110], saved_copy[0x110];
-        PadState trace_pad;
-        int trace_connected = split_read_local(seat, &trace_pad);
-        unsigned trace_start = trace_connected && !!(trace_pad.buttons & (1u << PAD_START));
-        if (trace_start != split_trace_start[seat]){
-            split_trace_start[seat] = trace_start;
-            fprintf(stderr, "[split-pause-trace] P%u START %s; connected=%d mode=%u flow=%u\n",
-                    seat + 1, trace_start ? "down" : "up", trace_connected,
-                    MR32(G_GAMEMODE), MR32(G_FLOW));
-        }
         if (!dipad_local_state(seat, state)) continue;
         memcpy(g_mem + SPLIT_INPUT_RECORD, g_mem + record, 0x370);
         MR32(SPLIT_INPUT_RECORD + 0x33cu) = 0; /* never capture a binding */
@@ -1565,9 +1779,6 @@ static void split_poll(CPU *c){
         MR32(cur) = MR32(SPLIT_INPUT_RECORD + 8);
         MR32(cur + 4) = MR32(SPLIT_INPUT_RECORD + 12);
         MR32(cur + 8) = MR32(SPLIT_INPUT_RECORD + 16);
-        if (trace_start && (split_trace_race_polls++ < 8))
-            fprintf(stderr, "[split-pause-trace] P%u converted actions=%08x/%08x axis=%08x record=%08x\n",
-                    seat + 1, MR32(cur), MR32(cur + 4), MR32(cur + 8), record);
     }
 }
 #endif
@@ -1616,14 +1827,6 @@ void sub_005cfd60(CPU *c){
         static uint32_t port_type;
         if (!port){
             split_pause_refresh(c);
-            uint8_t keys[256];
-            kbd_state(keys, sizeof keys);
-            unsigned esc = !!keys[0x01];
-            if (esc != split_trace_escape){
-                split_trace_escape = esc;
-                fprintf(stderr, "[split-pause-trace] Escape %s in split race; pause_owner=%d\n",
-                        esc ? "down" : "up", split_pause_port);
-            }
             sub_005cfd60_orig(c); /* polls real devices and frontend input once */
             /* The native frontend contains the keyboard's race pause action.
              * split_poll builds independent driving records from gamepads and
@@ -1634,14 +1837,6 @@ void sub_005cfd60(CPU *c){
             port_type = type ? MR32(type) : 0;
             split_poll(c);
             MR32(SPLIT_INPUT_CURRENT) &= (native_pause | ~0x1000u);
-            if (esc && split_trace_race_polls++ < 12)
-                fprintf(stderr, "[split-pause-v10] native=%08x P1=%08x pause=%s\n",
-                        native_input ? MR32(native_input) : 0,
-                        MR32(SPLIT_INPUT_CURRENT), native_pause ? "released" : "pressed");
-            if (esc && split_trace_race_polls++ < 8)
-                fprintf(stderr, "[split-pause-trace] Escape original frontend=%08x/%08x; P1 converted=%08x/%08x\n",
-                        c->eax ? MR32(c->eax) : 0, c->eax ? MR32(c->eax+4) : 0,
-                        MR32(SPLIT_INPUT_CURRENT), MR32(SPLIT_INPUT_CURRENT+4));
             /* While paused the original frontend device already contains
              * the owner's routed pad. Do not replace it with player one's
              * racing buffer, which would lock out owners on ports 2..5. */
@@ -1823,8 +2018,6 @@ int splitscreen_hook(CPU *c, uint32_t ip){
             static unsigned logged;
             if (getenv("NFSU2_SPLIT_LIGHTS_LOG") && !(logged & (1u << split_current_view))){
                 logged |= 1u << split_current_view;
-                fprintf(stderr, "[split lights] streak camera=%d, isolated accumulation, overbright=%u\n",
-                        split_current_view, MR32(0x870cfcu));
             }
         }
         return 1;
@@ -1962,7 +2155,6 @@ int splitscreen_hook(CPU *c, uint32_t ip){
         uint32_t player = MR32(0x85ad28u), msg = MR32(c->esp + 4);
         if (player < 2){
             static uint32_t held[6];
-            static uint32_t debug_stamp[6] = { UINT32_MAX, UINT32_MAX, UINT32_MAX, UINT32_MAX, UINT32_MAX, UINT32_MAX };
             unsigned seat = (unsigned)split_seat;
             if (msg == 0xc98356bau){
                 /* A returning Press Start overlay is not necessarily a new
@@ -1979,8 +2171,6 @@ int splitscreen_hook(CPU *c, uint32_t ip){
                     memset(split_keyboard_armed, 0, sizeof split_keyboard_armed);
                     memset(split_keyboard_previous, 0, sizeof split_keyboard_previous);
                     held[seat] = 0;
-                    fprintf(stderr, "[split-debug] P%u Press Start re-entered after %u frames; claim reopened (baseline %u)\n",
-                            seat+1, split_pressstart_gap, split_join_stamp);
                     split_claim_sync();
                 }
                 split_pressstart_gap = 0;
@@ -1997,7 +2187,6 @@ int splitscreen_hook(CPU *c, uint32_t ip){
                     for (int k = 0; k < 2; ++k) split_keyboard_previous[k] = down[k];
                     if (side >= 0){
                         split_kb_seat[side] = (int)seat;
-                        fprintf(stderr, "[split] keyboard (%s) assigned to player %u\n", side ? "Space" : "Enter", seat + 1);
                     }
                 }
                 PadState pad;
@@ -2005,13 +2194,6 @@ int splitscreen_hook(CPU *c, uint32_t ip){
                 uint32_t start = pad.buttons & (1u << PAD_START);
                 uint32_t stamp = split_join_counter(seat);
                 split_claim_sync();
-                /* Log only meaningful input edges/counter changes. */
-                if ((start && !held[seat]) || (stamp != split_join_stamp && stamp != debug_stamp[seat])){
-                    debug_stamp[seat] = stamp;
-                    fprintf(stderr, "[split-debug] P%u start=%u held=%u stamp=%u baseline=%u ready=%u pad=%u\n",
-                            seat+1, !!start, !!held[seat], stamp, split_join_stamp,
-                            !!MR8(c->ecx + 0x4c), split_pad_of(seat));
-                }
                 /* Discard any START stamps accumulated during the previous race,
                  * loading screens or while this prompt was not yet ready. The
                  * first ready/released observation arms a fresh press. */
@@ -2031,7 +2213,6 @@ int splitscreen_hook(CPU *c, uint32_t ip){
                     split_start_armed[seat] = 0;
                     split_release_pad = 1;
                     split_join_stamp = stamp;
-                    fprintf(stderr, "[split] player %u joined (local pad %u, stamp %u)\n", seat+1, split_pad_of(seat), stamp);
                     split_claim_sync();
                 }
                 held[seat] = start;

@@ -363,9 +363,14 @@ void sub_0050d510(CPU *c){
       if (fp && mem_is_committed(fp + 31)){
           const char *f = (const char *)(g_mem + fp);
           extern void autotest_note_screen(const char *);
-          if (!strncmp(f, "Init Package %s", 15)) autotest_note_screen(gstr(MR32(c->esp + 8u)));
-          else if (!strncmp(f, "SwitchFEngPackages from %s to %s", 32))
-              autotest_note_screen(gstr(MR32(c->esp + 12u)));
+          if (!strncmp(f, "Init Package %s", 15)){
+              const char *screen = gstr(MR32(c->esp + 8u));
+              autotest_note_screen(screen);
+          }
+          else if (!strncmp(f, "SwitchFEngPackages from %s to %s", 32)){
+              const char *screen = gstr(MR32(c->esp + 12u));
+              autotest_note_screen(screen);
+          }
       } }
     static int on = -1;
     if (on < 0){ const char *e = getenv("GAMELOG"); on = (e && *e && *e != '0'); }

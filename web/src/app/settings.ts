@@ -262,6 +262,8 @@ export const KEYS: readonly KeyDef[] = [
   // the racers' visual crash damage, FRS Mods' Crashing Foreign Cars (runtime/damage.c), off unless asked for.  Not in
   // bundle.m's table
   { key: 'crash_damage', env: 'NFSU2_DAMAGE', kind: 'bool', scope: 'web' },
+  // Split-screen AI is experimental and applies only when the split race is created.
+  { key: 'split_ai_opponents', env: 'NFSU2_SPLIT_AI_OPPONENTS', kind: 'int', vals: '0..4', scope: 'web' },
 ];
 
 /** strcasecmp's and toupper's folding: ASCII letters only (String.toLowerCase would also fold the Kelvin sign to 'k') */
@@ -372,6 +374,13 @@ export const TEMPLATE = `# NFSU2 settings, read at every launch.
 # off, you see every car undamaged.  off (the default) = the original game.
 # [NFSU2_DAMAGE]
 #crash_damage = off
+
+# Experimental AI racers in local split-screen.  0 = humans only; 1..4 =
+# additional computer racers.  The total grid cannot exceed six, so a
+# three-player race allows at most three AI racers.  Unsupported race modes
+# remain humans-only.  This does not change Quick Race or career opponents.
+# [NFSU2_SPLIT_AI_OPPONENTS]
+#split_ai_opponents = 0
 
 # Each car's stance, as Archie's Stance Mod has it, set in the garage's
 # Body Shop (Stance, after Rims): the camber front and rear, how far the
