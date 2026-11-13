@@ -62,3 +62,21 @@ Staging alone does **not** restart the live server. To preflight a staged releas
 - The old shared Cloudflare tunnel route is retained for rollback, but the public DNS record points to the new dedicated tunnel.
 
 The LXC and tunnel must be running for the public site to work. Visual gameplay with a real GPU remains a separate check from the automated null-renderer game test.
+
+## Music: the silent-songs switch (kept ready, off)
+
+The server sends the game's EA Trax songs as they are (inside `SDATA/sdat.viv`). If they ever have to come down (a
+notice from a rights holder), `tools/silentmusic.py` makes a copy of that file with only the songs' bytes zeroed: the
+speech stays, the game plays silence, and players who used the start page's **Your copy of the game** (Game tab) keep
+hearing their own. From this PC:
+
+```fish
+cd ~/Documents/nfsu2-web
+python3 tools/silentmusic.py "<game folder>" /tmp/silent
+scp /tmp/silent/SDATA/sdat.viv NFSU2-lxc:/tmp/sdat.viv.silent
+```
+
+Then on the LXC: keep the original outside the game folder (`mv /srv/nfsu2/game/SDATA/sdat.viv /srv/nfsu2/sdat.viv.songs`),
+`install -o root -g nfsu2 -m 640 /tmp/sdat.viv.silent /srv/nfsu2/game/SDATA/sdat.viv`, and
+`curl http://127.0.0.1:8080/data-manifest?refresh`. No restart is needed. Moving the original back and refreshing
+again undoes it. Tested on the PC: the quick-race scenario passes with the silent file.

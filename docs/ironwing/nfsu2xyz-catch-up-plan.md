@@ -15,6 +15,12 @@ changelog says what was fixed but not why: the bug has to be found again before 
 | **Crash Damage** | Freezes when cars hit | Already off on IronWing (10 Nov). Fix later (Phase 3) | done |
 | **Cloud saves: an empty or broken browser no longer replaces the saves in the cloud** | Players can lose their saves | Repro first in `vault.ts`: refuse an upload that would replace a cloud copy with an empty or unreadable set | M |
 
+Phase 0 status (13 Nov, branch `catch-up`): the cloud-saves fix is in (a restore that stopped halfway is no longer
+sent as the player's choice). The music is in: the Game tab's **Your copy of the game** row (IronWing's game folder
+keeps the songs in `SDATA/sdat.viv`, so the player's whole `sdat.viv` is copied; a server with pfdata's two files gets
+those), the Spotify link, and `tools/silentmusic.py` (NFSU2-LXC.md says how to switch it on). Checked in a browser with
+`web/tools/own-music-e2e.mjs`; the quick race passes with the silent file.
+
 ## Phase 1: fixes for things IronWing already has
 
 Free roam and races
