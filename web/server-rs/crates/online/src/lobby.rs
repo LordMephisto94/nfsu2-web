@@ -245,6 +245,14 @@ const COUNTDOWN: u32 = 1 << 12;
 /// CUSTFLAGS bit of a private game (Options: Private Room, SPEED2.EXE 0x58d55d; the game's own search always asks
 /// for it clear, 0x590669: its players come by invitation)
 const PRIVATE: u32 = 1 << 8;
+/// CUSTFLAGS bit of the game's seventh race type, Outrun (REPORT_TYPES' "type 6": SPEED2.EXE 0x5fe8d0)
+const OUTRUN: u32 = 1 << 25;
+/// the most players of an Outrun game, as in the original game: with 5 or 6 the host's game froze
+const OUTRUN_SIZE: f64 = 4.0;
+/// the most players a game of these CUSTFLAGS takes, of the lobby's `most`
+fn most_players(most: f64, cust_flags: u32) -> f64 {
+    if cust_flags & OUTRUN != 0 { most.min(OUTRUN_SIZE) } else { most }
+}
 /// a search's code (the header's [4..7], 0 in the game's own requests) when the player left the game's Filter screen
 /// with the settings it asks for (runtime/olfilter.c)
 const FILTER_SET: &str = "filt";
@@ -2510,7 +2518,9 @@ impl Core {
         let pass = f.str("PASS");
         let password = (!pass.is_empty()).then(|| RoomPassword::new(pass));
         let l = self.lobby.l;
-        let size = |k: &str, def: f64| l.game_size.min(2f64.max(jsx::to_int32(f.num(k, def)) as f64));
+        let cust_flags = jsx::to_uint32(f.num("CUSTFLAGS", 0.0));
+        let most = most_players(l.game_size, cust_flags);
+        let size = |k: &str, def: f64| most.min(2f64.max(jsx::to_int32(f.num(k, def)) as f64));
         let id = self.lobby.next_game;
         self.lobby.next_game += 1;
         let x = self.lobby.s(s);
@@ -2524,7 +2534,7 @@ impl Core {
             group: x.group.clone(),
             max_size: size("MAXSIZE", 4.0),
             min_size: size("MINSIZE", 2.0),
-            cust_flags: jsx::to_uint32(f.num("CUSTFLAGS", 0.0)),
+            cust_flags,
             sys_flags: (sys_flags & !PASSWORD) | if password.is_some() { PASSWORD } else { 0 },
             password,
             params: jsx::slice16(f.str("PARAMS"), 256).to_string(),
@@ -2722,7 +2732,9 @@ impl Core {
                 }
             }
             if f.has("MAXSIZE") {
-                let v = l.game_size.min((x.players.len() as f64).max(2.0).max(jsx::to_int32(f.num("MAXSIZE", f64::NAN)) as f64));
+                // (never under the players in it: an Outrun game's most holds for those who join from here on)
+                let most = most_players(l.game_size, x.cust_flags).max(x.players.len() as f64);
+                let v = most.min((x.players.len() as f64).max(2.0).max(jsx::to_int32(f.num("MAXSIZE", f64::NAN)) as f64));
                 if x.max_size != v {
                     x.max_size = v;
                     changed = true;

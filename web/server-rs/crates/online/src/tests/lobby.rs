@@ -452,6 +452,31 @@ fn the_game_list_in_one_search() {
 }
 
 // six players: a game asked for 8 takes 6, the seventh finds it full; +ses names all six
+// an Outrun game (CUSTFLAGS bit 25) takes four players, whatever its creator asks for, at its making and after
+#[test]
+fn an_outrun_game_takes_four() {
+    let mut w = world();
+    let names = ["Alpha", "Bravo", "Charlie", "Delta", "Echo"];
+    let cs: Vec<C> = names
+        .iter()
+        .enumerate()
+        .map(|(i, n)| {
+            let g = w.client(&format!("10.77.0.{}", i + 2));
+            w.login(g, n)
+        })
+        .collect();
+    w.send(cs[0], "gcre", fields![("NAME", "out"), ("MAXSIZE", 6), ("CUSTFLAGS", 1 << 25), ("PARAMS", "TRACK=4123")]);
+    assert_eq!(w.c(cs[0]).l("gcre").g("MAXSIZE"), "4");
+    w.send(cs[0], "gset", fields![("NAME", "out"), ("MAXSIZE", 6)]);
+    for c in &cs[1..4] {
+        w.send(*c, "gjoi", fields![("NAME", "out")]);
+        assert_eq!(w.c(*c).l("gjoi").code, "");
+    }
+    assert_eq!(w.c(cs[1]).l("gjoi").g("MAXSIZE"), "4", "a change of its settings does not raise it");
+    w.send(cs[4], "gjoi", fields![("NAME", "out")]);
+    assert_eq!(w.c(cs[4]).l("gjoi").code, "full");
+}
+
 #[test]
 fn six_players() {
     let mut w = world();
