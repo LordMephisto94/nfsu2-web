@@ -23,6 +23,11 @@ those), the Spotify link, and `tools/silentmusic.py` (NFSU2-LXC.md says how to s
 
 ## Phase 1: fixes for things IronWing already has
 
+Done on `catch-up` (13 Nov): full screen locks only Esc and the browser's risky shortcut keys (other programs' keys
+work); a stick at its rim steers fully; no rumble under the page's menu or dialogs; Last.fm titles without quotation
+marks; an Outrun game takes four players (the server's lobby). Rumble under the game's own pause menu and after a
+race is still open (runtime).
+
 Free roam and races
 - Lobby races: the host's game freezing as players join (repro first) **M**
 - Lobby races: a race or lobby lost when the server restarts for an update: keep lobby state in the server's state folder **M**
