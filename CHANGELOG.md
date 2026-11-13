@@ -11,7 +11,7 @@ first, then under `### Fixes` what was broken and works now, which the popup kee
 insides, the forum bot, logs, tests, docs and cheat checks. A change that may or may not belong here is asked about
 before the release, not guessed.
 
-## 2026-11-13 (5c0bd87f)
+## 2026-11-13 (576e19ea)
 
 - **Split screen:** race against up to four AI opponents alongside two human players, for a full six-car race.
 - **Split screen:** choose how many AI opponents join a race, including racing with no AI.
@@ -23,6 +23,8 @@ before the release, not guessed.
 - **Split screen:** starting-grid positions no longer overlap between human players and AI opponents.
 - **Split screen:** restarting a race keeps the correct number of opponents.
 - **Split screen:** fixed memory errors associated with restarting races.
+- **Split screen:** fixed Player 2's controller handling during local co-op.
+- **Split screen:** fixed outrun icons disappearing prematurely when another outrun is offered in local co-op.
 
 ## 2026-11-11 (d10d0d5)
 
