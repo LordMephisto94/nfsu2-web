@@ -496,11 +496,14 @@ void coop_frame(CPU *c){
 void sub_00413030_orig(CPU *c);
 void sub_00413030(CPU *c){
     if (!coop_pl || MR32(SPLIT_PLAYERS_COUNT) != 2u){ sub_00413030_orig(c); return; }
+    /* Always advance the original encounter manager, even during a local
+     * co-op offer.  Suppressing this update can strand its internal state. */
     MR32(SPLIT_PLAYERS_COUNT) = 1u;
     sub_00413030_orig(c);
     MR32(SPLIT_PLAYERS_COUNT) = 2u;
     MR32(coop_pl + 0x250u) = 0;
-    void coop_outrun_icon(CPU *c); coop_outrun_icon(c);     /* (it put player 1's outrun icon out: ours back on) */
+    /* The original update may clear the HUD icon.  Do not replay the HUD
+     * notification here: the co-op offer is announced once by or_icons(). */
 }
 
 /* the markers' and triggers' step of Player::Update (0x602AD9): player 1's only */
@@ -668,6 +671,13 @@ static int coop_asking;             /* the dialog is up: player 2's START on a c
 static uint32_t coop_ask_stamps[6], coop_ask_pkg, coop_ask_held;   /* held: the seats' START when asked */
 static int coop_close_steps;        /* after a START: Back to the dialog, then the car or the resume */
 static int coop_close_dev;          /* that START's seat */
+static int coop_claim_seat = -1;    /* temporary browser assignment window for free-roam co-op */
+static void coop_claim_end(void){
+#ifdef __wasm__
+    if (coop_claim_seat >= 0) gamepad_local_claim((unsigned)coop_claim_seat, 0);
+#endif
+    coop_claim_seat = -1;
+}
 uint32_t gamepad_local_join_stamp(unsigned seat);
 
 /* photo.c: the pause menu is being made: our item goes in (free roam's career only) */
@@ -705,6 +715,17 @@ int coop_act(CPU *c){
         call(c, FN_DIALOG2, 0, 0, 10, a);
         coop_asking = 1; coop_ask_pkg = pkg;
         coop_ask_held = 0;
+        coop_claim_end();
+        /* Unlike race split-screen, free-roam has no native Press Start screen.
+         * Open a temporary assignment window on an unused local seat so an
+         * unassigned physical controller can join through the same mailbox. */
+#ifdef __wasm__
+        for (unsigned k = 0; k < 6; k++){
+            PadState p;
+            if (!gamepad_read_local(k, &p)){ coop_claim_seat = (int)k; break; }
+        }
+        if (coop_claim_seat >= 0) gamepad_local_claim((unsigned)coop_claim_seat, 1);
+#endif
         for (unsigned k = 0; k < 6; k++){
             coop_ask_stamps[k] = gamepad_local_join_stamp(k);
             PadState p; if (gamepad_read_local(k, &p) && (p.buttons & 1u << PAD_START)) coop_ask_held |= 1u << k;
@@ -771,6 +792,7 @@ int coop_dialog_answer(CPU *c, uint32_t msg){
     long f = autotest_frame();
     if (!coop_asking) return 1;
     coop_asking = 0;
+    coop_claim_end();
     if (msg == MSG_KB){
         fprintf(stderr, "[coop] f=%ld Add Player 2: the keyboard's left half\n", f);
         coop_pick_begin(COOP_DEV_KB);
@@ -805,10 +827,11 @@ static void coop_ask_frame(CPU *c){
     if (!MR32(G_DLG) && coop_close_steps){
         /* the dialog went after player 2's START: the car next */
         coop_asking = coop_close_steps = 0;
+        coop_claim_end();
         coop_pick_begin(coop_close_dev);
         return;
     }
-    if (!MR32(G_DLG)){ coop_asking = 0; return; }   /* gone another way */
+    if (!MR32(G_DLG)){ coop_asking = 0; coop_claim_end(); return; }   /* gone another way */
     for (unsigned k = 0; k < 6 && !coop_close_steps; k++){
         /* the page's join stamp (a START claims a seat, readable once let go), or a START read from the seat */
         uint32_t st = gamepad_local_join_stamp(k);
@@ -819,6 +842,7 @@ static void coop_ask_frame(CPU *c){
         coop_ask_stamps[k] = st;
         fprintf(stderr, "[coop] f=%ld Add Player 2: START on the controller of seat %u\n", autotest_frame(), k);
         coop_close_dev = (int)k;
+        coop_claim_end();
         coop_close_steps = 1;
         uint32_t a[2] = { MSG_BACK, COOP_STR };
         call(c, FN_FE_MSG, 0, 0, 2, a);
@@ -853,30 +877,70 @@ void coop_ask_frame_(CPU *c){ coop_ask_frame(c); coop_pick_frame(c); coop_outrun
 #define OR_NEAR_US    4000000
 #define OR_KEEP_M     35.f
 #define OR_RANK_MPS   2.f
-static struct { int st; int64_t near_since, t; uint32_t icon1, icon2, eng1, eng2; float d, away, was[4]; uint32_t wins1, wins2; } OR;
+static struct { int st; int rearm_required; int64_t near_since, t; uint32_t icon1, icon2, eng1, eng2; float d, away, was[4]; uint32_t wins1, wins2; } OR;
 enum { OR_IDLE, OR_OFFER, OR_RACE, OR_OVER };
 static float or_dist(uint32_t a, uint32_t b){
     float dx = MRF32(a + 0x60u) - MRF32(b + 0x60u), dy = MRF32(a + 0x64u) - MRF32(b + 0x64u);
     return sqrtf(dx * dx + dy * dy);
 }
+/* Diagnostic only: observe the icon-list state without issuing extra HUD
+ * notifications.  The icon list layout is also used by roam_game.c. */
+static int or_icon_visible(uint32_t hud){
+    if (!hud) return 0;
+    uint32_t il = MR32(hud + 0x58u);
+    if (!il) return 0;
+    for (uint32_t i = 0; i < 8u; i++)
+        if (MR8(il + 0x60u + 0x14u*i) && MR8(il + 0x61u + 0x14u*i) == 9u) return 1;
+    return 0;
+}
+/* The stock encounter manager can clear player 1's outrun HUD icon while
+ * our local co-op offer is still active.  Only swallow that specific stock
+ * clear; leave encounter updates, all other HUD calls and our own clear intact.
+ * 0x00500D3C is the return address of the stock 0x500D20 -> 0x4DB890 call. */
+void sub_00500d20_orig(CPU *c);
+void sub_00500d20(CPU *c){ sub_00500d20_orig(c); }
+void sub_004db890_orig(CPU *c);
+void sub_004db890(CPU *c){
+    uint32_t caller = MR32(c->esp), car = MR32(c->esp + 4u);
+    uint32_t p1 = MR32(SPLIT_PLAYERS_INDEX);
+    uint32_t h1 = p1 ? MR32(p1 + PL_HUD) : 0;
+    if (coop_pl && OR.st == OR_OFFER && OR.icon1 &&
+        h1 && c->ecx == h1 && !car && caller == 0x00500d3cu){
+        POP32(c->eip); c->esp += 4u; /* thiscall, ret 4 */
+        return;
+    }
+    sub_004db890_orig(c);
+}
 static void or_icons(CPU *c, int on){
+    static uint32_t prev_h1, prev_h2;
+    static int last1 = -1, last2 = -1;
     uint32_t p1 = MR32(SPLIT_PLAYERS_INDEX), car1 = p1_car(), car2 = coop_p2_car();
     uint32_t h1 = p1 ? MR32(p1 + PL_HUD) : 0, h2 = coop_pl ? MR32(coop_pl + PL_HUD) : 0;
     uint32_t want1 = on ? car2 : 0, want2 = on ? car1 : 0;
-    if (h1 && want1 != OR.icon1){ call(c, FN_HUD_OUTRUN, h1, 0, 1, &want1); OR.icon1 = want1; }
-    if (h2 && want2 != OR.icon2){ call(c, FN_HUD_OUTRUN, h2, 0, 1, &want2); OR.icon2 = want2; }
+    if (h1 != prev_h1){ OR.icon1 = 0; prev_h1 = h1; last1 = -1; }
+    if (h2 != prev_h2){ OR.icon2 = 0; prev_h2 = h2; last2 = -1; }
+    if (h1 && want1 != OR.icon1){
+        fprintf(stderr, "[coop-hud] f=%ld P1 request %s hud=%08x car=%08x\n", autotest_frame(), on ? "ON" : "OFF", h1, want1);
+        call(c, FN_HUD_OUTRUN, h1, 0, 1, &want1); OR.icon1 = want1;
+    }
+    if (h2 && want2 != OR.icon2){
+        fprintf(stderr, "[coop-hud] f=%ld P2 request %s hud=%08x car=%08x\n", autotest_frame(), on ? "ON" : "OFF", h2, want2);
+        call(c, FN_HUD_OUTRUN, h2, 0, 1, &want2); OR.icon2 = want2;
+    }
+    if (on){
+        int v1 = or_icon_visible(h1), v2 = or_icon_visible(h2);
+        if (v1 != last1 || v2 != last2){
+            fprintf(stderr, "[coop-hud] f=%ld icon state P1=%d P2=%d cached=%08x/%08x\n", autotest_frame(), v1, v2, OR.icon1, OR.icon2);
+            last1 = v1; last2 = v2;
+        }
+    } else { last1 = last2 = -1; }
 }
+
 int coop_outrun_on(void){ return OR.st == OR_RACE || OR.st == OR_OVER; }
 static int or_starting;              /* or_start's call of the game's outrun start (sub_00532e30) */
 void coop_outrun_world_end(void){
     if (OR.st != OR_IDLE) fprintf(stderr, "[coop] f=%ld the world ends: the outrun between the two players with it\n", autotest_frame());
-    OR.st = OR_IDLE; OR.near_since = 0; OR.icon1 = OR.icon2 = 0;
-}
-/* the tuners' step puts player 1's HUD's outrun icon out each frame a tuner is not near: on again while offered */
-void coop_outrun_icon(CPU *c){
-    if (OR.st != OR_OFFER) return;
-    uint32_t p1 = MR32(SPLIT_PLAYERS_INDEX), h1 = p1 ? MR32(p1 + PL_HUD) : 0, car2 = coop_p2_car();
-    if (h1 && car2){ call(c, FN_HUD_OUTRUN, h1, 0, 1, &car2); OR.icon1 = car2; }
+    OR.st = OR_IDLE; OR.rearm_required = 0; OR.near_since = 0; OR.icon1 = OR.icon2 = 0;
 }
 /* The World as a one-human game's around a call of the game's outrun code: player 1's car alone in the humans' range
  * [0, 1), then `n` cars as the AI range.  Player 2's car is a human's in the World's index (IndexCars puts kind 1
@@ -995,7 +1059,17 @@ static void coop_outrun_frame(CPU *c){
         uint32_t p1 = MR32(SPLIT_PLAYERS_INDEX);
         int free = MR32(race + 0x24u) == 1u && !MR32(G_RACETYPE) && MR32(G_OUTRUN_ST) != 2u && coop_driving() &&
                    p1 && !MR32(p1 + 0x9acu);   /* (at a race marker Engage is the marker's: 0x602D99, Player +0x9AC) */
-        if (!free || d > (OR.st == OR_OFFER ? OR_KEEP_M : OR_NEAR_M)){ OR.near_since = 0; if (OR.st == OR_OFFER){ or_icons(c, 0); OR.st = OR_IDLE; } break; }
+        /* A new offer must be armed by separating the cars first.  Otherwise
+         * the original game's offer/HUD lifecycle can be re-entered while the
+         * two cars remain together after a cancelled offer.  This also avoids
+         * spamming new offers immediately after an outrun finishes. */
+        if (d > OR_KEEP_M) OR.rearm_required = 0;
+        if (!free || d > (OR.st == OR_OFFER ? OR_KEEP_M : OR_NEAR_M)){
+            OR.near_since = 0;
+            if (OR.st == OR_OFFER){ or_icons(c, 0); OR.st = OR_IDLE; OR.rearm_required = 1; }
+            break;
+        }
+        if (OR.rearm_required){ OR.near_since = 0; break; }
         if (!OR.near_since) OR.near_since = now;
         if (OR.st == OR_IDLE && now - OR.near_since >= OR_NEAR_US){ OR.st = OR_OFFER; fprintf(stderr, "[coop] f=%ld outrun offered\n", autotest_frame()); }
         if (OR.st == OR_OFFER){
@@ -1020,7 +1094,7 @@ static void coop_outrun_frame(CPU *c){
         { uint32_t p1 = MR32(SPLIT_PLAYERS_INDEX); if (p1 && MR32(p1 + PL_OPPONENT) == car2) MR32(p1 + PL_OPPONENT) = 0; }
 
         call(c, FN_EM_OVER, G_ENCOUNTERS, 0, 0, 0);
-        OR.st = OR_IDLE; OR.near_since = 0;
+        OR.st = OR_IDLE; OR.near_since = 0; OR.rearm_required = 1;
         break;
     }
 }
