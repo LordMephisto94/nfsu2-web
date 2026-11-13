@@ -303,11 +303,11 @@ test('a phone controller with a touch pad for its right stick under Chrome on An
       const at = (ms, x, y) => { t += ms; if (x !== undefined) { g.axes[2] = x; g.axes[3] = y; } p.poll(); return rs(); };
       at(0);
       assert.deepEqual(at(16, -0.4, 0.2), [-0.4, 0.2]);           // a finger on the pad
-      assert.deepEqual(at(16, -0.9671, -0.9685), [-0.97, -0.97]);  // its last place, the finger off
-      assert.deepEqual(at(1900), [-0.97, -0.97]);                   // still read for 2 s: a stick held there
+      assert.deepEqual(at(16, -0.9671, -0.9685), [-1, -1]);        // its last place, the finger off (a corner: past the rim, read as full)
+      assert.deepEqual(at(1900), [-1, -1]);                         // still read for 2 s: a stick held there
       assert.deepEqual(at(200), [0, 0]);                            // then as let go
       assert.ok(logs.some(s => /right stick stayed at \[-0\.97 -0\.97\] for 2 s/.test(s)));
-      assert.deepEqual(at(16, -0.9671, -0.9684), [-0.97, -0.97]);  // it moves: read again
+      assert.deepEqual(at(16, -0.9671, -0.9684), [-1, -1]);        // it moves: read again
       assert.deepEqual(at(16, 0, 0), [0, 0]);
       assert.deepEqual(at(5000), [0, 0]);                           // at rest: nothing to do
       p.dispose();
@@ -332,4 +332,19 @@ test('a standard-mapping controller\'s right stick held still is read as it is',
       p.dispose();
     });
   } finally { performance.now = realNow; }
+});
+
+test('a stick at its rim reads full on its larger axis; nearer the middle the axes are as they come', async () => {
+  const G3 = G;
+  const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} is not ${b}`);
+  for (const [x, y] of [[0, 0], [0.5, 0], [0.5, 0.2], [-0.4, 0.4], [1, 0], [0, -1], [0.3, -0.7]]) assert.deepEqual(G3.toTheRim(x, y), [x, y]);
+  // fully to the right, 25 degrees up: X was 0.906
+  const [x, y] = G3.toTheRim(Math.cos(25 * Math.PI / 180), -Math.sin(25 * Math.PI / 180));
+  near(x, 1); assert.ok(y < -0.42 && y > -0.5);
+  assert.ok(G3.toTheRim(-0.95, 0.31)[0] < -0.995);              // a hair inside the rim: all but full
+  // a diagonal at the rim: both full, never past it
+  assert.deepEqual(G3.toTheRim(0.7072, 0.7072), [1, 1]);
+  // between RIM_FROM and the rim it grows smoothly
+  const mid = G3.toTheRim(0.85, 0.3)[0];
+  assert.ok(mid > 0.85 && mid < 0.9, String(mid));
 });
