@@ -15,7 +15,7 @@
 import {
   CTL_IO_BEAT, CTL_IO_DOORBELL, E, IO_SLOW_MS, MAX_THREADS, Op, opName, RPC_DONE, RPC_POSTED, RPC_SLOT, RPC_TAKEN, type BootConfig, type ReadAnswer, type ReadAsk,
 } from './proto';
-import { BLOCK, CACHE_DIR, av1Path, songsPath, blockRuns, cacheKey, cacheOpen, dataUrl, exactUrl, openCacheFile, putBlock, runUrl, type CacheFile, type Manifest } from './datacache';
+import { BLOCK, CACHE_DIR, OWN_MPF, OWN_MUS, OWN_MUSIC_DIR, OWN_MUSIC_FILES, OWN_VIV, av1Path, ownMusicName, songsPath, blockRuns, cacheKey, cacheOpen, dataUrl, exactUrl, openCacheFile, putBlock, runUrl, type CacheFile, type Manifest } from './datacache';
 import { movieClose, movieDecode, movieOpen } from './movie';
 import { allocMemory, type MemoryTry } from './memory';
 
@@ -32,7 +32,9 @@ const u8 = () => new Uint8Array(memory.buffer);
 const dv = () => new DataView(memory.buffer);
 
 // ---------------------------------------------------------------- /data ----
-interface DNode { name: string; dir: boolean; size: number; mtime: number; kids?: Map<string, DNode>; byLower?: Map<string, DNode>; path: string; ino: number }
+interface DNode { name: string; dir: boolean; size: number; mtime: number; kids?: Map<string, DNode>; byLower?: Map<string, DNode>; path: string; ino: number;
+  /** a file of this browser's own, read here and never from the server or its cache (the player's own music) */
+  own?: FileSystemSyncAccessHandle }
 let dataRoot: DNode;
 let inoNext = 16;
 let runs: { url: string; max: number };     // the server's compressed blocks (datacache.ts blockRuns)
@@ -51,6 +53,29 @@ async function loadManifest() {
     const leaf = parts[parts.length - 1];
     if (f.d) { if (!cur.kids!.has(leaf)) addKid(cur, mkdirNode(leaf, f.p)); }
     else addKid(cur, { name: leaf, dir: false, size: f.s ?? 0, mtime: f.m ?? 0, path: f.p, ino: inoNext++ });
+  }
+}
+// The player's own copy of the game's music (NFSU2_MUSIC = own, app/own-music.ts): its files in place of the server's
+// SDATA/sdat.viv, or of pfdata/MusicSFx.mus and .mpf (both or neither: the .mpf's table points into its own .mus).
+const ownMusic = new Map<string, DNode>();
+async function loadOwnMusic() {
+  if (cfg.env.NFSU2_MUSIC?.trim().toLowerCase() !== 'own') return;
+  const open: DNode[] = [];
+  try {
+    const dir = await (await navigator.storage.getDirectory()).getDirectoryHandle(OWN_MUSIC_DIR);
+    for (const name of OWN_MUSIC_FILES) {
+      let fh: FileSystemFileHandle;
+      try { fh = await dir.getFileHandle(name); } catch { continue; }
+      const f = await fh.getFile(), h = await fh.createSyncAccessHandle();
+      open.push({ name, dir: false, size: h.getSize(), mtime: Math.floor(f.lastModified / 1000), path: `${OWN_MUSIC_DIR}/${name}`, ino: inoNext++, own: h });
+    }
+    const has = (name: string) => open.some(n => n.name === name && n.size > 0);
+    if (!has(OWN_VIV) && !(has(OWN_MUS) && has(OWN_MPF))) throw new Error('no whole copy there');
+    for (const n of open) ownMusic.set(n.name, n);
+    note(`[data] music: your own copy of the game's (${open.map(n => n.name).join(', ')}, ${(open.reduce((a, n) => a + n.size, 0) / 1048576).toFixed(0)} MB in this browser)`);
+  } catch (e) {
+    for (const n of open) try { n.own!.close(); } catch { /* closed */ }
+    note(`[data] music: your own copy did not open (${e}); the server's songs play`);
   }
 }
 function addKid(dir: DNode, n: DNode) { dir.kids!.set(n.name, n); if (!dir.byLower!.has(n.name.toLowerCase())) dir.byLower!.set(n.name.toLowerCase(), n); return n; }
@@ -73,6 +98,8 @@ function dataLookup(rel: string): DNode | null {
 function dataFile(rel: string): DNode | null {
   const n = dataLookup(rel);
   if (!n || n.dir) return n;
+  const mine = ownMusic.size ? ownMusicName(n.path) : null;
+  if (mine) return ownMusic.get(mine) ?? n;
   const s = cfg.env.NFSU2_SONGS?.trim().toLowerCase() === 'original' ? songsPath(n.path) : null;
   const o = s ? dataLookup(s) : null;
   if (o && !o.dir) return o;
@@ -335,6 +362,7 @@ async function getBlock(n: DNode, bi: number, pri: number): Promise<Uint8Array> 
   const t: Ticket = { pri };
   p = (async () => {
     const start = bi * BLOCK, len = Math.min(BLOCK, n.size - start);
+    if (n.own) { const b = new Uint8Array(len); n.own.read(b, { at: start }); memPut(key, b); sum.local++; return b; }
     steps.set(key, { t0: performance.now(), at: 'its cache file' });
     const cf = await cacheFile(n);
     if (cf && cf.have[bi]) {
@@ -437,7 +465,7 @@ async function dataRead(n: DNode, pos: number, dst: { ptr: number; len: number }
   if (end <= pos) return 0;
   const first = Math.floor(pos / BLOCK), last = Math.floor((end - 1) / BLOCK), track = isTrackStream(n);
   if (track) readAhead(n, first);
-  if (readsKept && offPage && cacheDir && !blocksInMemory(n, first, last)) {
+  if (readsKept && offPage && cacheDir && !n.own && !blocksInMemory(n, first, last)) {
     dataSummary(performance.now());
     const cf = await cacheFile(n);
     const r = cf ? readKept(cf, pos, end, dst, first, last) : -1;
@@ -1105,6 +1133,7 @@ onmessage = async (e: MessageEvent<Init | { t: 'save-ready' } | { t: 'give'; por
       try { cacheDir = await opfs.getDirectoryHandle(CACHE_DIR, { create: true }); } catch { cacheDir = null; }
     }
     await loadManifest();
+    await loadOwnMusic();
     fds.set(3, { mount: 'data', kind: 'dir', path: '', pos: 0, append: false, node: dataRoot, preopen: '/data' });
     fds.set(4, { mount: 'save', kind: 'dir', path: '', pos: 0, append: false, dh: saveRoot, preopen: '/save' });
     fds.set(5, { mount: 'dev', kind: 'dir', path: '', pos: 0, append: false, preopen: '/dev' });
