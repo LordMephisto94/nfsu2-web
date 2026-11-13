@@ -79,10 +79,17 @@ export async function enterFullscreen(el: HTMLElement): Promise<{ ok: boolean; l
   return { ok: true, locked: await lockKeys() };
 }
 
+/** The keys kept for the page in full screen (Keyboard Lock): Esc, which would leave full screen, and the keys of the
+ *  browser's shortcuts a game's hands reach with Ctrl or Alt held for the gears or the nitrous (Ctrl+W closes the tab,
+ *  Ctrl+R and F5 reload it, Ctrl+T, N and Q open or quit, F11 leaves full screen).  Not every key, as lock() without
+ *  a list takes: the browser then holds the whole keyboard, and other programs' own keys stop working while the game
+ *  is in full screen (a recording's start in OBS or GeForce Experience, Discord's push to talk). */
+export const LOCKED_KEYS = ['Escape', 'KeyW', 'KeyR', 'KeyT', 'KeyN', 'KeyQ', 'F5', 'F11'];
+
 export async function lockKeys(): Promise<boolean> {
   const kb = (navigator as any).keyboard as { lock?: (codes?: string[]) => Promise<void> } | undefined;
   if (!kb?.lock || !document.fullscreenElement) return false;
-  try { await kb.lock(); return true; } catch { return false; }
+  try { await kb.lock(LOCKED_KEYS); return true; } catch { return false; }
 }
 
 /**
