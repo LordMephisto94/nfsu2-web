@@ -1565,5 +1565,15 @@
   "Street X: Parkade": "Street X: Πάρκινγκ",
   "Join takes you to your friend: their world, their track and their car.": "Η «Συμμετοχή» σε πηγαίνει στον φίλο σου: στον κόσμο του, στην πίστα του και στο αυτοκίνητό του.",
   "{name} is in a part of the city your career hasn't opened yet.": "Ο παίκτης {name} είναι σε μέρος της πόλης που δεν έχει ξεκλειδωθεί ακόμα στην καριέρα σου.",
-  "{name} could not be found in free roam.": "Ο παίκτης {name} δεν βρέθηκε στην ελεύθερη οδήγηση."
+  "{name} could not be found in free roam.": "Ο παίκτης {name} δεν βρέθηκε στην ελεύθερη οδήγηση.",
+  "Those are not the game's music files.": "Αυτά δεν είναι τα αρχεία μουσικής του παιχνιδιού.",
+  "Not enough room in this browser for the songs.": "Δεν υπάρχει αρκετός χώρος σε αυτό το πρόγραμμα περιήγησης για τα τραγούδια.",
+  "Copying the songs stopped. Try again.": "Η αντιγραφή των τραγουδιών σταμάτησε. Δοκίμασε ξανά.",
+  "No music found there. Pick the folder the game is installed in.": "Δεν βρέθηκε μουσική εκεί. Διάλεξε τον φάκελο όπου είναι εγκατεστημένο το παιχνίδι.",
+  "Your copy of the game": "Το δικό σου αντίγραφο του παιχνιδιού",
+  "Plays the songs from your own copy of the game instead of this server's. Pick the folder it is installed in: the songs are copied into this browser.": "Παίζει τα τραγούδια από το δικό σου αντίγραφο του παιχνιδιού αντί για του διακομιστή. Διάλεξε τον φάκελο όπου είναι εγκατεστημένο: τα τραγούδια αντιγράφονται σε αυτό το πρόγραμμα περιήγησης.",
+  "Choose game folder": "Επιλογή φακέλου παιχνιδιού",
+  "Copying the songs: {percent} %": "Αντιγραφή τραγουδιών: {percent} %",
+  "Your own songs play ({size} MB in this browser).": "Παίζουν τα δικά σου τραγούδια ({size} MB σε αυτό το πρόγραμμα περιήγησης).",
+  "The official playlist on Spotify": "Η επίσημη λίστα στο Spotify"
 }

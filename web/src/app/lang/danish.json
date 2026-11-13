@@ -1625,5 +1625,15 @@
   "Street X: Parkade": "Street X: Parkeringshuset",
   "Join takes you to your friend: their world, their track and their car.": "Deltag bringer dig hen til din ven: til vennens verden, bane og bil.",
   "{name} is in a part of the city your career hasn't opened yet.": "{name} er i en del af byen, som din karriere ikke har åbnet endnu.",
-  "{name} could not be found in free roam.": "{name} blev ikke fundet i udforsknings-mode."
+  "{name} could not be found in free roam.": "{name} blev ikke fundet i udforsknings-mode.",
+  "Those are not the game's music files.": "Det er ikke spillets musikfiler.",
+  "Not enough room in this browser for the songs.": "Der er ikke plads nok i denne browser til sangene.",
+  "Copying the songs stopped. Try again.": "Kopieringen af sangene stoppede. Prøv igen.",
+  "No music found there. Pick the folder the game is installed in.": "Ingen musik fundet der. Vælg den mappe, spillet er installeret i.",
+  "Your copy of the game": "Dit eksemplar af spillet",
+  "Plays the songs from your own copy of the game instead of this server's. Pick the folder it is installed in: the songs are copied into this browser.": "Afspiller sangene fra dit eget eksemplar af spillet i stedet for serverens. Vælg den mappe, det er installeret i: sangene kopieres til denne browser.",
+  "Choose game folder": "Vælg spilmappe",
+  "Copying the songs: {percent} %": "Kopierer sangene: {percent} %",
+  "Your own songs play ({size} MB in this browser).": "Dine egne sange afspilles ({size} MB i denne browser).",
+  "The official playlist on Spotify": "Den officielle playliste på Spotify"
 }

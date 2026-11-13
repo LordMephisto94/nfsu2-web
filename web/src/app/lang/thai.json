@@ -1535,5 +1535,15 @@
   "Street X: Parkade": "Street X: อาคารจอดรถ",
   "Join takes you to your friend: their world, their track and their car.": "“เข้าร่วม” จะพาคุณไปหาเพื่อน: ไปยังโลก สนามแข่ง และรถของเพื่อน",
   "{name} is in a part of the city your career hasn't opened yet.": "{name} อยู่ในส่วนของเมืองที่ยังไม่เปิดในโหมดอาชีพของคุณ",
-  "{name} could not be found in free roam.": "ไม่พบ {name} ในการขับอิสระ"
+  "{name} could not be found in free roam.": "ไม่พบ {name} ในการขับอิสระ",
+  "Those are not the game's music files.": "ไฟล์เหล่านี้ไม่ใช่ไฟล์เพลงของเกม",
+  "Not enough room in this browser for the songs.": "เบราว์เซอร์นี้มีพื้นที่ไม่พอสำหรับเพลง",
+  "Copying the songs stopped. Try again.": "การคัดลอกเพลงหยุดลง ลองอีกครั้ง",
+  "No music found there. Pick the folder the game is installed in.": "ไม่พบเพลงที่นั่น เลือกโฟลเดอร์ที่ติดตั้งเกมไว้",
+  "Your copy of the game": "เกมของคุณเอง",
+  "Plays the songs from your own copy of the game instead of this server's. Pick the folder it is installed in: the songs are copied into this browser.": "เล่นเพลงจากเกมของคุณเองแทนเพลงของเซิร์ฟเวอร์นี้ เลือกโฟลเดอร์ที่ติดตั้งเกมไว้ เพลงจะถูกคัดลอกมายังเบราว์เซอร์นี้",
+  "Choose game folder": "เลือกโฟลเดอร์เกม",
+  "Copying the songs: {percent} %": "กำลังคัดลอกเพลง: {percent} %",
+  "Your own songs play ({size} MB in this browser).": "กำลังเล่นเพลงของคุณเอง ({size} MB ในเบราว์เซอร์นี้)",
+  "The official playlist on Spotify": "เพลย์ลิสต์ทางการบน Spotify"
 }

@@ -1655,5 +1655,15 @@
   "Street X: Parkade": "Street X : Parking",
   "Join takes you to your friend: their world, their track and their car.": "« Rejoindre » vous emmène auprès de votre ami : dans son monde, sur sa piste et juste derrière sa voiture.",
   "{name} is in a part of the city your career hasn't opened yet.": "{name} est dans une partie de la ville pas encore débloquée dans votre carrière.",
-  "{name} could not be found in free roam.": "{name} est introuvable en mode Exploration."
+  "{name} could not be found in free roam.": "{name} est introuvable en mode Exploration.",
+  "Those are not the game's music files.": "Ce ne sont pas les fichiers de musique du jeu.",
+  "Not enough room in this browser for the songs.": "Pas assez de place dans ce navigateur pour les chansons.",
+  "Copying the songs stopped. Try again.": "La copie des chansons s'est arrêtée. Réessayez.",
+  "No music found there. Pick the folder the game is installed in.": "Aucune musique trouvée ici. Choisissez le dossier où le jeu est installé.",
+  "Your copy of the game": "Votre copie du jeu",
+  "Plays the songs from your own copy of the game instead of this server's. Pick the folder it is installed in: the songs are copied into this browser.": "Joue les chansons de votre propre copie du jeu à la place de celles de ce serveur. Choisissez le dossier où il est installé : les chansons sont copiées dans ce navigateur.",
+  "Choose game folder": "Choisir le dossier du jeu",
+  "Copying the songs: {percent} %": "Copie des chansons : {percent} %",
+  "Your own songs play ({size} MB in this browser).": "Vos propres chansons sont jouées ({size} Mo dans ce navigateur).",
+  "The official playlist on Spotify": "La playlist officielle sur Spotify"
 }

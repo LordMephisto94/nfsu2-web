@@ -1655,5 +1655,15 @@
   "Street X: Parkade": "Calle X: Aparcamiento",
   "Join takes you to your friend: their world, their track and their car.": "«Unirse» te lleva con tu amigo: a su mundo, a su pista y justo detrás de su coche.",
   "{name} is in a part of the city your career hasn't opened yet.": "{name} está en una zona de la ciudad que aún no está disponible en tu modo carrera.",
-  "{name} could not be found in free roam.": "No se encontró a {name} en circulación libre."
+  "{name} could not be found in free roam.": "No se encontró a {name} en circulación libre.",
+  "Those are not the game's music files.": "Esos no son los archivos de música del juego.",
+  "Not enough room in this browser for the songs.": "No hay suficiente espacio en este navegador para las canciones.",
+  "Copying the songs stopped. Try again.": "La copia de las canciones se detuvo. Inténtalo de nuevo.",
+  "No music found there. Pick the folder the game is installed in.": "No se encontró música ahí. Elige la carpeta donde está instalado el juego.",
+  "Your copy of the game": "Tu copia del juego",
+  "Plays the songs from your own copy of the game instead of this server's. Pick the folder it is installed in: the songs are copied into this browser.": "Reproduce las canciones de tu propia copia del juego en lugar de las de este servidor. Elige la carpeta donde está instalado: las canciones se copian a este navegador.",
+  "Choose game folder": "Elegir carpeta del juego",
+  "Copying the songs: {percent} %": "Copiando las canciones: {percent} %",
+  "Your own songs play ({size} MB in this browser).": "Suenan tus propias canciones ({size} MB en este navegador).",
+  "The official playlist on Spotify": "La lista oficial en Spotify"
 }

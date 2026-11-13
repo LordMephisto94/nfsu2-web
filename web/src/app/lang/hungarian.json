@@ -1541,5 +1541,15 @@
   "Street X: Parkade": "Stílus X: Parkolóház",
   "Join takes you to your friend: their world, their track and their car.": "A „Csatlakozás” a barátodhoz visz: a világába, a pályájára és az autójához.",
   "{name} is in a part of the city your career hasn't opened yet.": "{name} a város egy olyan részén van, amely a karrieredben még nincs feloldva.",
-  "{name} could not be found in free roam.": "{name} nem található Felfedező módban."
+  "{name} could not be found in free roam.": "{name} nem található Felfedező módban.",
+  "Those are not the game's music files.": "Ezek nem a játék zenefájljai.",
+  "Not enough room in this browser for the songs.": "Ebben a böngészőben nincs elég hely a dalokhoz.",
+  "Copying the songs stopped. Try again.": "A dalok másolása megszakadt. Próbáld újra.",
+  "No music found there. Pick the folder the game is installed in.": "Ott nem található zene. Válaszd azt a mappát, ahová a játék telepítve van.",
+  "Your copy of the game": "A saját játékod",
+  "Plays the songs from your own copy of the game instead of this server's. Pick the folder it is installed in: the songs are copied into this browser.": "A szerver dalai helyett a saját játékod dalait játssza le. Válaszd azt a mappát, ahová telepítve van: a dalok ebbe a böngészőbe másolódnak.",
+  "Choose game folder": "Játékmappa kiválasztása",
+  "Copying the songs: {percent} %": "Dalok másolása: {percent} %",
+  "Your own songs play ({size} MB in this browser).": "A saját dalaid szólnak ({size} MB ebben a böngészőben).",
+  "The official playlist on Spotify": "A hivatalos lejátszási lista a Spotify-on"
 }

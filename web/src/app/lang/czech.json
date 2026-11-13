@@ -1685,5 +1685,15 @@
   "Street X: Parkade": "Street X: Parkovací dům",
   "Join takes you to your friend: their world, their track and their car.": "„Připojit“ tě vezme za přítelem: do jeho světa, na jeho trať a k jeho autu.",
   "{name} is in a part of the city your career hasn't opened yet.": "{name} je v části města, která v tvé kariéře ještě není otevřená.",
-  "{name} could not be found in free roam.": "{name} ve volné jízdě není k nalezení."
+  "{name} could not be found in free roam.": "{name} ve volné jízdě není k nalezení.",
+  "Those are not the game's music files.": "To nejsou hudební soubory hry.",
+  "Not enough room in this browser for the songs.": "V tomto prohlížeči není dost místa na skladby.",
+  "Copying the songs stopped. Try again.": "Kopírování skladeb se přerušilo. Zkus to znovu.",
+  "No music found there. Pick the folder the game is installed in.": "Žádná hudba tam nebyla nalezena. Vyber složku, ve které je hra nainstalovaná.",
+  "Your copy of the game": "Tvoje kopie hry",
+  "Plays the songs from your own copy of the game instead of this server's. Pick the folder it is installed in: the songs are copied into this browser.": "Přehrává skladby z tvé vlastní kopie hry místo skladeb tohoto serveru. Vyber složku, ve které je nainstalovaná: skladby se zkopírují do tohoto prohlížeče.",
+  "Choose game folder": "Vybrat složku hry",
+  "Copying the songs: {percent} %": "Kopírování skladeb: {percent} %",
+  "Your own songs play ({size} MB in this browser).": "Hrají tvoje vlastní skladby ({size} MB v tomto prohlížeči).",
+  "The official playlist on Spotify": "Oficiální playlist na Spotify"
 }

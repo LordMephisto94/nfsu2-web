@@ -1685,5 +1685,15 @@
   "Street X: Parkade": "Стріт-X: Парковка",
   "Join takes you to your friend: their world, their track and their car.": "«Приєднатися» переносить вас до друга: у його світ, на його трасу й до його машини.",
   "{name} is in a part of the city your career hasn't opened yet.": "{name} їздить у частині міста, яка у вашій кар'єрі ще не відкрита.",
-  "{name} could not be found in free roam.": "Гравця {name} не вдалося знайти у вільній їзді."
+  "{name} could not be found in free roam.": "Гравця {name} не вдалося знайти у вільній їзді.",
+  "Those are not the game's music files.": "Це не музичні файли гри.",
+  "Not enough room in this browser for the songs.": "У цьому браузері недостатньо місця для пісень.",
+  "Copying the songs stopped. Try again.": "Копіювання пісень перервалося. Спробуйте ще раз.",
+  "No music found there. Pick the folder the game is installed in.": "Музики там не знайдено. Виберіть папку, у яку встановлено гру.",
+  "Your copy of the game": "Ваша копія гри",
+  "Plays the songs from your own copy of the game instead of this server's. Pick the folder it is installed in: the songs are copied into this browser.": "Грає пісні з вашої копії гри замість пісень цього сервера. Виберіть папку, у яку її встановлено: пісні копіюються в цей браузер.",
+  "Choose game folder": "Вибрати папку гри",
+  "Copying the songs: {percent} %": "Копіювання пісень: {percent} %",
+  "Your own songs play ({size} MB in this browser).": "Грають ваші пісні ({size} МБ у цьому браузері).",
+  "The official playlist on Spotify": "Офіційний плейлист у Spotify"
 }

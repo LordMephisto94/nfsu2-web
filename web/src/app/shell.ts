@@ -61,6 +61,8 @@ import { canPickMusic, pickMusic } from '../radio-folder';
 import { RadioLink } from './radio-link';
 import { LastfmApi, readSession, Scrobbler, scrobbleWhilePlaying } from './lastfm';
 import { LastfmRow } from './lastfm-ui';
+import { OwnMusicRow } from './own-music-ui';
+import { ownMusic } from './own-music';
 import { FpsOverlay, FPS_MODES, type FpsMode } from './overlay';
 import { LobbyPanel } from './lobby';
 import { ICON as CHAT_ICON, QuickChat } from './quickchat';
@@ -700,6 +702,9 @@ async function startGame() {
   setReach(await serverAnswers(2000));
   // the movies in AV1 where this browser decodes it, else in VP6 (host/movie.ts; settings.ini NFSU2_MOVIE_CODEC)
   r.env.NFSU2_MOVIE_CODEC = await movieCodec(r.env);
+  // the player's own copy of the game's music, where a whole one is in this browser (own-music.ts); a settings.ini
+  // line NFSU2_MUSIC decides otherwise (server: the server's songs)
+  if (!r.env.NFSU2_MUSIC && await ownMusic().catch(() => null)) r.env.NFSU2_MUSIC = 'own';
   let offlineNote = '';
   if (offline) {
     log.add('[app] offline: the server does not answer, the game runs from this PC (no free roam or Online)');
@@ -2588,6 +2593,8 @@ export async function boot() {
   const scrobbler = new Scrobbler({ api: lastfmApi, folder: () => radio?.lastTrack ?? null, dropped: () => lastfmRow.dropped(), log: logLine });
   scrobbleWhilePlaying(radioPort, scrobbler, readSession);
   onLanguage(() => lastfmRow.render());
+  const ownMusicRow = new OwnMusicRow({ busy: () => !!session || starting || !instance.owner, log: logLine });
+  onLanguage(() => ownMusicRow.render());
   settings = new SettingsPanel($('#settings'), {
     // another language, texture pack or songs count other files as the game data (its pack); a keyphrase sends the file
     file: settingsFile, environment: ENVIRONMENT, defaults: DEVICE, onSaved: (_, was) => {
@@ -2603,7 +2610,7 @@ export async function boot() {
     readOnly: () => !instance.owner, say: pageToast, confirm: confirmBox,
     nameRow: (row, input, ctl) => nameRow.attach(row, input, ctl),
     quietSave: (key, value) => key === 'roam_name' && nameRow.notPlayed(value),
-    rowAfter: key => key === 'race_music' ? lastfmRow.el : null,
+    rowAfter: key => key === 'race_music' ? [ownMusicRow.el, lastfmRow.el] : null,
   }, $('#online'));
   // the language picker at the top: the same setting as the Game tab's Language
   const pick = $<HTMLSelectElement>('#lang-pick');

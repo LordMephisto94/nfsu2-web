@@ -1547,5 +1547,15 @@
   "Street X: Parkade": "Street X: Otopark Pisti",
   "Join takes you to your friend: their world, their track and their car.": "Katıl, seni arkadaşına götürür: dünyasına, pistine ve arabasına.",
   "{name} is in a part of the city your career hasn't opened yet.": "{name}, şehrin kariyerinde henüz açılmamış bir bölümünde.",
-  "{name} could not be found in free roam.": "{name} serbest sürüşte bulunamadı."
+  "{name} could not be found in free roam.": "{name} serbest sürüşte bulunamadı.",
+  "Those are not the game's music files.": "Bunlar oyunun müzik dosyaları değil.",
+  "Not enough room in this browser for the songs.": "Bu tarayıcıda şarkılar için yeterli yer yok.",
+  "Copying the songs stopped. Try again.": "Şarkıların kopyalanması durdu. Tekrar dene.",
+  "No music found there. Pick the folder the game is installed in.": "Orada müzik bulunamadı. Oyunun kurulu olduğu klasörü seç.",
+  "Your copy of the game": "Kendi oyun kopyan",
+  "Plays the songs from your own copy of the game instead of this server's. Pick the folder it is installed in: the songs are copied into this browser.": "Bu sunucunun şarkıları yerine kendi oyun kopyandaki şarkıları çalar. Oyunun kurulu olduğu klasörü seç: şarkılar bu tarayıcıya kopyalanır.",
+  "Choose game folder": "Oyun klasörünü seç",
+  "Copying the songs: {percent} %": "Şarkılar kopyalanıyor: %{percent}",
+  "Your own songs play ({size} MB in this browser).": "Kendi şarkıların çalıyor (bu tarayıcıda {size} MB).",
+  "The official playlist on Spotify": "Spotify'daki resmi çalma listesi"
 }

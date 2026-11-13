@@ -1535,5 +1535,15 @@
   "Street X: Parkade": "Street X 賽：立體停車場",
   "Join takes you to your friend: their world, their track and their car.": "按「加入」就會前往好友身邊：好友所在的世界、賽道和車子旁。",
   "{name} is in a part of the city your career hasn't opened yet.": "{name} 位於你的生涯模式中尚未開放的城市區域。",
-  "{name} could not be found in free roam.": "在自由漫遊中找不到 {name}。"
+  "{name} could not be found in free roam.": "在自由漫遊中找不到 {name}。",
+  "Those are not the game's music files.": "這些不是遊戲的音樂檔案。",
+  "Not enough room in this browser for the songs.": "此瀏覽器的空間不足以存放歌曲。",
+  "Copying the songs stopped. Try again.": "歌曲複製已中斷。請再試一次。",
+  "No music found there. Pick the folder the game is installed in.": "那裡找不到音樂。請選擇遊戲的安裝資料夾。",
+  "Your copy of the game": "你自己的遊戲",
+  "Plays the songs from your own copy of the game instead of this server's. Pick the folder it is installed in: the songs are copied into this browser.": "播放你自己那份遊戲裡的歌曲，而不是這個伺服器的。請選擇遊戲的安裝資料夾：歌曲會複製到此瀏覽器。",
+  "Choose game folder": "選擇遊戲資料夾",
+  "Copying the songs: {percent} %": "正在複製歌曲：{percent} %",
+  "Your own songs play ({size} MB in this browser).": "正在播放你自己的歌曲（此瀏覽器中 {size} MB）。",
+  "The official playlist on Spotify": "Spotify 上的官方播放清單"
 }

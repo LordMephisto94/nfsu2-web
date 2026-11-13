@@ -1685,5 +1685,15 @@
   "Street X: Parkade": "Стрит-X: Парковка",
   "Join takes you to your friend: their world, their track and their car.": "«Присоединиться» переносит вас к другу: в его мир, на его трассу и к его машине.",
   "{name} is in a part of the city your career hasn't opened yet.": "{name} ездит в части города, которая в вашей карьере ещё не открыта.",
-  "{name} could not be found in free roam.": "Игрока {name} не удалось найти в свободной езде."
+  "{name} could not be found in free roam.": "Игрока {name} не удалось найти в свободной езде.",
+  "Those are not the game's music files.": "Это не музыкальные файлы игры.",
+  "Not enough room in this browser for the songs.": "В этом браузере недостаточно места для песен.",
+  "Copying the songs stopped. Try again.": "Копирование песен прервалось. Попробуйте ещё раз.",
+  "No music found there. Pick the folder the game is installed in.": "Музыка там не найдена. Выберите папку, в которую установлена игра.",
+  "Your copy of the game": "Ваша копия игры",
+  "Plays the songs from your own copy of the game instead of this server's. Pick the folder it is installed in: the songs are copied into this browser.": "Играет песни из вашей копии игры вместо песен этого сервера. Выберите папку, в которую она установлена: песни копируются в этот браузер.",
+  "Choose game folder": "Выбрать папку игры",
+  "Copying the songs: {percent} %": "Копирование песен: {percent} %",
+  "Your own songs play ({size} MB in this browser).": "Играют ваши песни ({size} МБ в этом браузере).",
+  "The official playlist on Spotify": "Официальный плейлист в Spotify"
 }
