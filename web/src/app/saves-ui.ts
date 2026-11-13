@@ -829,6 +829,10 @@ export class SavesPanel {
       this.msg(() => err instanceof UndoPending ? t('An earlier restore stopped halfway and is not undone yet, so nothing was changed. Reload the page, then try again.')
         : adding ? t('Adding stopped halfway: {error}. Add the profiles again before playing.', { error: String(err) })
         : t('Restoring stopped halfway: {error}. Restore the backup again before playing.', { error: String(err) }));
+      // stopped halfway, or nothing changed at all: not what the player chose, so the cloud saves are not told to send
+      // the folder as it is (vault.ts intended()); their next sync judges it as any other change and asks
+      await this.refresh();
+      return;
     }
     this.deps.onChanged?.();
     await this.refresh();
