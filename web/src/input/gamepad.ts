@@ -59,6 +59,19 @@ export interface PadSnapshot { connected: boolean; buttons: number; axes: number
 /** IronWing: how many raw lines (rawLog) a controller gets in one game's log */
 const RAW_LINES = 80;
 
+/** A stick's two axes with its rim read as full: a stick moves in a circle, so pushed all the way to a side but held a
+ *  little up or down its X reads 0.9 or less, and the car never steered fully.  From RIM_FROM of the way out the
+ *  larger axis grows towards what the stick's distance from the middle is, 1 at the rim; nearer the middle the axes
+ *  are as they come (a stick held halfway reads halfway). */
+const RIM_FROM = 0.8;
+export function toTheRim(x: number, y: number): [number, number] {
+  const m = Math.max(Math.abs(x), Math.abs(y)), r = Math.min(1, Math.hypot(x, y));
+  if (m <= 0 || r <= RIM_FROM) return [x, y];
+  const w = (r - RIM_FROM) / (1 - RIM_FROM), k = 1 + (r / m - 1) * w * w * (3 - 2 * w);
+  const cl = (v: number) => Math.max(-1, Math.min(1, v * k));
+  return [cl(x), cl(y)];
+}
+
 // standard mapping: buttons[i] -> PAD_* (6 and 7 are the analog triggers)
 const BUTTON_OF: (number | -1)[] = [PAD_A, PAD_B, PAD_X, PAD_Y, PAD_LB, PAD_RB, -1, -1, PAD_BACK, PAD_START,
   PAD_LS, PAD_RS, PAD_DUP, PAD_DDOWN, PAD_DLEFT, PAD_DRIGHT, PAD_HOME];
@@ -97,7 +110,7 @@ export function mapStandard(g: Gamepad, notStick?: ReadonlySet<number>): PadSnap
   };
   const tr = (i: number) => { const b = g.buttons[i]; return b ? Math.max(0, Math.min(1, b.value || (b.pressed ? 1 : 0))) : 0; };
   const axes = [0, 0, 0, 0, 0, 0];
-  axes[PAD_AXIS_LX] = ax(0); axes[PAD_AXIS_LY] = ax(1); axes[PAD_AXIS_RX] = ax(2); axes[PAD_AXIS_RY] = ax(3);
+  [axes[PAD_AXIS_LX], axes[PAD_AXIS_LY]] = toTheRim(ax(0), ax(1)); [axes[PAD_AXIS_RX], axes[PAD_AXIS_RY]] = toTheRim(ax(2), ax(3));
   axes[PAD_AXIS_LT] = tr(6); axes[PAD_AXIS_RT] = tr(7);
   const { family, name } = familyOf(g.id);
   return { connected: true, buttons, axes, family, name, index: g.index };
@@ -626,7 +639,8 @@ export class PadPoller {
       const seq = Atomics.load(h, IM_RUMBLE_SEQ);
       if (seq !== this.rumbleSeq) { this.rumbleSeq = seq; this.rumbleSeen = now; }
       // levels the game still sends: it polls the pad every frame while it runs
-      if (now - this.rumbleSeen < 150 && document.visibilityState === 'visible') {
+      // (none while the page's menu or one of its dialogs is open: the controller works that, not the car)
+      if (now - this.rumbleSeen < 150 && document.visibilityState === 'visible' && !this.page?.dialog()) {
         strong = Atomics.load(h, IM_RUMBLE_STRONG) / 65535; weak = Atomics.load(h, IM_RUMBLE_WEAK) / 65535;
       }
     }
