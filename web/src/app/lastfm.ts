@@ -44,6 +44,8 @@ export class LastfmApi {
 /** Last.fm's "allow access" page, which sends the player back to /lastfm.html with a token */
 export const authLink = (key: string, origin = location.origin) => `${AUTH_PAGE}?api_key=${encodeURIComponent(key)}&cb=${encodeURIComponent(`${origin}/lastfm.html`)}`;
 
+/** a title without the quotation marks around it */
+export const unquoted = (title: string) => title.trim().replace(/^["\u201c\u201d]+|["\u201c\u201d]+$/g, '').trim() || title.trim();
 /** a title without its artist in front ("Artist - Title"), as the game's plaque shows it (radio-tags.ts plaqueTags) */
 const ownTitle = (t: Lines) => t.artist && t.title.toLowerCase().startsWith(`${t.artist} - `.toLowerCase()) ? t.title.slice(t.artist.length + 3) : t.title;
 
@@ -106,7 +108,8 @@ export class Scrobbler {
 
   private track(c: Current): Omit<Scrobble, 'timestamp'> {
     const l = c.lines!;
-    return { artist: l.artist, track: l.title, ...(l.album ? { album: l.album } : {}), ...(c.duration ? { duration: c.duration } : {}) };
+    // (the game's plaque writes an EA Trax song's title in quotation marks: the title is what is between them)
+    return { artist: l.artist, track: unquoted(l.title), ...(l.album ? { album: l.album } : {}), ...(c.duration ? { duration: c.duration } : {}) };
   }
 
   /** a call, and what came of it: 'later' when Last.fm could not be asked or asks to wait */

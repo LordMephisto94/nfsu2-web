@@ -120,3 +120,11 @@ test('a session key that stopped working: dropped, and nothing more is sent with
 test('the link to Last.fm\'s page names this server\'s key and its way back', () => {
   assert.equal(authLink('K&1', 'https://nfsu2.example'), 'https://www.last.fm/api/auth/?api_key=K%261&cb=https%3A%2F%2Fnfsu2.example%2Flastfm.html');
 });
+
+test('a title goes without the quotation marks the game\'s plaque puts around it', async () => {
+  const L2 = await load('web/src/app/lastfm.ts');
+  assert.equal(L2.unquoted('"Riders on the Storm"'), 'Riders on the Storm');
+  assert.equal(L2.unquoted('\u201cLean Back\u201d'), 'Lean Back');
+  assert.equal(L2.unquoted('Say "Hi" to Me'), 'Say "Hi" to Me', 'marks inside stay');
+  assert.equal(L2.unquoted('""'), '""', 'nothing between them: as it is');
+});
