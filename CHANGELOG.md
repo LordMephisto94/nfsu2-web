@@ -11,6 +11,16 @@ first, then under `### Fixes` what was broken and works now, which the popup kee
 insides, the forum bot, logs, tests, docs and cheat checks. A change that may or may not belong here is asked about
 before the release, not guessed.
 
+## 2026-11-14 (027aead8)
+
+- **Mods:** Roads and Shadows, featuring high-resolution roads, grass, car shadows, traffic shadows and neon textures from underground2.net.
+- **Mods:** choose Original or HD under Mods → Graphics, below Upscaled HUD and Detailed Map.
+- **Graphics:** improved texture detail at higher resolutions, with HD mipmaps and a separate optional texture pack.
+
+### Fixes
+
+- **Mods:** conflicting texture replacements no longer prevent Roads and Shadows from generating its texture pack.
+
 ## 2026-11-13 (576e19ea)
 
 - **Split screen:** race against up to four AI opponents alongside two human players, for a full six-car race.
