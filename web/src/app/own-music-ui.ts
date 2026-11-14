@@ -21,9 +21,12 @@ async function pickGameMusic(): Promise<Found | null> {
     catch (e) { if (e instanceof DOMException && e.name === 'AbortError') return null; throw e; }
   }
   return new Promise(resolve => {
-    const input = Object.assign(document.createElement('input'), { type: 'file', webkitdirectory: true, multiple: true });
-    input.addEventListener('cancel', () => resolve(null));
-    input.addEventListener('change', () => resolve(findMusic(Array.from(input.files ?? [], file => ({ path: file.webkitRelativePath || file.name, file })))));
+    // (in the page while it is open: hidden, taken out once answered)
+    const input = Object.assign(document.createElement('input'), { type: 'file', webkitdirectory: true, multiple: true, hidden: true });
+    const done = (found: Found | null) => { input.remove(); resolve(found); };
+    input.addEventListener('cancel', () => done(null));
+    input.addEventListener('change', () => done(findMusic(Array.from(input.files ?? [], file => ({ path: file.webkitRelativePath || file.name, file })))));
+    document.body.append(input);
     input.click();
   });
 }
