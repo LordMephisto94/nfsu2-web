@@ -1556,14 +1556,13 @@ body {
 .top-row { flex-wrap: wrap; }
 .brand { flex: 1 1 420px; }
 .iw-game-heading { margin: 0; line-height: 1; }
+/* the IronWing banner: a picture with its own dark background, so its corners are rounded as a panel's */
 .iw-game-logo {
   display: block;
-  width: min(100%, 530px);
+  width: min(100%, 440px);
   height: auto;
-  max-height: 188px;
-  object-fit: contain;
-  object-position: left center;
-  filter: drop-shadow(0 0 15px rgba(38,194,228,.14));
+  border-radius: 12px;
+  box-shadow: 0 0 16px rgba(38,194,228,.16);
 }
 .iw-edition {
   color: var(--iw-gold);
@@ -1624,13 +1623,11 @@ body {
 @media (max-width: 720px) {
   .iw-host-banner { align-items: flex-start; }
   .iw-original-credit { max-width: none; padding-left: 64px; }
-  .iw-game-logo { max-height: 150px; }
 }
 @media (max-width: 420px) {
   .iw-host-banner { padding: 10px; }
   .iw-host-name { font-size: 13px; }
   .iw-original-credit { padding-left: 0; }
-  .iw-game-logo { max-height: 120px; }
 }
 /* the changelog's releases made by IronWing Networks (changelog.ts: a release's by) */
 #changelog-body .changelog-by { margin: -4px 0 8px; color: var(--lime); font-weight: 700; }
