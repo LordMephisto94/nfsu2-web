@@ -76,6 +76,7 @@ const LANGUAGE_OPTS = LANGUAGES.map(l => [l, LANGUAGE_NAMES[l]] as [string, stri
  *  nowhere else: web/test/mods.test.mjs) */
 export const MOD_CONTROLS: Record<string, Control> = {
   ui_textures: { t: 'seg', opts: [['original', N('Original')], ['map', N('Map only')], ['uhud', N('Upscaled')]] },
+  roads_and_shadows: { t: 'seg', opts: [['original', N('Original')], ['roads-and-shadows', N('HD')]] },
   subtitles: { t: 'switch' },
   songs: { t: 'seg', opts: [['uncensored', N('Uncensored')], ['original', N('Original')]] },
   gps_distance: { t: 'switch' },

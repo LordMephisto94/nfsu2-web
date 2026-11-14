@@ -136,6 +136,14 @@ export const MODS: readonly Mod[] = [
     online: 'mine', sizeMB: 20, files: ['tools/texpacks.py', 'runtime/web/texrep_web.c'],
   },
   {
+    id: 'roads-and-shadows', name: 'Roads and shadows', authors: [{ name: 'underground2.net' }],
+    links: { page: 'https://underground2.net' }, kind: 'screen', uses: 'data',
+    control: { setting: 'roads_and_shadows', values: ['roads-and-shadows'] },
+    line: N('HD roads, grass, car shadows and neon, sharp at high resolutions.'),
+    details: 'Optional higher-resolution road and grass textures, car and traffic shadows and neon. More download data and GPU memory are needed, especially on phones.',
+    online: 'mine', sizeMB: 60, files: ['tools/texpacks.py', 'runtime/web/texrep_web.c'],
+  },
+  {
     id: 'widescreen', name: 'Widescreen Fix', mod: 'Widescreen Fixes Pack', authors: [{ name: 'ThirteenAG' }, { name: 'Aero_' }, { name: 'xan1242' }],
     links: { page: 'https://nfsmods.xyz/mod/3327', source: 'https://github.com/ThirteenAG/WidescreenFixesPack' },
     kind: 'screen', uses: 'findings', licence: 'MIT',

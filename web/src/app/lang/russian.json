@@ -1710,5 +1710,7 @@
   "Winner": "Победитель",
   "Winning streak": "Серия побед",
   "Reach {n} km/h in a race.": "Разгонитесь до {n} км/ч в гонке.",
-  "Race {n} km in all.": "Проедьте в гонках в сумме {n} км."
+  "Race {n} km in all.": "Проедьте в гонках в сумме {n} км.",
+  "HD": "HD",
+  "HD roads, grass, car shadows and neon, sharp at high resolutions.": "HD roads, grass, car shadows and neon, sharp at high resolutions."
 }

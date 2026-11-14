@@ -61,7 +61,7 @@ typedef struct { uint32_t off, size; } Base;
 _Static_assert(sizeof(Base) == 8, "TEXPACKS base");
 
 /* the packs picked, each a TEXPACKS/<name>.pak; their entries are merged into one table, sorted by key */
-#define MAXPACKS 2
+#define MAXPACKS 3
 typedef struct { char name[32]; FILE *fp; char *names; uint32_t names_at, names_len, version; } Pack;
 static Pack g_packs[MAXPACKS]; static unsigned g_npacks;
 static int g_init, g_on, g_shown = 1, g_log;
@@ -219,6 +219,7 @@ static void init(void){
     g_log = getenv("NFSU2_TEXLOG") && *getenv("NFSU2_TEXLOG") == '1';
     open_pack("NFSU2_UI_TEXTURES");
     open_pack("NFSU2_MAP_TEXTURES");
+    open_pack("NFSU2_ROADS_AND_SHADOWS");
     if (!g_n) return;
     /* one table: sorted by key, with each entry's pack beside it */
     struct { Ent e; Base b; uint8_t src; } *both = malloc(g_n * sizeof *both);

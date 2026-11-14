@@ -1567,5 +1567,7 @@
   "Finish races on {n} different tracks (each direction counts).": "{n}種類のコースでレースを完走する（向きが違えば別々に数える）。",
   "Win with {n} different cars.": "{n}種類の車で勝利する。",
   "Win {n} races with the same car.": "同じ車でレースに{n}回勝利する。",
-  "Win {n} races against other players.": "他のプレイヤーとのレースで{n}回勝利する。"
+  "Win {n} races against other players.": "他のプレイヤーとのレースで{n}回勝利する。",
+  "HD": "HD",
+  "HD roads, grass, car shadows and neon, sharp at high resolutions.": "HD roads, grass, car shadows and neon, sharp at high resolutions."
 }

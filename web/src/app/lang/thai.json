@@ -1567,5 +1567,7 @@
   "Finish races on {n} different tracks (each direction counts).": "แข่งจนจบใน {n} สนามที่ต่างกัน (แต่ละทิศทางนับแยกกัน)",
   "Win with {n} different cars.": "ชนะด้วยรถ {n} คันที่ต่างกัน",
   "Win {n} races with the same car.": "ชนะการแข่ง {n} ครั้งด้วยรถคันเดียวกัน",
-  "Win {n} races against other players.": "ชนะการแข่งกับผู้เล่นคนอื่น {n} ครั้ง"
+  "Win {n} races against other players.": "ชนะการแข่งกับผู้เล่นคนอื่น {n} ครั้ง",
+  "HD": "HD",
+  "HD roads, grass, car shadows and neon, sharp at high resolutions.": "HD roads, grass, car shadows and neon, sharp at high resolutions."
 }

@@ -181,6 +181,7 @@ export const KEYS: readonly KeyDef[] = [
   // map turns on only that one (uiPack: no pack of the menus' and HUD's).  Not in bundle.m's table: the Mac's packs
   // are "textures"
   { key: 'ui_textures', env: 'NFSU2_UI_TEXTURES', kind: 'enum', vals: 'original|map|uhud', scope: 'web', device: true },
+  { key: 'roads_and_shadows', env: 'NFSU2_ROADS_AND_SHADOWS', kind: 'enum', vals: 'original|roads-and-shadows', scope: 'web', device: true },
   // the players this one blocks in free roam, by name (the page's hello to the server: net/index.ts).  Not in bundle.m's
   // table: the Mac's free roam has no hub
   { key: 'roam_block', env: 'NFSU2_ROAM_BLOCK', kind: 'names', ic: true, scope: 'web' },
@@ -495,6 +496,7 @@ export const TEMPLATE = `# NFSU2 settings, read at every launch.
 # phones' GPUs decode the larger textures into four times the memory;
 # NFSU2_MAP_TEXTURES = original keeps the game's maps).  [NFSU2_UI_TEXTURES]
 #ui_textures = original
+#roads_and_shadows = original
 # Textures without smoothing (point sampling), blocky like early PC games;
 # on overrides the game's Texture Filtering.  [NFSU2_PIXELATED_TEXTURES]
 #pixelated_textures = off

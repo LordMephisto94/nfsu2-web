@@ -329,7 +329,7 @@ function resolved(host: Record<string, string> = {}): Resolved { return resolveE
 const language = (r: Resolved = resolved()) => (r.env.NFSU2_LANGUAGE ?? 'english').toLowerCase();
 /** the texture packs picked (runtime/web/texrep_web.c), comma-separated, '' for none: the ones the page fetches ahead
  *  and counts.  Each setting's value names its pack (ui_textures = map: none of the menus' and HUD's, uiPack) */
-const texpack = (r: Resolved = resolved()) => [uiPack(r.env.NFSU2_UI_TEXTURES), r.env.NFSU2_MAP_TEXTURES]
+const texpack = (r: Resolved = resolved()) => [uiPack(r.env.NFSU2_UI_TEXTURES), r.env.NFSU2_MAP_TEXTURES, r.env.NFSU2_ROADS_AND_SHADOWS]
   .map(v => (v ?? '').toLowerCase()).filter(v => v && v !== 'original').join(',');
 /** the data the settings pick (datacache.ts Packs): the texture pack, the songs (EA's own: io-worker.ts dataFile), the
  *  crash damage's scratches and the gearbox whine's sounds (runtime/damage.c, runtime/whine.c: each read only with its

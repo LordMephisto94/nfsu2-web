@@ -1567,5 +1567,7 @@
   "Finish races on {n} different tracks (each direction counts).": "서로 다른 트랙 {n}곳에서 레이스를 완주하세요(방향마다 따로 세요).",
   "Win with {n} different cars.": "서로 다른 차 {n}대로 우승하세요.",
   "Win {n} races with the same car.": "같은 차로 레이스에서 {n}번 우승하세요.",
-  "Win {n} races against other players.": "다른 플레이어와의 레이스에서 {n}번 우승하세요."
+  "Win {n} races against other players.": "다른 플레이어와의 레이스에서 {n}번 우승하세요.",
+  "HD": "HD",
+  "HD roads, grass, car shadows and neon, sharp at high resolutions.": "HD roads, grass, car shadows and neon, sharp at high resolutions."
 }

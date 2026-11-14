@@ -1567,5 +1567,7 @@
   "Finish races on {n} different tracks (each direction counts).": "在 {n} 條不同的賽道上完成比賽（正反方向分開計算）。",
   "Win with {n} different cars.": "用 {n} 輛不同的車獲勝。",
   "Win {n} races with the same car.": "用同一輛車贏得 {n} 場比賽。",
-  "Win {n} races against other players.": "在與其他玩家的比賽中獲勝 {n} 次。"
+  "Win {n} races against other players.": "在與其他玩家的比賽中獲勝 {n} 次。",
+  "HD": "HD",
+  "HD roads, grass, car shadows and neon, sharp at high resolutions.": "HD roads, grass, car shadows and neon, sharp at high resolutions."
 }

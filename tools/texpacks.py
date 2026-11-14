@@ -2,13 +2,15 @@
 """The texture packs: TEXPACKS/<name>.pak in the game folder, which the
 browser's runtime (runtime/web/texrep_web.c) reads when a player picks one in
 Settings.  Two so far:
-  uhud.pak      LunicAura106's "Upscaled HUD" (UHUD, nfsmods.xyz/mod/4319), the
-                menus, HUD, fonts, icons and logos redrawn at four times their
-                size (Menus and HUD, Upscaled)
-  detailed.pak  JeansBig's "NFSU2 Detailed Map" (nfsmods.xyz/mod/4485), the
-                minimap's and world map's maps (TRACKS/TRACKMAP*.BIN) redrawn
-                at 2048x2048 with the missing shortcuts and more (Minimap,
-                Detailed), with detailed.tracks beside it
+  uhud.pak               LunicAura106's "Upscaled HUD" (UHUD, nfsmods.xyz/mod/4319), the
+                         menus, HUD, fonts, icons and logos redrawn at four times their
+                         size (Menus and HUD, Upscaled)
+  detailed.pak           JeansBig's "NFSU2 Detailed Map" (nfsmods.xyz/mod/4485), the
+                         minimap's and world map's maps (TRACKS/TRACKMAP*.BIN) redrawn
+                         at 2048x2048 with the missing shortcuts and more (Minimap,
+                         Detailed), with detailed.tracks beside it
+  roads-and-shadows.pak  Extracted underground2.net mod folder for roads, grass,
+                         car shadows and neon
 
     tools/texpacks.py <game folder> --uhud <mod folder>
     .venv/bin/python tools/texpacks.py <game folder> --detailed <mod folder>
@@ -59,7 +61,7 @@ race's route drawn on: 2048x2048 DXT5 with mipmaps, 610 MB as they are, about
 A pack is checked as the runtime reads it (tools/packcheck.py) before it is
 written.
 """
-import argparse, os, re, struct, sys, zlib
+import argparse, json, os, re, struct, sys, zlib
 
 ARGB, P8 = 21, 41                                   # D3DFORMATs
 FOURCC = {b'DXT1': 0x31545844, b'DXT3': 0x33545844, b'DXT5': 0x35545844}
@@ -523,16 +525,146 @@ def write(path, ents, data, version=1):
     os.replace(tmp, path)
 
 
+
+
+def packed_texture_levels(blob):
+    """Full mip chains from a TPK with raw texture records (the mod's TEXTURES.BIN)."""
+    result = {}
+    for b, e in tpks(blob, 0, len(blob)):
+        parts = {cid: (cb, ce) for cid, cb, ce in chunks(blob, b, e)}
+        if 0xB3310000 not in parts or 0xB3320000 not in parts: continue
+        info = {cid: (cb, ce) for cid, cb, ce in chunks(blob, *parts[0xB3310000])}
+        tb, te = info.get(0x33310004, (0, 0))
+        pl, pe = info.get(0x33310005, (0, 0))
+        pix = next(((cb + 0x7F) & ~0x7F for cid, cb, ce in chunks(blob, *parts[0xB3320000])
+                    if cid == 0x33320002), None)
+        if pix is None: continue
+        for i in range((te - tb) // 0x7C):
+            ti = blob[tb + i * 0x7C:tb + (i + 1) * 0x7C]
+            pf = blob[pl + i * 0x20:pl + (i + 1) * 0x20] if pl + (i + 1) * 0x20 <= pe else b''
+            nh, w, h, fmt, lv0 = texture(ti, pf, blob, pix)
+            if lv0 is None: continue
+            img_off, _, img_size, _, _ = struct.unpack_from('<5I', ti, 0x30)
+            start = pix + img_off
+            end = min(start + img_size, len(blob))
+            levels, size, width, height = 0, 0, w, h
+            while levels < 13 and start + size + level_size(width, height, fmt) <= end:
+                size += level_size(width, height, fmt)
+                levels += 1
+                if width == 1 and height == 1: break
+                width, height = max(1, width // 2), max(1, height // 2)
+            result[nh] = (w, h, fmt, levels, blob[start:start + size])
+    return result
+
+
+def roads_and_shadows(game, mod):
+    """Build an opt-in texture pack from underground2.net's TexturePacks folder.
+
+    Match the *original* uploaded texture bytes, not merely the names.  This
+    leaves the game's bundles and every other installed graphics mod alone.
+    """
+    import zipfile
+    from collections import Counter
+
+    def load_mod():
+        if zipfile.is_zipfile(mod):
+            with zipfile.ZipFile(mod) as z:
+                meta = next((n for n in z.namelist() if n.lower().endswith('underground2.net/meta.json')), None)
+                if not meta: sys.exit(f'{mod}: missing underground2.net/meta.json')
+                return z.read(meta).decode('utf-8-sig'), z.read(meta.rsplit('/', 1)[0] + '/TEXTURES.BIN')
+        root = find(mod, 'TexturePacks/underground2.net') or (mod if os.path.isfile(os.path.join(mod, 'meta.json')) else None)
+        if not root: sys.exit(f'{mod}: no TexturePacks/underground2.net')
+        with open(os.path.join(root, 'meta.json'), encoding='utf-8-sig') as f: manifest = f.read()
+        with open(os.path.join(root, 'TEXTURES.BIN'), 'rb') as f: data = f.read()
+        return manifest, data
+
+    manifest, blob = load_mod()
+    # The texture pack's meta.json contains // category comments.
+    manifest = re.sub(r'(?m)^\s*//[^\n]*', '', manifest)
+    pairs = json.loads(manifest)['textures']
+    if not pairs or any(not isinstance(p, list) or len(p) != 2 for p in pairs):
+        sys.exit('roads-and-shadows: invalid texture manifest')
+    targets = {bstring_hash(src.upper()): (src.upper(), dst.upper()) for src, dst in pairs}
+    replacements = packed_texture_levels(blob)
+    missing = sorted({dst for _, dst in pairs if bstring_hash(dst.upper()) not in replacements})
+    if missing: sys.exit('roads-and-shadows: missing replacement textures: ' + ', '.join(missing))
+
+    ents, raw, found = {}, {}, set()
+    counts = Counter()
+    # A pack is keyed by the original pixels' CRC32/Adler32, not by texture
+    # name.  Two different named originals can have identical pixels, even
+    # when the mod assigns different HD replacements (notably FE/IG shadows).
+    # Keep the first mapping, report the others, and never claim they were
+    # independently installed: the current runtime cannot disambiguate them.
+    conflicts = set()
+    # The game can upload textures from many bundles, including per-car bundles.
+    # Scan by texture name hash, then key by the actual original upload bytes.
+    for folder, dirs, files in os.walk(game):
+        dirs[:] = [d for d in dirs if d.lower() not in ('texpacks', 'scripts', '.git')]
+        for fn in sorted(files):
+            if not fn.lower().endswith(('.bin', '.bun', '.lzc')): continue
+            path = os.path.join(folder, fn)
+            try:
+                with open(path, 'rb') as f: original = f.read()
+                if original[:4] == b'JDLZ': original = jdlz(original)
+                original_tex = textures(original)
+                for nh, ow, oh, ofmt, lv0 in original_tex:
+                    if nh not in targets or lv0 is None: continue
+                    name, dest = targets[nh]
+                    w, h, fmt, levels, new0 = replacements[bstring_hash(dest)]
+                    label = f'{name} -> {dest}'
+                    if not ow or not oh or w * oh != h * ow or w < ow:
+                        counts['wrong shape'] += 1; continue
+                    key = (zlib.crc32(lv0), zlib.adler32(lv0))
+                    if key in ents:
+                        if raw[key] != new0 or (ents[key]['w'], ents[key]['h'], ents[key]['fmt']) != (w, h, fmt):
+                            conflicts.add((name, dest, ents[key]['name']))
+                            counts['ambiguous original pixels'] += 1
+                            continue
+                        counts['shared'] += 1
+                        found.add(name)
+                        continue
+                    ents[key] = dict(key=key, ow=ow, oh=oh, ofmt=ofmt, w=w, h=h,
+                                     fmt=fmt, levels=levels, name=label)
+                    raw[key] = new0
+                    found.add(name)
+                    counts['matched'] += 1
+            except (OSError, ValueError, IndexError, struct.error) as e:
+                counts['unreadable bundles'] += 1
+                continue
+    if not ents: sys.exit('roads-and-shadows: no matching original game textures; check game folder and version')
+    # Preserve the mod's mip chains for sharp textures without distant shimmering.
+    data = bytearray()
+    for key, e in ents.items():
+        e['off'], e['size'] = len(data), len(raw[key]); data += raw[key]
+        data += bytes(-len(data) % 16)
+    out = os.path.join(game, 'TEXPACKS', 'roads-and-shadows.pak')
+    write(out, ents, data)
+    missing_orig = sorted({src.upper() for src, _ in pairs} - found)
+    print(f'roads-and-shadows: {len(ents)} original textures matched, {len(found)}/{len(targets)} names; '
+          f'{len(data)/1048576:.1f} MiB -> {out}')
+    print('  categories:', ', '.join(f'{k}={v}' for k, v in counts.items()))
+    if conflicts:
+        print(f'  WARNING: {len(conflicts)} mappings have identical original pixels but different HD replacements.')
+        print('  The pack format cannot distinguish these by name; the first replacement was kept.')
+        for name, dest, kept in sorted(conflicts)[:20]:
+            print(f'    skipped {name} -> {dest}; original pixels already mapped to {kept}')
+    if missing_orig:
+        print(f'  unmatched original names ({len(missing_orig)}): ' + ', '.join(missing_orig[:18]))
+
+
 def main():
-    ap = argparse.ArgumentParser(usage='tools/texpacks.py <game folder> [--uhud <mod folder>] [--detailed <mod folder>]')
+    ap = argparse.ArgumentParser(usage='tools/texpacks.py <game folder> [--uhud <mod folder>] [--detailed <mod folder>] [--roads-and-shadows <extracted mod folder>]')
     ap.add_argument('game')
     ap.add_argument('--uhud', metavar='MOD', help='the Upscaled HUD mod (nfsmods.xyz/mod/4319), extracted')
     ap.add_argument('--detailed', metavar='MOD', help='the Detailed Map mod (nfsmods.xyz/mod/4485), extracted')
+    ap.add_argument('--roads-and-shadows', metavar='MOD', help='extracted underground2.net mod folder for roads, grass, car shadows and neon')
     a = ap.parse_args()
-    if not a.uhud and not a.detailed: sys.exit(__doc__)
+    if not a.uhud and not a.detailed and not a.roads_and_shadows: sys.exit(__doc__)
     if not find(a.game, 'SPEED2.EXE'): sys.exit(f'{a.game}: no SPEED2.EXE, not the game folder')
     if a.uhud: uhud(a.game, a.uhud)
     if a.detailed: detailed(a.game, a.detailed)
+    if a.roads_and_shadows: roads_and_shadows(a.game, a.roads_and_shadows)
 
 
 if __name__ == '__main__':
