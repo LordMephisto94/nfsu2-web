@@ -64,6 +64,9 @@ int racenet_slot_of(uint32_t ip){
     for (int i = 0; i < g_nslot; i++) if (g_slot_ip[i] == ip) return g_slot_of[i];
     return -1;
 }
+/* racenet.c's creator checks (a lobby race's AI racers): no creator here */
+int racenet_is_creator(void){ return 0; }
+int racenet_from_creator(uint32_t ip){ (void)ip; return 0; }
 static struct { uint32_t to; int n; uint8_t m[256]; } g_out[16]; static int g_nout;
 int vlan_rt_send(uint16_t port, uint32_t ip_h, const void *p, int n){
     (void)port;
