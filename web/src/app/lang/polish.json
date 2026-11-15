@@ -1718,7 +1718,7 @@
   "Not enough room in this browser for the songs.": "W tej przeglądarce jest za mało miejsca na utwory.",
   "Copying the songs stopped. Try again.": "Kopiowanie utworów zostało przerwane. Spróbuj ponownie.",
   "No music found there. Pick the folder the game is installed in.": "Nie znaleziono tam muzyki. Wybierz folder, w którym gra jest zainstalowana.",
-  "Your copy of the game": "Twoja kopia gry",
+  "Music": "Muzyka",
   "Plays the songs from your own copy of the game instead of this server's. Pick the folder it is installed in: the songs are copied into this browser.": "Odtwarza utwory z twojej własnej kopii gry zamiast utworów tego serwera. Wybierz folder, w którym jest zainstalowana: utwory zostaną skopiowane do tej przeglądarki.",
   "Choose game folder": "Wybierz folder gry",
   "Copying the songs: {percent} %": "Kopiowanie utworów: {percent} %",

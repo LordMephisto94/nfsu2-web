@@ -1,4 +1,4 @@
-// The Game tab's "Your copy of the game" row, under the songs' setting: the player picks the folder their own game is
+// The Game tab's "Music" row, under the songs' setting: the player picks the folder their own game is
 // installed in, its two music files are copied into this browser (own-music.ts) and every game from then on plays
 // them in place of the server's songs; Remove takes them out again.  Under it, a link to the official playlist.
 import { findMusic, installOwnMusic, musicIn, musicToCopy, ownMusic, OwnMusicError, removeOwnMusic, serverLayout, type Found, type OwnMusic } from './own-music';
@@ -80,7 +80,7 @@ export class OwnMusicRow {
   }
 
   render() {
-    const label = Object.assign(document.createElement('div'), { className: 'set-label', textContent: t('Your copy of the game') });
+    const label = Object.assign(document.createElement('div'), { className: 'set-label', textContent: t('Music') });
     const help = Object.assign(document.createElement('p'), { className: 'set-help', id: 'set-own-music-help',
       textContent: t('Plays the songs from your own copy of the game instead of this server\'s. Pick the folder it is installed in: the songs are copied into this browser.') });
     const ctl = Object.assign(document.createElement('div'), { className: 'set-control' });

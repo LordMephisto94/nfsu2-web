@@ -50,7 +50,7 @@ The server normally serves the songs from your own game files unchanged. If you
 need to stop serving those songs, `tools/silentmusic.py` creates a **separate**
 copy of `SDATA/sdat.viv` with only the song data zeroed. It does not modify or
 install the original. In-game speech remains available; players who imported
-their own music through **Game → Your copy of the game** can still hear it.
+their own music through **Game → Music** can still hear it.
 
 On the machine with your own game files, from the repository root:
 

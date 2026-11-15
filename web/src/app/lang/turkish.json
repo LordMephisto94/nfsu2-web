@@ -1580,7 +1580,7 @@
   "Not enough room in this browser for the songs.": "Bu tarayıcıda şarkılar için yeterli yer yok.",
   "Copying the songs stopped. Try again.": "Şarkıların kopyalanması durdu. Tekrar dene.",
   "No music found there. Pick the folder the game is installed in.": "Orada müzik bulunamadı. Oyunun kurulu olduğu klasörü seç.",
-  "Your copy of the game": "Kendi oyun kopyan",
+  "Music": "Müzik",
   "Plays the songs from your own copy of the game instead of this server's. Pick the folder it is installed in: the songs are copied into this browser.": "Bu sunucunun şarkıları yerine kendi oyun kopyandaki şarkıları çalar. Oyunun kurulu olduğu klasörü seç: şarkılar bu tarayıcıya kopyalanır.",
   "Choose game folder": "Oyun klasörünü seç",
   "Copying the songs: {percent} %": "Şarkılar kopyalanıyor: %{percent}",

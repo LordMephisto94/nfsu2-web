@@ -1598,7 +1598,7 @@
   "Not enough room in this browser for the songs.": "Δεν υπάρχει αρκετός χώρος σε αυτό το πρόγραμμα περιήγησης για τα τραγούδια.",
   "Copying the songs stopped. Try again.": "Η αντιγραφή των τραγουδιών σταμάτησε. Δοκίμασε ξανά.",
   "No music found there. Pick the folder the game is installed in.": "Δεν βρέθηκε μουσική εκεί. Διάλεξε τον φάκελο όπου είναι εγκατεστημένο το παιχνίδι.",
-  "Your copy of the game": "Το δικό σου αντίγραφο του παιχνιδιού",
+  "Music": "Μουσική",
   "Plays the songs from your own copy of the game instead of this server's. Pick the folder it is installed in: the songs are copied into this browser.": "Παίζει τα τραγούδια από το δικό σου αντίγραφο του παιχνιδιού αντί για του διακομιστή. Διάλεξε τον φάκελο όπου είναι εγκατεστημένο: τα τραγούδια αντιγράφονται σε αυτό το πρόγραμμα περιήγησης.",
   "Choose game folder": "Επιλογή φακέλου παιχνιδιού",
   "Copying the songs: {percent} %": "Αντιγραφή τραγουδιών: {percent} %",

@@ -1575,7 +1575,7 @@
   "Not enough room in this browser for the songs.": "이 브라우저에 노래를 넣을 공간이 부족합니다.",
   "Copying the songs stopped. Try again.": "노래 복사가 중단되었습니다. 다시 시도하세요.",
   "No music found there. Pick the folder the game is installed in.": "거기에서 음악을 찾지 못했습니다. 게임이 설치된 폴더를 고르세요.",
-  "Your copy of the game": "내 게임 사본",
+  "Music": "음악",
   "Plays the songs from your own copy of the game instead of this server's. Pick the folder it is installed in: the songs are copied into this browser.": "이 서버의 노래 대신 내가 가진 게임 사본의 노래를 재생합니다. 게임이 설치된 폴더를 고르면 노래가 이 브라우저로 복사됩니다.",
   "Choose game folder": "게임 폴더 선택",
   "Copying the songs: {percent} %": "노래 복사 중: {percent} %",

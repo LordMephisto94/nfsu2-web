@@ -273,6 +273,9 @@ kbd .glyph { display: inline-block; width: 14px; height: 14px; vertical-align: -
 .set + .set, .more, .keys > div + div { box-shadow: inset 0 1px var(--line); }   /* a divider that adds no height */
 .set-label { grid-area: label; font-size: 16px; line-height: 24px; }
 .set-help { grid-area: help; color: var(--muted); font-size: 14px; line-height: 20px; }
+/* the Music row's playlist link (own-music-ui.ts) is a .set-help too, but not the row's help: on its own line under the
+ * control, where it shared the help's grid area and was drawn over the help text */
+.own-music a.set-help { grid-area: auto; grid-column: 1 / -1; justify-self: start; margin-top: 8px; }
 .set-state { grid-column: 1 / -1; font-size: 14px; line-height: 20px; margin-top: 8px; }
 .set-state.bad { color: var(--bad); }
 .set-state.env { color: var(--warn); }

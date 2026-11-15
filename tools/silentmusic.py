@@ -2,7 +2,7 @@
 """The game's music made silent: a copy of the file the EA Trax songs are in with the songs' bytes zeroed, for a
 server that must stop sending the songs.  The game plays a "song" as before and nothing is heard; the speech, the
 map of the songs and every size and offset stay as they are, so no game code changes.  Players who put their own
-copy of the game's music into their browser (the start page's "Your copy of the game") still hear theirs.
+copy of the game's music into their browser (the start page's "Music") still hear theirs.
 
     tools/silentmusic.py <game folder> <out folder>
 

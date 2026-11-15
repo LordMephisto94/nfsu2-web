@@ -1,4 +1,4 @@
-// A browser's check of "Your copy of the game" (web/src/app/own-music-ui.ts) against a running --dev server:
+// A browser's check of "Music" (web/src/app/own-music-ui.ts) against a running --dev server:
 //   node web/tools/own-music-e2e.mjs --base http://127.0.0.1:8641 --folder "<game folder>/SDATA"
 // Picks the folder through the page's own button (the file input a browser without a directory picker gets), waits
 // for the copy, presses Play and reads the game's log: the I/O worker must say it reads the player's own copy.
