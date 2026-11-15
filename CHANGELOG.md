@@ -11,6 +11,14 @@ first, then under `### Fixes` what was broken and works now, which the popup kee
 insides, the forum bot, logs, tests, docs and cheat checks. A change that may or may not belong here is asked about
 before the release, not guessed.
 
+## 2026-11-15 (fa436c4c)
+
+### Fixes
+
+- **Split screen:** races with 5 or 6 racers now start like the others, with the start scene and the woman giving the hand signals, instead of with no start at all.
+- **Split screen:** with 5 or 6 racers, the cars that don't take part in the start scene stay out of sight until it ends, and every car then stands on its own place on the grid.
+- **Music:** the Game tab's "Your copy of the game" is now called "Music", and its playlist link no longer overlaps the text above it.
+
 ## 2026-11-14 (3a02d65a)
 
 - **Mods:** Roads and Shadows, featuring high-resolution roads, grass, car shadows, traffic shadows and neon textures from underground2.net.
