@@ -1652,5 +1652,16 @@
   "Reach {n} km/h in a race.": "Erreiche {n} km/h in einem Rennen.",
   "Race {n} km in all.": "Fahre in Rennen insgesamt {n} km.",
   "HD": "HD",
-  "HD roads, grass, car shadows and neon, sharp at high resolutions.": "HD roads, grass, car shadows and neon, sharp at high resolutions."
+  "HD roads, grass, car shadows and neon, sharp at high resolutions.": "HD roads, grass, car shadows and neon, sharp at high resolutions.",
+  "{name} could not be found in free roam.": "{name} wurde in der freien Fahrt nicht gefunden.",
+  "Those are not the game's music files.": "Das sind nicht die Musikdateien des Spiels.",
+  "Not enough room in this browser for the songs.": "In diesem Browser ist nicht genug Platz für die Songs.",
+  "Copying the songs stopped. Try again.": "Das Kopieren der Songs wurde abgebrochen. Versuch es noch einmal.",
+  "No music found there. Pick the folder the game is installed in.": "Dort wurde keine Musik gefunden. Wähle den Ordner, in dem das Spiel installiert ist.",
+  "Music": "Musik",
+  "Plays the songs from your own copy of the game instead of this server's. Pick the folder it is installed in: the songs are copied into this browser.": "Spielt die Songs aus deiner eigenen Kopie des Spiels statt die dieses Servers. Wähle den Ordner, in dem es installiert ist: Die Songs werden in diesen Browser kopiert.",
+  "Choose game folder": "Spielordner wählen",
+  "Copying the songs: {percent} %": "Songs werden kopiert: {percent} %",
+  "Your own songs play ({size} MB in this browser).": "Deine eigenen Songs werden gespielt ({size} MB in diesem Browser).",
+  "The official playlist on Spotify": "Die offizielle Playlist auf Spotify"
 }

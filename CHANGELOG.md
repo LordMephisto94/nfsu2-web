@@ -11,15 +11,38 @@ first, then under `### Fixes` what was broken and works now, which the popup kee
 insides, the forum bot, logs, tests, docs and cheat checks. A change that may or may not belong here is asked about
 before the release, not guessed.
 
-## 2026-11-14 (027aead8)
+## 2026-11-15 (fa436c4c)
+
+### Fixes
+
+- **Split screen:** races with 5 or 6 racers now start like the others, with the start scene and the woman giving the hand signals, instead of with no start at all.
+- **Split screen:** with 5 or 6 racers, the cars that don't take part in the start scene stay out of sight until it ends, and every car then stands on its own place on the grid.
+- **Music:** the Game tab's "Your copy of the game" is now called "Music", and its playlist link no longer overlaps the text above it.
+
+## 2026-11-14 (3a02d65a)
 
 - **Mods:** Roads and Shadows, featuring high-resolution roads, grass, car shadows, traffic shadows and neon textures from underground2.net.
 - **Mods:** choose Original or HD under Mods → Graphics, below Upscaled HUD and Detailed Map.
 - **Graphics:** improved texture detail at higher resolutions, with HD mipmaps and a separate optional texture pack.
+- **Dyno:** optional race-specific tuning presets for untouched setups, covering suspension, steering, gearing, downforce, nitrous and other adjustable settings (`tune_presets = on`).
+- **Dyno:** presets also adjust brake balance and tyre grip, including reduced rear grip for drift setups.
+- **Dyno:** use `tune_presets = always` to reapply presets when reopening a setup; per-race preset shares can be customized with `NFSU2_TUNE_<KIND>`.
+- **Music:** use music files from your own copy of the game in the browser instead of the server's music.
+- **Music:** an optional silent-song file can be prepared for a music-replacement setup.
 
 ### Fixes
 
 - **Mods:** conflicting texture replacements no longer prevent Roads and Shadows from generating its texture pack.
+- **Cloud saves:** an interrupted or failed backup restore no longer marks the incomplete folder as the player's chosen version for upload.
+- **Music:** importing your own music through the folder picker works in the browser.
+- **Fullscreen:** browser keyboard locking no longer blocks unrelated shortcuts used by other programs.
+- **Controllers:** steering reaches full input near the outer edge of an analog stick.
+- **Controllers:** rumble stops when the page menu, a dialog or the in-game pause menu is open.
+- **Last.fm:** scrobbled track titles no longer include decorative quotation marks.
+- **Online:** Outrun race lobbies are limited to four players to prevent host freezes.
+- **Dyno:** preset slider ranges are sorted and constrained to the car's installed parts.
+- **Dyno:** brake bias presets use the correct front/rear direction.
+- **Dyno:** reopening a preset no longer compounds adjustments beyond the intended values.
 
 ## 2026-11-13 (576e19ea)
 

@@ -42,3 +42,39 @@ variant, with `deploy/cloudflare-origin-pull-ca.pem`) or the server (variant B
 with `--trusted-proxies cloudflare`) asks them for Cloudflare's certificate.
 
 **SSH:** log in with a key only.
+
+
+## Optional: serve silent EA Trax songs
+
+The server normally serves the songs from your own game files unchanged. If you
+need to stop serving those songs, `tools/silentmusic.py` creates a **separate**
+copy of `SDATA/sdat.viv` with only the song data zeroed. It does not modify or
+install the original. In-game speech remains available; players who imported
+their own music through **Game → Music** can still hear it.
+
+On the machine with your own game files, from the repository root:
+
+```sh
+python3 tools/silentmusic.py "<game folder>" /tmp/silent
+```
+
+The steps below assume the game files are served from `/srv/nfsu2/game` as
+in step 3 above, and that the generated file is already on the server. If
+necessary, copy `/tmp/silent/SDATA/sdat.viv` to the server first. **Back up
+before replacing anything**, and keep the original outside the served game
+directory:
+
+```sh
+sudo mkdir -p /srv/nfsu2
+sudo mv /srv/nfsu2/game/SDATA/sdat.viv /srv/nfsu2/sdat.viv.songs
+sudo cp /tmp/silent/SDATA/sdat.viv /srv/nfsu2/game/SDATA/sdat.viv
+sudo chmod 644 /srv/nfsu2/game/SDATA/sdat.viv
+curl 'http://127.0.0.1:8080/data-manifest?refresh'
+```
+
+Adjust the server address and file ownership/permissions for your setup. If
+`SDATA/sdat.viv` is not present in the served game directory, check which
+music layout your deployment uses before proceeding. To undo, move the saved
+original back to `/srv/nfsu2/game/SDATA/sdat.viv` and refresh the manifest
+again. The upstream author reports a successful quick-race browser check with
+the silent file; that test has not been repeated for this adapted patch set.

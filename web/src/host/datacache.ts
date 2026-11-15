@@ -48,6 +48,28 @@ const parts = (f: DataFile) => f.path.toLowerCase().split('/');
  *  gearbox whine's sounds (MODPACKS/WHINE, runtime/whine.c: read only with gearbox_whine on). */
 export interface Packs { texpack: string; songs: string; damage?: boolean; whine?: boolean }
 export const NO_PACKS: Packs = { texpack: '', songs: '' };
+/** The player's own copy of the game's music (app/own-music.ts), copied from their game folder into this OPFS folder
+ *  and read by the I/O worker in place of the server's with NFSU2_MUSIC = own.  A game folder keeps the songs one of
+ *  two ways, and the copy is in the one the server's folder has: the PC release's archive SDATA/sdat.viv (the songs
+ *  and the speech in one BIG4 file), or pfdata's two files unpacked from it (MusicSFx.mus, the songs, and
+ *  MusicSFx.mpf, the map into it). */
+export const OWN_MUSIC_DIR = 'nfsu2-own-music';
+export const OWN_VIV = 'sdat.viv', OWN_MUS = 'MusicSFx.mus', OWN_MPF = 'MusicSFx.mpf';
+export const OWN_MUSIC_FILES = [OWN_VIV, OWN_MUS, OWN_MPF] as const;
+/** the own-music file that stands in for a file of the game data: SDATA/sdat.viv -> sdat.viv, pfdata/MusicSFx.mus ->
+ *  MusicSFx.mus; null: none does */
+export function ownMusicName(path: string): string | null {
+  const p = path.toLowerCase().split('/');
+  if (p.length !== 2) return null;
+  if (p[0] === 'sdata') return p[1] === OWN_VIV ? OWN_VIV : null;
+  if (p[0] !== 'pfdata') return null;
+  return [OWN_MUS, OWN_MPF].find(f => f.toLowerCase() === p[1]) ?? null;
+}
+/** how a folder (the server's, by its manifest's paths) keeps the songs: null when it has none */
+export function musicLayout(paths: readonly string[]): 'viv' | 'loose' | null {
+  const have = new Set(paths.map(ownMusicName));
+  return have.has(OWN_VIV) ? 'viv' : have.has(OWN_MUS) && have.has(OWN_MPF) ? 'loose' : null;
+}
 /** EA's own songs (tools/musicpack.py --original) for a file of pfdata: pfdata/<name> -> pfdata/original/<name>; null
  *  for any other path.  The folder's own are a soundtrack mod's uncensored versions. */
 export function songsPath(path: string): string | null {

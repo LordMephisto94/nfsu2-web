@@ -34,6 +34,79 @@ static int split_racing(void){
     return 0;
 #endif
 }
+/* The race intro with 5 or 6 racers plays a 4-car scene (see the 0x4368f9 hook).  The scene drives cars 1-4 (their
+ * [car+0x28] is 5 while it does); the others would stand on the grid in the middle of it.  As NFSU2-SplitScreen
+ * does (CarNotVisible), the game's per-view "skip this car" check (0x60d4f0: arg 1 the car, the answer in eax,
+ * non-zero skips it; called for a car's body, lights and headlight pools) says "skip" for them until the scene lets
+ * its cars go.  The cars are the game's list at [0x890080] + 0x1c (as the intro context's loop reads them); a car
+ * that is not in it, or any other race, is left alone. */
+static int split_intro_hidden(uint32_t car){
+    uint32_t race = MR32(G_RACE), n = race ? MR32(race + 0x24u) : 0u, list = MR32(0x890080u);
+    if (MR32(SPLIT_PLAYERS_COUNT) < 2u || !car || n <= 4u || n > 6u || !list) return 0;
+    if (!guest_ok_bytes(list + 0x1cu, 4u * n)) return 0;
+    int scene = 0, mine = 0;
+    for (uint32_t i = 0; i < n; ++i){
+        uint32_t o = MR32(list + 0x1cu + 4u * i);
+        if (!o || !guest_ok_bytes(o, 0x2cu)) return 0;
+        if (MR32(o + 0x28u) == 5u) scene = 1;
+        else if (o == car) mine = 1;
+    }
+    if (scene && !mine){
+        static unsigned odd;      /* the check's car is not one of the racers': say so a few times, it tells the layout is not as assumed */
+        if (odd++ < 3u) fprintf(stderr, "[split intro] scene active, car %08x is not a non-driven racer (list %08x, %u cars)\n", car, list, n);
+    }
+    if (scene && mine){
+        static unsigned hid;
+        if (hid++ < 6u) fprintf(stderr, "[split intro] car %08x is not driven by the scene: not drawn until it ends\n", car);
+    }
+    return scene && mine;
+}
+/* The 4-car intro scene teleports only its own four cars; the game then leaves cars 5 and 6 on the scene's spots
+ * (the log shows them within 0.1 of cars 3 and 4), or on whatever the scene's end left, so the grid is two cars
+ * short of a row or all AI cars on one.  Once no car is scene-driven any more (the scene over, or a restart's
+ * binder done) put every car on its own start spot, like the upstream mod's PutCarsOnGrid: 0x5EB5D0(6, out) gives
+ * the track's six spots (0x20 bytes: x, y, z, heading u16 at +0x10), car+0x14 -> racer spec +3 the grid slot,
+ * and the car's SetPosition (0x5FBD60, thiscall, (pos*, speed, u16 heading, flag)). */
+static void split_grid_fix(CPU *c, uint32_t race, uint32_t n, uint32_t list){
+    static uint32_t key; static int armed;
+    const uint32_t out = 0x00d0fc00u, pv = 0x00d0fe00u;
+    uint32_t phase = MR32(race);
+    if (key != race){ key = race; armed = 0; }
+    int scene = 0;
+    for (uint32_t i = 0; i < n; ++i){
+        uint32_t o = MR32(list + 0x1cu + 4u * i);
+        if (o && guest_ok_bytes(o, 0x2cu) && MR32(o + 0x28u) == 5u) scene = 1;
+    }
+    if (phase < 3u || scene){ armed = 1; return; }
+    if (!armed || (phase != 3u && phase != 4u) || !guest_ok_bytes(out, 0x1c0u)) return;
+    armed = 0;
+    uint32_t a2[2] = { 6u, out };
+    gcall(c, 0x005eb5d0u, 0u, 2, a2);
+    for (uint32_t i = 0; i < n; ++i){
+        uint32_t o = MR32(list + 0x1cu + 4u * i), spec = o ? MR32(o + 0x14u) : 0u;
+        if (!o || !spec || !guest_ok_bytes(spec, 8u) || !guest_ok_bytes(o, 0x9e0u)) continue;
+        unsigned slot = MR8(spec + 3u);
+        if (slot < 1u || slot > 6u || MR8(spec + 4u) == 3u) continue;
+        uint32_t sp = out + 0x20u * (slot - 1u);
+        float x = MRF32(sp), y = MRF32(sp + 4u), z = MRF32(sp + 8u);
+        uint16_t hd = MR16(sp + 0x10u);
+        fprintf(stderr, "[split grid] fix: car#%u %08x slot %u -> spot %.2f,%.2f,%.2f heading 0x%04x\n", i, o, slot,
+                (double)x, (double)y, (double)z, (unsigned)hd);
+        MRF32(pv) = x; MRF32(pv + 4u) = y; MRF32(pv + 8u) = z + 0.1f;
+        uint32_t a4[4] = { pv, 0u, hd, 0u };
+        gcall(c, 0x005fbd60u, o, 4, a4);
+    }
+}
+void sub_0060d4f0_orig(CPU *c);
+void sub_0060d4f0(CPU *c){
+    {
+        uint32_t race = MR32(G_RACE), n = race ? MR32(race + 0x24u) : 0u, list = MR32(0x890080u);
+        if (MR32(SPLIT_PLAYERS_COUNT) >= 2u && n > 4u && n <= 6u && list && guest_ok_bytes(list + 0x1cu, 4u * n))
+            split_grid_fix(c, race, n, list);
+    }
+    if (split_intro_hidden(MR32(c->esp + 4u))){ c->eax = 1; POP32(c->eip); return; }
+    sub_0060d4f0_orig(c);
+}
 /* co-op: the HUDs' size in their halves (picked from 0.5, 0.6 and 0.7, 2026-11-04) */
 static float split_coop_scale(void){ return 0.7f; }
 /* co-op free roam's two views (coop.c): each player's free-roam HUD mapped into its half */
@@ -1913,6 +1986,24 @@ void sub_005c21e0(CPU *c){
 int splitscreen_hook(CPU *c, uint32_t ip){
 #ifdef __wasm__
     if (ip == 0x5cacccu){ reflection_roads(c); return 1; }
+    /* HOOK_SITE(0x004368f9)  The race-intro selector (0x436840) has just built its context (0x431f10): [0] racers,
+     * [4] humans, [8] humans' slot mask, [0xc] the AIs'.  The intro scenes exist for 2 and 4 cars only, so with 5 or
+     * 6 racers none passes: no cutscene, and the 2P HUDs have no 3-2-1-GO either (the game shows that in the
+     * single-player HUD).  As NFSU2-SplitScreen does, a local-multiplayer race of 5 or 6 cars asks for a 4-car scene
+     * and slots 1-4.  The context is at esp + 0xc (the selector's frame); it is checked against the race's own
+     * racer count before it is touched. */
+    if (ip == 0x4368f9u){
+        static unsigned seen;
+        uint32_t race = MR32(G_RACE), ctx = c->esp + 0xcu;
+        if (MR32(SPLIT_PLAYERS_COUNT) >= 2u && race && guest_ok_bytes(ctx, 0x10u) && MR32(ctx) == MR32(race + 0x24u)
+            && MR32(ctx) > 4u){
+            if (seen++ < 8u)
+                fprintf(stderr, "[split intro] %u racers: asks for a 4-car scene (slots %x/%x -> %x/%x)\n", MR32(ctx),
+                        MR32(ctx + 8u), MR32(ctx + 0xcu), MR32(ctx + 8u) & 0xfu, MR32(ctx + 0xcu) & 0xfu);
+            MR32(ctx) = 4u; MR32(ctx + 8u) &= 0xfu; MR32(ctx + 0xcu) &= 0xfu;
+        }
+        return 1;
+    }
     if (ip == 0x4ca902u){ if (mm_center >= 0) MR32(c->esp) = mm_center; return 1; }
     if (ip == 0x4ac6d9u){ MR32(c->esp) = 128; return 1; }
     if (ip == 0x4cad01u){

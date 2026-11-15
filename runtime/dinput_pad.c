@@ -1011,7 +1011,8 @@ static void ff_jolt(void){
     if (MR32(G_FLOW) != 6u || !car || !mem_is_committed(car + 0x7bu)){ g_jolt_car = 0; g_jolt = 0; return; }
     float v[3] = { MRF32(car + 0x70u), MRF32(car + 0x74u), MRF32(car + 0x78u) };
     if (!isfinite(v[0]) || !isfinite(v[1]) || !isfinite(v[2])) return;
-    if (!(dt > 0.f && dt < 0.25f)) return;              /* the world stands (pause, a menu over it) */
+    /* the world stands (pause, a menu over it): the last jolt is not held under it */
+    if (!(dt > 0.f && dt < 0.25f)){ g_jolt = 0; return; }
     g_jolt_age = car == g_jolt_car ? g_jolt_age + dt : 0.f;
     if (ff_log() && (g_jolt_logt += dt) >= 2.f){
         g_jolt_logt = 0.f;
