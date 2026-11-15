@@ -947,6 +947,11 @@
   "Your last game stopped with an error.": "Последняя игра остановилась из-за ошибки.",
   "Results": "Результаты",
   "DNF": "Сход",
+  "AI racer": "ИИ-гонщик",
+  "AI racers": "ИИ-гонщики",
+  "Your race lobby: AI racers in its empty places, or none": "Твоё лобби гонки: ИИ-гонщики на свободных местах или без них",
+  "AI racers fill the empty places": "ИИ-гонщики занимают свободные места",
+  "No AI racers": "Без ИИ-гонщиков",
   "{n} points": {
     "one": "{n} очко",
     "few": "{n} очка",

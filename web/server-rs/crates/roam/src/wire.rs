@@ -94,6 +94,7 @@ pub(crate) const LOBBY_COUNTS_HOST: u16 = 0x0001;
 pub(crate) const LOBBY_STAGED: u16 = 0x0080;
 /// ...and its host's stage (bits 9-11; 0 from an older game: its race's): the stage above which it keeps players out
 pub(crate) const LOBBY_HSTAGE: u16 = 9;
+// (bit 12, roam_game.c MP_AI: AI racers fill the race's empty places; the players' games read it, the hub does not)
 /// a LOBBIES entry: x, y (i16 LE, m), race (u32 LE), players, most players, state (u8: with LOBBIES_STAGED and
 /// LOBBIES_MATE); at most LOBBIES_MAX of them
 pub(crate) const LOBBIES_ENTRY: usize = 11;

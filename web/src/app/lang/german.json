@@ -905,6 +905,11 @@
   "Your last game stopped with an error.": "Dein letztes Spiel wurde durch einen Fehler beendet.",
   "Results": "Ergebnisse",
   "DNF": "Nicht im Ziel",
+  "AI racer": "KI-Fahrer",
+  "AI racers": "KI-Fahrer",
+  "Your race lobby: AI racers in its empty places, or none": "Deine Rennlobby: KI-Fahrer auf den freien Plätzen oder keine",
+  "AI racers fill the empty places": "KI-Fahrer füllen die freien Plätze",
+  "No AI racers": "Keine KI-Fahrer",
   "{n} points": {
     "one": "{n} Punkt",
     "other": "{n} Punkte"

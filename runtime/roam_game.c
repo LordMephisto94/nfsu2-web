@@ -5819,13 +5819,14 @@ static const char *const mp_st[] = { "idle", "hosting", "asked to join", "in a l
  * game's says no stage: its race's); else everyone.  past: its host is past the race's stage (MP_PAST: Enter's pick
  * puts it after the lobbies of the player's side).  A JOIN says its player's career stage (MP_JOIN_STAGE: the host
  * keeps out one past its stage too; an older game's says none) */
-typedef struct { uint32_t id, host, race; float x, y; uint8_t n, max, state, away_s, counts, priv, staged, past, hstage; uint32_t ids[RC_LOBBY_MAX]; int64_t heard; } MpLobby;
+typedef struct { uint32_t id, host, race; float x, y; uint8_t n, max, state, away_s, counts, priv, staged, past, hstage, ai; uint32_t ids[RC_LOBBY_MAX]; int64_t heard; } MpLobby;
 #define MP_COUNTS_ON    0x8000u
 #define MP_PRIVATE      0x0040u
 #define MP_STAGED       0x0080u
 #define MP_PAST         0x0100u
 #define MP_JOIN_STAGE   8             /* ...a JOIN's stage: t_ms >> this & 7 */
 #define MP_HSTAGE       9             /* ...an ADVERT's host's stage: t_ms >> this & 7 */
+#define MP_AI           0x1000u       /* ...an ADVERT's AI racers: on (lobbyai.c fills the race's empty places; an older game says off) */
 static struct {
     int      st;
     MpLobby  l;                                  /* ours (hosting) or the one we are in */
@@ -6044,7 +6045,8 @@ static void mp_send_of(const MpLobby *l, uint8_t op, uint8_t arg, uint32_t to){
     m.y = (int16_t)(l->y < -32767.f ? -32767.f : l->y > 32767.f ? 32767.f : l->y);
     if (op == RC_LOBBY_START){ int64_t t = (g_mp.start_at - roam_plat_now_us()) / 1000; m.t_ms = (uint16_t)(t < 0 ? 0 : t > 60000 ? 60000 : t); }
     else if (op == RC_LOBBY_ADVERT) m.t_ms = (uint16_t)(MP_COUNTS_ON | (l->counts & 0x3fu) | (l->priv ? MP_PRIVATE : 0u) |
-                                                        (l->staged ? MP_STAGED : 0u) | (l->past ? MP_PAST : 0u) | (l->hstage & 7u) << MP_HSTAGE);
+                                                        (l->staged ? MP_STAGED : 0u) | (l->past ? MP_PAST : 0u) | (l->hstage & 7u) << MP_HSTAGE |
+                                                        (l->ai ? MP_AI : 0u));
     else if (op == RC_LOBBY_JOIN) m.t_ms = (uint16_t)(MP_COUNTS_ON | (mp_counts(l->race) ? 1u : 0u) | (rd32(G_CAREER + C_STAGE) & 7u) << MP_JOIN_STAGE);
     memcpy(m.ids, l->ids, sizeof m.ids);
     rc_send_lobby(&g_s, &m);
@@ -6074,6 +6076,7 @@ static void mp_raceres(rc_raceres *q, const rc_racerep *m, const MpResult *res, 
     q->lobby = m->lobby; q->race = m->race; q->mode = m->mode; q->laps = laps;
     q->heat = (uint8_t)heat; q->heats = (uint8_t)heats;
     for (int k = 0; k < nr && q->n < RC_LOBBY_MAX; k++){
+        if (res[k].ai) continue;                      /* the server judges the players' results: an AI racer is none */
         uint32_t id = 0;
         for (int i = 0; i < g_mp.l.n && i < RC_LOBBY_MAX; i++)
             if (res[k].name[0] && !strcasecmp(g_mp.lan[i], res[k].name)) id = g_mp.l.ids[i];
@@ -6301,6 +6304,7 @@ static void mp_recv(int64_t host, uint32_t from, const rc_lobby *m){
             l->counts = on ? (uint8_t)(m->t_ms & 0x3fu) : 0; l->priv = (uint8_t)priv;
             l->staged = (uint8_t)(on && (m->t_ms & MP_STAGED)); l->past = (uint8_t)(on && (m->t_ms & MP_PAST));
             l->hstage = (uint8_t)(on ? m->t_ms >> MP_HSTAGE & 7u : 0u);
+            l->ai = (uint8_t)(on && (m->t_ms & MP_AI));
         }   /* (a START's is its countdown) */
         l->id = m->lobby; l->host = from; l->race = r; l->x = m->x; l->y = m->y; l->n = m->n; l->max = m->max; l->state = m->state;
         l->away_s = m->op != RC_LOBBY_ADVERT ? 0 : m->away_s > MP_IDLE_WARN_US / 1000000 ? MP_IDLE_WARN_US / 1000000 : m->away_s;
@@ -6486,6 +6490,7 @@ static void mp_trip(int64_t host){
     t.mode = race_net_mode(r);
     t.track = MR16(r + 0x18u); t.reverse = MR8(r + 0x1au) & 1u; t.laps = MR8(r + 0x1bu);
     t.players = g_mp.l.n;
+    t.ai = g_mp.l.ai;
     t.host_up = !t.host && g_mp.host_up;
     t.heats = MR8(r + 0x34u) == 2u && MR8(r + 0x7eu) >= 1u && MR8(r + 0x7eu) <= 3u ? MR8(r + 0x7eu) : 1;
     t.credit = mp_counts(r) ? r : 0;
@@ -6494,8 +6499,8 @@ static void mp_trip(int64_t host){
     g_mp.trip_counts = t.credit != 0;
     g_mp.told = 0;
     char nm[40]; race_name(r, nm, sizeof nm);
-    rlog("[roam] f=%ld race lobby %08x: the trip to the LAN race: %s (mode %d, track %d%s, %d laps), %d players, %s\n", rh_frame(), g_mp.l.id, nm,
-         t.mode, t.track, t.reverse ? " reverse" : "", t.laps, t.players, t.host ? "we host" : "we join");
+    rlog("[roam] f=%ld race lobby %08x: the trip to the LAN race: %s (mode %d, track %d%s, %d laps), %d players%s, %s\n", rh_frame(), g_mp.l.id, nm,
+         t.mode, t.track, t.reverse ? " reverse" : "", t.laps, t.players, t.ai ? ", AI racers in the empty places" : "", t.host ? "we host" : "we join");
     if (!mprace_start(&t)){ mp_note(host, "The race could not start"); mp_close(host, RC_LL_GONE, 0); return; }
     g_mp.trips++;
     mp_to(MP_TRIP, host);
@@ -6615,6 +6620,14 @@ static void mp_act(int64_t host, int in_roam, int act, uint32_t a, uint32_t b, u
              who == 0 ? "its stage and below" : who == 1 ? "Friends & crew only" : "everyone");
         g_mp.tx_at = 0;                                                  /* (its adverts at once) */
         return; }
+    case ROAM_LB_AI:
+        /* AI racers, the host's choice (the card's L, D-pad right held): off (the default) or on, the race's empty places
+         * filled with the game's AI racers (lobbyai.c: as many as the race's cars take, less the lobby's players) */
+        if (g_mp.st != MP_HOST) return;
+        g_mp.l.ai = !g_mp.l.ai;
+        rlog("[roam] f=%ld race lobby %08x: AI racers %s\n", rh_frame(), g_mp.l.id, g_mp.l.ai ? "on: they fill the empty places" : "off");
+        g_mp.tx_at = 0;                                                  /* (its adverts at once) */
+        return;
     case ROAM_LB_LEAVE:
         if (g_mp.st == MP_ASKED || g_mp.st == MP_IN) mp_close(host, RC_LL_LEFT, "You left the race");
         return;
@@ -6624,7 +6637,8 @@ static void mp_act(int64_t host, int in_roam, int act, uint32_t a, uint32_t b, u
     }
 }
 /* The card's keys on a controller (dinput_pad.c lobby_pad): D-pad left held a new lobby at a start, who can join
- * (hosting) or leave (joined from afar), right held the next lobby; what each does now, while the card is up (the page
+ * (hosting) or leave (joined from afar), right held the next lobby or AI racers (hosting); what each does now, while
+ * the card is up (the page
  * shows them in place of the keys while a controller drives: lobby.ts) */
 void pad_lobby_offer(int left, int right);
 int  pad_lobby_take(void);
@@ -6635,7 +6649,7 @@ static void mp_pad(int64_t host, int in_roam){
             MpLobby *h[MP_SEEN]; int n = mp_here(h);
             if (n >= 1 && mp_new_page(mp_spot_here(), n)) l = ROAM_LB_NEW;      /* (a start with no lobby: the game's Engage) */
             if (n >= 2) r = ROAM_LB_NEXT;
-        } else if (g_mp.st == MP_HOST) l = ROAM_LB_PRIVATE;
+        } else if (g_mp.st == MP_HOST){ l = ROAM_LB_PRIVATE; r = ROAM_LB_AI; }
         else if ((g_mp.st == MP_IN || g_mp.st == MP_ASKED) && g_mp.far) l = ROAM_LB_LEAVE;
     }
     pad_lobby_offer(l, r);
@@ -7017,13 +7031,13 @@ static void js_players(MpJs *j, const MpLobby *l){
 }
 /* the race's results, once the game showed them (mprace_results, by the LAN names the trip gave the lobby's players):
  * res, the rows in their order, each {n: the player's name, f: 1 finished, t: its time (s) or p: a drift's points,
- * me: 1 ours}; prize: ours */
+ * me: 1 ours, ai: 1 an AI racer (no name: the page names it)}; prize: ours */
 static void js_results(MpJs *j){
     MpResult r[MPRACE_RESULTS_MAX]; int n = mprace_results(r, MPRACE_RESULTS_MAX);
     if (n <= 0) return;
     js_key(j, "res"); js_raw(j, "[");
     for (int k = 0; k < n; k++){
-        const char *nm = r[k].name[0] ? r[k].name : "?";
+        const char *nm = r[k].ai ? "" : r[k].name[0] ? r[k].name : "?";
         for (int i = 0; i < g_mp.l.n && i < RC_LOBBY_MAX; i++) if (r[k].name[0] && !strcasecmp(g_mp.lan[i], r[k].name)){ nm = g_mp.names[i]; break; }
         char t[48];
         js_raw(j, k ? ",{\"n\":" : "{\"n\":"); js_val(j, nm);
@@ -7031,6 +7045,7 @@ static void js_results(MpJs *j){
         if (r[k].finished && r[k].points > 0){ snprintf(t, sizeof t, ",\"p\":%d", r[k].points); js_raw(j, t); }
         else if (r[k].finished && r[k].time > 0.f){ snprintf(t, sizeof t, ",\"t\":%.2f", (double)r[k].time); js_raw(j, t); }
         if (r[k].ours) js_raw(j, ",\"me\":1");
+        if (r[k].ai) js_raw(j, ",\"ai\":1");
         js_raw(j, "}");
     }
     js_raw(j, "]");
@@ -7059,6 +7074,7 @@ static void mp_panel(int64_t host, int in_roam){
         }
         if ((g_mp.st == MP_HOST || g_mp.st == MP_IN) && g_mp.l.away_s) js_int(&j, "away", g_mp.l.away_s);
         if (g_mp.st == MP_HOST || g_mp.st == MP_IN) js_int(&j, "priv", g_mp.l.priv);
+        if (g_mp.l.ai) js_int(&j, "ai", 1);                                /* (AI racers fill the empty places) */
         /* hosting: who can join (the card's V), stage: our stage and below (upto) */
         if (g_mp.st == MP_HOST){
             js_str(&j, "who", g_mp.l.priv ? "friends" : g_mp.l.staged || (g_mp.l.counts & 1u) ? "stage" : "all");

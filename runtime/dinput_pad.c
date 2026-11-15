@@ -545,9 +545,9 @@ int pad_horn_ours(int *button){
 
 /* ---- the race lobby's card (roam_game.c mp_pad) ----------------------------------------------------
  * While the card offers them, D-pad left and right held LB_HOLD_S do its keys: left a new lobby at a start (its B), who
- * can join (V, hosting) or leave (Z, joined from afar), right the next lobby (E); let go before, the game's own press
- * (World Map, SMS by default), as D-pad down's hold does (showoff_pad).  Not on a direction the player put another of
- * the game's controls on (Joypad Configuration). */
+ * can join (V, hosting) or leave (Z, joined from afar), right the next lobby (E) or AI racers (L, hosting); let go
+ * before, the game's own press (World Map, SMS by default), as D-pad down's hold does (showoff_pad).  Not on a
+ * direction the player put another of the game's controls on (Joypad Configuration). */
 #define LB_HOLD_S       0.6
 #define LB_TAP_S        0.12
 static int g_lb_offer[2], g_lb_fired;                     /* left, right: what each does now (roam_plat.h ROAM_LB_*, 0 none) */

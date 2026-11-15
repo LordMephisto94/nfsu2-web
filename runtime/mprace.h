@@ -20,6 +20,8 @@ typedef struct {
     int      heats;                /* the race's heats (race record +0x7E: a URL race has 1 to 3); 1 for any other */
     int      nfriends;             /* the lobby's players who are our friends or crew-mates (the hub's marks, at the */
     char     friends[6][16];       /* trip's start): their LAN names.  Their win counts for us too (MpRace.credit) */
+    int      ai;                   /* the lobby's AI racers (its host's choice): the race's empty places filled with the
+                                    * game's AI racers, the host's game driving them (mprace.c) */
     int      host_up;              /* a joiner: the host's LAN server takes logins already (its lobby said so):
                                     * connect at once (mprace_host_up when that comes later) */
 } MpRace;
@@ -88,7 +90,7 @@ const char *mprace_winner(void);
  * the way when the race ended, 30 s after the first, has that), how far it came (laps), the way it drove (m: its
  * average speed for its time) and which is ours; how many (0: no results) */
 #define MPRACE_RESULTS_MAX 6
-typedef struct { char name[16]; int finished, ours, points; float time, clock, done, dist, jump; } MpResult;
+typedef struct { char name[16]; int finished, ours, points; float time, clock, done, dist, jump; int ai; } MpResult;   /* ai: an AI racer's row (no name) */
 int  mprace_results(MpResult *r, int max);
 /* a URL race of 2 or 3 heats, raced one after the other in one trip (mprace.c): the heat being raced, or the last one
  * raced (1 ..), of heats; final: the last heat's results are in (mprace_results is the series' standing then, each
@@ -207,4 +209,7 @@ typedef struct {
 } MpReport;
 /* 1 when the trip raced and rated its cars (the report filled in) */
 int  mprace_report(MpReport *r);
+/* a lobby race's trip (roam_game.c's mp_trip): its race, while it goes (0 none); and racing it now (lobbyai.c) */
+const MpRace *mprace_lobby(void);
+int  mprace_lobby_racing(void);
 #endif

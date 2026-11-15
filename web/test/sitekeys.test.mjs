@@ -24,7 +24,7 @@ const K = await import('data:text/javascript;base64,' + Buffer.from(await build(
 
 test('the keys and buttons from the environment', () => {
   K.applySiteKeys({});
-  assert.deepEqual(K.OURS.map(o => K.siteKey(o.id)), ['KeyX', 'KeyO', 'KeyN', 'KeyG', null, null, 'KeyI', 'KeyF', 'KeyE', 'KeyB', 'KeyV', 'KeyZ', 'F12', 'F10', 'F9', 'F7', 'F8']);
+  assert.deepEqual(K.OURS.map(o => K.siteKey(o.id)), ['KeyX', 'KeyO', 'KeyN', 'KeyG', null, null, 'KeyI', 'KeyF', 'KeyE', 'KeyB', 'KeyV', 'KeyL', 'KeyZ', 'F12', 'F10', 'F9', 'F7', 'F8']);
   assert.deepEqual(['button_hold', 'button_horn', 'button_chat', 'button_look'].map(K.siteButton), ['ddown', 'ls', 'rs', 'auto']);
   assert.ok(K.SITE_KEYS.includes('key_lights'), 'the headlights\' key is one of settings.ini\'s');
   assert.ok(K.SITE_KEYS.includes('key_hud') && K.SITE_KEYS.includes('button_look'), 'hiding the HUD\'s key and the free look\'s switch too');
@@ -58,7 +58,7 @@ test('the keys and buttons from the environment', () => {
 test('what may be picked', () => {
   K.applySiteKeys({});
   assert.equal(K.refusal('drift', 'Digit7'), '');
-  assert.match(K.refusal('drift', 'KeyZ'), /Z is already Invite to a race/, 'the race lobby card\'s E, V and Z');
+  assert.match(K.refusal('drift', 'KeyZ'), /Z is already Invite to a race/, 'the race lobby card\'s E, V, L and Z');
   assert.equal(K.refusal('drift', 'KeyX'), '', 'its own key');
   assert.match(K.refusal('drift', 'KeyW'), /W is one of the game's keys/);
   assert.match(K.refusal('drift', 'KeyG'), /G is already Headlights/, 'the debug camera\'s G is free, but the headlights\'');
@@ -66,7 +66,8 @@ test('what may be picked', () => {
     'the game\'s HUD (issue 107)');
   assert.equal(K.refusal('lights', 'KeyG'), '', 'the headlights\' own G (the debug camera\'s)');
   assert.equal(K.refusal('lights', 'Digit6'), '');
-  for (const code of ['KeyL', 'BracketLeft', 'BracketRight', 'Numpad6', 'Numpad7', 'Numpad8', 'Numpad9'])
+  assert.match(K.refusal('lights', 'KeyL'), /L is already AI racers/, 'the debug camera\'s L is free, but the race lobby card\'s AI racers\'');
+  for (const code of ['BracketLeft', 'BracketRight', 'Numpad6', 'Numpad7', 'Numpad8', 'Numpad9'])
     assert.equal(K.refusal('lights', code), '', `${code}: the debug camera's, which the game never reads`);
   assert.match(K.refusal('lights', 'KeyX'), /X is already Drift mode/);
   assert.match(K.refusal('lights', 'Digit3'), /quick chat's/);

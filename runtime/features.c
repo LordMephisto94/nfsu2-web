@@ -66,6 +66,7 @@ static const struct { const char *name; int (*hook)(CPU *c, uint32_t ip); } k_ho
     { "trafficcars", trafficcars_hook },   /* a traffic vehicle as the player's car */
     { "travel",      travel_hook },        /* the World Map shut on a race track's map */
     { "damage",      damage_hook },        /* crash damage on the cars' meshes */
+    { "lobbyai",     lobbyai_hook },       /* a lobby race's AI racers' names on the results */
 };
 
 /* ---- every frame, from the main loop's hook (roam.c) -------------------- */
@@ -93,6 +94,7 @@ static const struct { const char *name; void (*frame)(CPU *c); } k_frames[] = {
     { "walls",       f_walls },                /* a car past the career's walls back on the roads it can reach */
     { "travel",      travel_frame },           /* Tracks: free roam on a race track's map (F9) and back */
     { "mprace",      mprace_frame },           /* a multiplayer race's trip from free roam and back */
+    { "lobbyai",     lobbyai_frame },          /* a lobby race's AI racers: a joiner's without a driver, their finishes */
     { "mpcredit",    mpcredit_frame },         /* a multiplayer race's win that waits for the crib */
     { "roam_game",   f_roam_game },            /* the multiplayer feature */
     { "racehorn",    racehorn_frame },         /* horns in races between players */
