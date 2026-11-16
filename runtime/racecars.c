@@ -70,7 +70,7 @@
  *    way, and an older game drops these (an unknown message on the port).
  *
  * N2RS, version 1 (little-endian):
- *   0 "N2RS", 4 version 1, 5 flags (1: states with the extension: the engine), 6 the
+ *   0 "N2RS", 4 version 1, 5 flags (1: states with the extension: the engine, the turn signals), 6 the
  *   sender's race slot, 7 n states (1..NSTATES, newest first), 8 epoch (a
  *   change: its car was put elsewhere, snap), 9 clock epoch (a change: its
  *   stamp clock was set anew, re-sync), 10 status (roam_core.h RC_ST_*), 11 0,
@@ -178,6 +178,8 @@ void roam_game_engine_state(uint32_t car, rc_state *s);
 int  roam_game_engine_files(CPU *c, uint32_t ride, char gin[2][32], float *idle, float *most);
 void roam_game_engine_sound(const char (*gin)[32], float idle, float most, const rc_pose *P, carsfx_state *st);
 void roam_game_aieng_patch(void);
+int  signals_mine(void);                           /* signals.c: our turn signals, and the others' cars' to show */
+void signals_car(uint32_t car, int sig, int paused);
 
 static void rd3(uint32_t a, float *o){ o[0] = MRF32(a); o[1] = MRF32(a + 4u); o[2] = MRF32(a + 8u); }
 static int64_t now_us(void){
@@ -423,7 +425,8 @@ static int own_state(rc_state *s, uint32_t car){
     if (!__builtin_isfinite(s->brake)) s->brake = 0;
     if (!__builtin_isfinite(s->steer)) s->steer = 0;
     roam_game_engine_state(car, s);               /* the engine as our game sounds it, in the extension */
-    s->ext = s->eng != 0;
+    s->sig = car == my_car() ? (uint8_t)signals_mine() : 0;   /* our turn signals (signals.c), in it too */
+    s->ext = s->eng != 0 || s->sig;
     return 1;
 }
 /* a car's state to every racer: N2RS with its slot */
@@ -912,6 +915,16 @@ void racecars_frame(CPU *c){
     clock_frame(racing);
     if (racing) send_frame();
     if (racing) ai_frame(c);
+    /* each other player's turn signals, as its newest state has them, the hazard lights while its game is paused */
+    if (racing){
+        int64_t t = now_us();
+        for (int i = 0; i < NCARS; i++){
+            Rc *r = &g_rc[i];
+            if (!r->ip || r->ai || r->slot < 0 || !r->mo.n || !guest_ok(r->car, 0x9e0) || t - r->rx_at > STALE_US) continue;
+            const rc_state *n = &r->mo.s[r->mo.n - 1];
+            signals_car(r->car, n->ext ? n->sig : 0, r->mo.status == RC_ST_PAUSED);
+        }
+    }
     engines_frame(c, racing);
     /* NFSU2_RACECARS_TRACE: a car moved between our put (the world's step) and here (before the frame is drawn) */
     if (racing && O.trace) for (int i = 0; i < NCARS; i++){

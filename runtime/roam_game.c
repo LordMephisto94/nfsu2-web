@@ -724,6 +724,8 @@ static int car_state(uint32_t car, rc_state *s, int horn, uint8_t *thumps, int *
     int lights = car == player_car() ? rh_lights_mine() : 0;
     if (lights == 1) s->bits |= RC_BIT_DARK;
     s->hibeam = lights == 2;
+    /* the turn signals and hazard lights (signals.c, player 1's) */
+    s->sig = car == player_car() ? (uint8_t)rh_signals_mine() : 0;
     if (g_sync_paused > 1){ for (int i = 0; i < 3; i++){ s->v[i] = 0; s->w[i] = 0; } s->speed = 0; s->rpm = 0; for (int i = 0; i < 8; i++) s->slip[i] = 0; }
     for (int i = 0; i < 3; i++) if (!__builtin_isfinite(s->p[i]) || !__builtin_isfinite(s->v[i])) return 0;
     /* the stamp clock may run a little faster than the world (it is pulled
@@ -4684,6 +4686,19 @@ static void lights_peers(void){
     for (int k = 0; k < NSLOT; k++){
         uint32_t car = g_sl[k].st == SL_ACTIVE && !g_sl[k].hidden ? g_sl[k].car : 0;
         rh_lights_car(k, ok(car, 0x9e0) ? car : 0, st[k]);
+    }
+}
+
+/* friends' turn signals (signals.c): as each shown car's pose has them (the extension's RC_OPEN_SIGL / RC_OPEN_SIGR),
+ * the hazard lights while its player's game is paused */
+static void signals_peers(void){
+    for (int i = 0; i < g_npv; i++){
+        const PeerView *v = &g_pv[i];
+        if (!v->visible || !v->have_pose) continue;
+        int sig = v->pose.ext ? v->pose.sig : 0;
+        for (int k = 0; k < NSLOT; k++)
+            if (g_sl[k].st == SL_ACTIVE && g_sl[k].peer_id == v->id && !g_sl[k].hidden && ok(g_sl[k].car, 0x9e0))
+                rh_signals_car(g_sl[k].car, sig, v->paused);
     }
 }
 
@@ -9931,6 +9946,7 @@ void roam_game_frame(CPU *c){
     sounds_update(have_ls ? &ls : 0, world_runs);
     showoff_peers(c);
     lights_peers();
+    signals_peers();
     damage_peers(c);
     plates_peers();
     stance_peers();
