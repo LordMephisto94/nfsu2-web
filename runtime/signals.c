@@ -14,9 +14,10 @@
  * CENTRE_BRAKELIGHT (bStringHash; every car in CARS/ checked: no other light names), and their parts are lamps
  * only (*_HEADLIGHT_LEFT, *_BRAKELIGHT_A..C).  So a signal is a flare of the game's own, amber: the flare routine the
  * headlights and brake lights are drawn with (0x490920, cdecl: view, light, matrix, strength, three of the view's
- * modes, colour), given a copy of the side's headlight light SIG_OUT_F metres further out and of its brake light
- * SIG_OUT_R further out, the copy's kind (+0x2C) 0, the headlights' (whose flare the colour tints: 0x4915F6), at full
- * strength, with SIG_COLOUR.  A light (0x30 bytes, 0x6204D0): +8 its hash, +0x10 its place in the car, +0x1C what the
+ * modes, colour), given a copy of the side's headlight light 0.15 m further out and of its brake light
+ * 0.06 m further out, the copy's kind (+0x2C) 0, the headlights' (whose flare the colour tints: 0x4915F6), at full
+ * strength, amber.  The colour is 0x00BBGGRR there: 0xFF8C00 as RRGGBB was blue on screen (a player's test,
+ * 2026-11-16).  A light (0x30 bytes, 0x6204D0): +8 its hash, +0x10 its place in the car, +0x1C what the
  * flare routine keeps of its visibility, +0x20 the way it faces (a flare seen from behind it is fainter: its flag 4 in
  * +0x2D), +0x2C its kind (0 a headlight, 1 a brake light).  It is drawn after the game's own flares of the car
  * (photo.c's override of 0x615630, the car's flares: thiscall on its render info, ret 0x18; its arguments the view,
@@ -83,7 +84,7 @@ static struct {
     long fr;                          /* frames (signals_frame) */
     uint32_t ring; uint32_t ri;       /* light copies (guest memory), the next */
     struct { uint32_t ri; int n; } said[32]; int nsaid;
-    float out_f, out_r; uint32_t colour;
+    float out_f, out_r; uint32_t colour;   /* the flares' colour, RRGGBB (flare_colour: the routine's order) */
     unsigned long drawn, pool_full;
 } S = { .test = -1, .last = -1, .out_f = 0.15f, .out_r = 0.06f, .colour = 0xff8c00u };
 
@@ -230,7 +231,8 @@ void signals_flares(CPU *c, uint32_t ri, const uint32_t *a){
             }
         }
         union { float f; uint32_t u; } sk = { k };
-        uint32_t args[8] = { a[0], l, m, sk.u, v1, v2, depth, S.colour };
+        uint32_t bgr = (S.colour >> 16 & 0xffu) | (S.colour & 0xff00u) | (S.colour & 0xffu) << 16;   /* RRGGBB -> BBGGRR */
+        uint32_t args[8] = { a[0], l, m, sk.u, v1, v2, depth, bgr };
         gcall(c, FN_FLARE, 0, 8, args);
         S.drawn++;
     }
