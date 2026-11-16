@@ -242,7 +242,7 @@ static void split_repair_duplicate_grid_slot(void){
     MR8(target+3u)=(uint8_t)missing;
 }
 void sub_006065b0_orig(CPU *c);
-void lobbyai_grid(CPU *c);     /* lobbyai.c: a lobby race's AI racers on the grid spots and skins no player has */
+void lobbyai_grid(CPU *c);     /* lobbyai.c: a lobby race's AI racers on the grid spots no player has */
 void sub_006065b0(CPU *c){
     lobbyai_grid(c);
     split_repair_duplicate_grid_slot();
