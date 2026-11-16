@@ -1679,6 +1679,20 @@ static void t_statex(void){
     s->hibeam = 0; s->bits = obits;
     en = rc_encode(&m, eb, sizeof eb); e = rc_decode(eb, en, &d);
     CHECK(en == 16 + 6 + 52 + 12 + 4 && e == RC_OK && !d.u.snap.s[0].hibeam, "no high beam: the short form again (%d bytes)", en);
+    /* the turn signals (signals.c): RC_OPEN_SIGL and RC_OPEN_SIGR in the same byte, both the hazard lights */
+    s->sig = RC_SIG_L | RC_SIG_R;
+    en = rc_encode(&m, eb, sizeof eb);
+    CHECK(en == 16 + 6 + 52 + 30 + 4 && ex[29] == (RC_OPEN_SIGL | RC_OPEN_SIGR) && !(ex[29] & RC_OPEN_ALL),
+          "hazard lights: the longest form, both bits in the open parts' byte (%d bytes)", en);
+    e = rc_decode(eb, en, &d);
+    CHECK(e == RC_OK && d.u.snap.s[0].sig == (RC_SIG_L | RC_SIG_R) && !d.u.snap.s[0].open && !d.u.snap.s[0].hibeam,
+          "...decode: both signals, nothing open (e %d)", e);
+    s->sig = RC_SIG_R;
+    en = rc_encode(&m, eb, sizeof eb); e = rc_decode(eb, en, &d);
+    CHECK(e == RC_OK && d.u.snap.s[0].sig == RC_SIG_R, "the right signal alone (e %d)", e);
+    s->sig = 0;
+    en = rc_encode(&m, eb, sizeof eb); e = rc_decode(eb, en, &d);
+    CHECK(en == 16 + 6 + 52 + 12 + 4 && e == RC_OK && !d.u.snap.s[0].sig, "no signal: the short form again (%d bytes)", en);
     /* a newer core's longer extension: its own fields skipped */
     uint8_t lb[RC_MAX_DGRAM]; memcpy(lb, b, (size_t)n - 4);
     lb[22 + 52] = RC_STATEX_SLIP - 1 + 3; lb[n - 4] = 0xAA; lb[n - 3] = 0xBB; lb[n - 2] = 0xCC;

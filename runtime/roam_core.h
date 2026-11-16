@@ -69,6 +69,12 @@
 /* ...and in the same byte (a core before it reads only RC_OPEN_ALL): the car's headlights are on high beam (lightkey.c),
  * sent as the open parts are, in the longest form */
 #define RC_OPEN_HIBEAM   0x10
+/* ...and the turn signals (signals.c): the left one, the right one, both the hazard lights.  Only the blinking's
+ * on: each game blinks them on its own clock */
+#define RC_OPEN_SIGL     0x20
+#define RC_OPEN_SIGR     0x40
+#define RC_SIG_L         1          /* rc_state sig */
+#define RC_SIG_R         2
 #define RC_SLIP_STEP     0.5f       /* a wheel's slip on the wire: int8 steps of this (m/s), up to 63.5 */
 #define RC_BUF_STATES    32         /* jitter buffer per peer */
 #define RC_OFFWIN        64         /* clock-offset samples per peer */
@@ -264,7 +270,7 @@ enum { RC_PLAT_MAC = 1, RC_PLAT_WIN = 2, RC_PLAT_TOOL = 3 };
  * after the engine of the longest form, and is skipped.  The first such:
  * (only while one of the car's parts is open: its hood, trunk or doors,
  * showoff.c) the longest form, its slip and engine 0 where they have none,
- * then the open parts (RC_STATEX_OPEN: RC_OPEN_* bits, and the high beam: RC_OPEN_HIBEAM), 30 bytes; a core
+ * then the open parts (RC_STATEX_OPEN: RC_OPEN_* bits, the high beam: RC_OPEN_HIBEAM, the turn signals: RC_OPEN_SIGL, RC_OPEN_SIGR), 30 bytes; a core
  * before it reads the 29 and skips the byte, so it shows the car closed.
  * Only to a peer whose HELLO carries the flag: an older core counts the
  * longer SNAP as bad */
@@ -401,6 +407,7 @@ typedef struct {
                                               recordings (GIN) and the engine model under them (the AEMS bank) */
     uint8_t  open;                 /* the car's open parts (RC_OPEN_*: hood, trunk, doors), 0: none */
     uint8_t  hibeam;               /* its headlights are on high beam (RC_OPEN_HIBEAM, in the open parts' byte) */
+    uint8_t  sig;                  /* its turn signals (RC_SIG_L, RC_SIG_R; both: the hazard lights), in the same byte */
 } rc_state;
 /* one state as a SNAP carries it (RC_STATE_BYTES, then with ext its extension as RC_HF_STATEX's), for another
  * channel's messages (racecars.c: the cars of a race between players); get: RC_OK / RC_E_* */
@@ -554,7 +561,7 @@ typedef struct {
     uint8_t slipx, surf[4];        /* as rc_state: slip 0 when no wheel slides */
     float   slip[8];
     float   eng, eng_acc, eng_dcl, eng_base;   /* as rc_state (the volumes 0 .. 1): eng 0 when the sender sent no engine */
-    uint8_t open, hibeam;          /* as rc_state */
+    uint8_t open, hibeam, sig;     /* as rc_state */
     int     mode;                  /* RC_MODE_* */
 } rc_pose;
 enum { RC_MODE_NONE = 0, RC_MODE_INTERP = 1, RC_MODE_EXTRAP = 2, RC_MODE_HOLD = 3 };
