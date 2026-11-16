@@ -11,6 +11,11 @@ first, then under `### Fixes` what was broken and works now, which the popup kee
 insides, the forum bot, logs, tests, docs and cheat checks. A change that may or may not belong here is asked about
 before the release, not guessed.
 
+## 2026-11-16 (0b4084f2)
+
+- **Race lobbies:** the host can fill a race's empty spots with AI opponents: L on the lobby card, or hold D-pad right on a controller. A drag race takes up to 4 cars, the other races up to 6.
+- **Race lobbies:** every player races the same AI opponents, with the same names and cars, driven by the host's game; their places and times count in the results, the HUD and the prize money.
+
 ## 2026-11-15 (fa436c4c)
 
 ### Fixes
