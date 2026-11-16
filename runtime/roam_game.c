@@ -6600,7 +6600,7 @@ static void mp_far_join(int64_t host, int in_roam, uint32_t hid, uint32_t lid, u
     g_mp.asked_far = g_mp.far = 1;
     rlog("[roam] f=%ld race lobby %08x: joining from afar (an invite), %.0f m from its start\n", rh_frame(), lid, (double)mp_dist(l.x, l.y));
 }
-/* the page's lobby actions (roam_plat_lobby_act): the card's next lobby (E), who can join (V), leave (Z from afar), an
+/* the page's lobby actions (roam_plat_lobby_act): the card's next lobby (E), who can join (V), leave (Z, joined), an
  * invite's Join, a new lobby of our own here (B) */
 static void mp_act(int64_t host, int in_roam, int act, uint32_t a, uint32_t b, uint32_t r){
     switch (act){
@@ -6652,7 +6652,7 @@ static void mp_act(int64_t host, int in_roam, int act, uint32_t a, uint32_t b, u
     }
 }
 /* The card's keys on a controller (dinput_pad.c lobby_pad): D-pad left held a new lobby at a start, who can join
- * (hosting) or leave (joined from afar), right held the next lobby or AI racers (hosting); what each does now, while
+ * (hosting) or leave (joined), right held the next lobby or AI racers (hosting); what each does now, while
  * the card is up (the page
  * shows them in place of the keys while a controller drives: lobby.ts) */
 void pad_lobby_offer(int left, int right);
@@ -6665,7 +6665,7 @@ static void mp_pad(int64_t host, int in_roam){
             if (n >= 1 && mp_new_page(mp_spot_here(), n)) l = ROAM_LB_NEW;      /* (a start with no lobby: the game's Engage) */
             if (n >= 2) r = ROAM_LB_NEXT;
         } else if (g_mp.st == MP_HOST){ l = ROAM_LB_PRIVATE; r = ROAM_LB_AI; }
-        else if ((g_mp.st == MP_IN || g_mp.st == MP_ASKED) && g_mp.far) l = ROAM_LB_LEAVE;
+        else if (g_mp.st == MP_IN || g_mp.st == MP_ASKED) l = ROAM_LB_LEAVE;      /* (at its start or from afar) */
     }
     pad_lobby_offer(l, r);
 }

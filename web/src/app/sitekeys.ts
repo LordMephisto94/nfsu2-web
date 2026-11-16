@@ -69,7 +69,7 @@ export const OURS: readonly Our[] = [
   { id: 'lobbyPrivate', name: N('Who can join'), line: N('Your race lobby: who can join it (your stage and below, friends & crew, or everyone)'),
     key: 'key_lobby_private', def: 'KeyV' },
   { id: 'lobbyAi', name: N('AI opponents'), line: N('Your race lobby: AI opponents in its empty spots, or none'), key: 'key_lobby_ai', def: 'KeyL' },
-  { id: 'lobbyInvite', name: N('Invite to a race'), line: N('Invite friends to your race lobby, join a friend\'s invite, leave a race you joined from afar'),
+  { id: 'lobbyInvite', name: N('Invite to a race'), line: N('Invite friends to your race lobby, join a friend\'s invite, leave a race lobby you joined'),
     key: 'key_lobby_invite', def: 'KeyZ' },
   { id: 'photo', name: N('Photo mode'), line: N('Photo mode, then the photo'), key: 'key_photo', def: 'F12', menus: true },
   { id: 'hud', name: N('Hide HUD'), line: N('Hide or show the HUD while driving (names and chat over cars too)'), key: 'key_hud', def: 'F10' },

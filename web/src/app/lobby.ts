@@ -187,7 +187,7 @@ export class LobbyPanel {
       o.ai = () => d.act(LB_AI);
       if ((s.names?.length ?? 0) < (s.max ?? 6)) o.invite = () => d.invite();
     }
-    if (s.v === 'lobby' && (s.st === 'in' || s.st === 'asked') && s.far) o.invite = () => d.act(LB_LEAVE);
+    if (s.v === 'lobby' && (s.st === 'in' || s.st === 'asked')) o.invite = () => d.act(LB_LEAVE);   /* (at its start or from afar) */
     return o;
   }
 
@@ -376,9 +376,10 @@ export class LobbyPanel {
     }
     if (o.fresh) go.push(this.own('fresh', t('New lobby'), o.fresh, '←'));
     if (o.next) go.push(this.own('next', this.nextPage(s), o.next, '→'));
-    // (how to leave: drive away, but from a lobby joined from afar)
-    if (s.v === 'lobby' && s.st !== 'count' && s.st !== 'asked') go.push(el('div', 'ov-small', s.me === 0 ? t('Drive away to call it off')
-      : s.far ? t('You joined from afar: the race leaves from where you are') : t('Drive away to leave')));
+    // (the host calls it off by driving away; a player who joined leaves with Leave above, and from afar is told where
+    // the race leaves from)
+    if (s.v === 'lobby' && s.st !== 'count' && s.st !== 'asked' && (s.me === 0 || s.far))
+      go.push(el('div', 'ov-small', s.me === 0 ? t('Drive away to call it off') : t('You joined from afar: the race leaves from where you are')));
     const blocks = [block(...this.head(s))];
     if (s.v !== 'spot') blocks.push(block(this.players(s), ...this.gauge(s)));
     if (settings.length) blocks.push(block(...settings));
