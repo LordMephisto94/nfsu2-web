@@ -66,7 +66,7 @@ test('what may be picked', () => {
     'the game\'s HUD (issue 107)');
   assert.equal(K.refusal('lights', 'KeyG'), '', 'the headlights\' own G (the debug camera\'s)');
   assert.equal(K.refusal('lights', 'Digit6'), '');
-  assert.match(K.refusal('lights', 'KeyL'), /L is already AI racers/, 'the debug camera\'s L is free, but the race lobby card\'s AI racers\'');
+  assert.match(K.refusal('lights', 'KeyL'), /L is already AI opponents/, 'the debug camera\'s L is free, but the race lobby card\'s AI opponents\'');
   for (const code of ['BracketLeft', 'BracketRight', 'Numpad6', 'Numpad7', 'Numpad8', 'Numpad9'])
     assert.equal(K.refusal('lights', code), '', `${code}: the debug camera's, which the game never reads`);
   assert.match(K.refusal('lights', 'KeyX'), /X is already Drift mode/);

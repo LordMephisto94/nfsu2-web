@@ -905,11 +905,11 @@
   "Your last game stopped with an error.": "Dein letztes Spiel wurde durch einen Fehler beendet.",
   "Results": "Ergebnisse",
   "DNF": "Nicht im Ziel",
-  "AI racer": "KI-Fahrer",
-  "AI racers": "KI-Fahrer",
-  "Your race lobby: AI racers in its empty places, or none": "Deine Rennlobby: KI-Fahrer auf den freien Plätzen oder keine",
-  "AI racers fill the empty places": "KI-Fahrer füllen die freien Plätze",
-  "No AI racers": "Keine KI-Fahrer",
+  "AI opponent": "KI-Gegner",
+  "AI opponents": "KI-Gegner",
+  "Your race lobby: AI opponents in its empty spots, or none": "Deine Rennlobby: KI-Gegner auf den freien Plätzen oder keine",
+  "AI opponents fill empty spots": "KI-Gegner füllen freie Plätze",
+  "No AI opponents": "Keine KI-Gegner",
   "{n} points": {
     "one": "{n} Punkt",
     "other": "{n} Punkte"

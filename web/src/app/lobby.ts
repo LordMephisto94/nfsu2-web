@@ -46,7 +46,7 @@ interface LobbyState {
   /** lobby: Friends & crew only (hosting: its switch); far: we joined it from afar (an invite), so driving away does
    *  not leave it */
   priv?: number; far?: number;
-  /** AI racers fill the race's empty places (its host's choice: L) */
+  /** AI opponents fill the race's empty spots (its host's choice: L) */
   ai?: number;
   /** hosting: who can join (the card's V, runtime mp_act): stage, its race's stage (upto) and below and the host's
    *  friends and crew; friends, Friends & crew only; all, everyone */
@@ -367,9 +367,10 @@ export class LobbyPanel {
         settings.push(this.own('priv', who === 'stage' ? t('Stage {n} and below can join', { n: s.upto ?? 1 })
           : who === 'friends' ? t('Friends & crew can join') : t('Everyone can join'), o.priv, '←'));
       }
-      // AI racers in the race's empty places (the host's L, D-pad right held); the others see what it chose
-      if (o.ai) settings.push(this.own('ai', s.ai ? t('AI racers fill the empty places') : t('No AI racers'), o.ai, '→'));
-      else if (s.ai) settings.push(el('div', '', t('AI racers fill the empty places')));
+      // AI opponents in the race's empty spots (the host's L, D-pad right held); the others see what it chose (split
+      // screen's word for them too)
+      if (o.ai) settings.push(this.own('ai', s.ai ? t('AI opponents fill empty spots') : t('No AI opponents'), o.ai, '→'));
+      else if (s.ai) settings.push(el('div', '', t('AI opponents fill empty spots')));
       // (no invite on a controller's card: the menu's Friends has it)
       if (o.invite && (!mine || !drivingPad() || touchFirst())) settings.push(this.own('invite', mine ? t('Invite friends') : t('Leave'), o.invite, mine ? undefined : '←'));
     }
@@ -396,7 +397,7 @@ export class LobbyPanel {
     let place = 0;
     for (const r of s.res ?? []) {
       const li = el('li', r.me ? 'taken mine' : 'taken');
-      li.append(el('span', 'lobby-n', r.f ? String(++place) : '–'), el('span', 'lobby-name', r.ai ? t('AI racer') : r.n));
+      li.append(el('span', 'lobby-n', r.f ? String(++place) : '–'), el('span', 'lobby-name', r.ai ? t('AI opponent') : r.n));
       const what = !r.f ? t('DNF') : r.p !== undefined ? tn(r.p, '{n} point', '{n} points') : r.t !== undefined ? raceTime(r.t) : '';
       if (what) li.append(el('span', 'lobby-time', what));
       if (r.me && s.credit && s.credited !== -1) li.append(el('span', 'lobby-prize', `★ ${s.credit === 2 ? t('Friend\'s win') : t('Career win')}`));

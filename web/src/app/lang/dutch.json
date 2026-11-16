@@ -905,11 +905,11 @@
   "Your last game stopped with an error.": "Je vorige spel is gestopt door een fout.",
   "Results": "Uitslag",
   "DNF": "Niet gefinisht",
-  "AI racer": "AI-coureur",
-  "AI racers": "AI-coureurs",
-  "Your race lobby: AI racers in its empty places, or none": "Je racelobby: AI-coureurs op de lege plaatsen, of geen",
-  "AI racers fill the empty places": "AI-coureurs vullen de lege plaatsen",
-  "No AI racers": "Geen AI-coureurs",
+  "AI opponent": "AI-tegenstander",
+  "AI opponents": "AI-tegenstanders",
+  "Your race lobby: AI opponents in its empty spots, or none": "Je racelobby: AI-tegenstanders op de lege plekken, of geen",
+  "AI opponents fill empty spots": "AI-tegenstanders vullen lege plekken",
+  "No AI opponents": "Geen AI-tegenstanders",
   "{n} points": {
     "one": "{n} punt",
     "other": "{n} punten"

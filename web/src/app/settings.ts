@@ -581,7 +581,7 @@ export const TEMPLATE = `# NFSU2 settings, read at every launch.
 # trunk and doors (free roam), the horn (with other players), the
 # headlights (a tap off or on, held high beam), Message a friend and Add
 # friend (free roam), the race lobby card's next lobby, Friends & crew
-# only, AI racers and invite (free roam), photo mode, hiding the HUD while driving
+# only, AI opponents and invite (free roam), photo mode, hiding the HUD while driving
 # (off again at each Play), the page's menu (never off), the next song and
 # the frame-rate counter.  A key one of the game's controls is on (its
 # Options, Controls) stays the game's.
