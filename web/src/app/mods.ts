@@ -185,7 +185,7 @@ export const MODS: readonly Mod[] = [
     kind: 'map', uses: 'original', control: { setting: 'open_tunnel' },
     line: N('Drive through the Construction Tunnel in free roam.'),
     details: 'The tunnel the game keeps closed for construction is open, to drive through in your career\'s free roam. Only your own city changes: friends you meet in free roam should turn it on too, or you drive where their city has a wall. It needs this server to have its pack.',
-    online: 'mine', sizeMB: 2, files: ['runtime/fileio.c'],
+    online: 'mine', sizeMB: 2, files: ['runtime/fileio.c', 'tools/open_tunnel.py'],
   },
   {
     id: 'open-parking-lots', name: 'Open Parking Lots', authors: [{ name: 'nfsu2.xyz' }], links: {},
