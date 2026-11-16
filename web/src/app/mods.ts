@@ -156,7 +156,7 @@ export const MODS: readonly Mod[] = [
     links: { page: 'https://streetsmodz.com.br/mods/underground-2/crashing-foreign-cars' },
     kind: 'car', uses: 'code', ownPort: true, control: { setting: 'crash_damage' },
     line: N('Dents, loose parts and scratches.'),
-    details: 'The racers\' cars, yours and the AI\'s, dent where they are hit, scratch, break their lights and lose their bumpers, mirrors, hood, trunk lid and doors, which lie on the road for a while. Only what is seen: the car drives as in the original game. In free roam, other players who have it on see your car\'s damage; with it off you see every car undamaged. The game\'s own repair, at a race\'s start or in the garage, takes it away.',
+    details: 'The racers\' cars, yours and the AI\'s, dent where they are hit, scratch, break their lights and lose their bumpers, mirrors, hood, trunk lid and doors, which lie on the road for a while. Only what is seen: the car drives as in the original game. In free roam, other players who have it on see your car\'s damage; with it off you see every car undamaged. The game\'s own repair takes it away: at a race\'s start, in the garage and before a magazine or DVD cover shoot.',
     online: 'seen', sizeMB: 1, files: ['runtime/damage.c', 'runtime/damagecore.cpp', 'runtime/damage/Dent.h',
       'runtime/damage/Tessellate.h', 'runtime/damage_none.c', 'tools/damagepack.py', 'tools/damage/scratches.tpk'],
   },
