@@ -17,7 +17,17 @@
  * number 0x5D3E40 and 0x5E92DE, by index 0x5D3E80, Quick Race's list 0x4CDED0), which its chunk's loader sets
  * (0x5D3EB0, from the chunk loaders' table): after it, they point at a copy of the game's records with the pack's
  * after them.  The names go into the game's language table (language.c).  The trips there are the page's Tracks
- * (travel.c's UG1 spots).  Log: "[ug1]". */
+ * (travel.c's UG1 spots).
+ *
+ * Quick Race lists its tracks from the same table (0x4CDED0, each by its flags: 0x4987C0), and keeps each mode's last
+ * pick in the profile: the profile's writer (0x52A280, thiscall on the profile, the buffer and its size) copies the
+ * Quick Race settings (0x83AAB4, 0x17C bytes) into it, each mode's track a number (a player's profile: 4021 its
+ * circuit's).  A save with one of the pack's there would be a track the stock game has not, so for the write each such
+ * pick is 0 (what a new profile has: no pick yet), and the pick is back once it is written: the stock game reads the
+ * profile as one with no pick, and this game, reading it again, too (garage.c's override of the writer asks
+ * ug1_qr_hide and ug1_qr_back).  The career unlocks none of the pack's tracks, so the track lock (0x5156F0, which
+ * Quick Race asks for each of its list: 0x4B4C10) has them open (netrace.c's override asks ug1_open_track).
+ * Log: "[ug1]". */
 #include "cpu.h"
 #include "guest.h"
 #include "game.h"
@@ -38,6 +48,9 @@ uint32_t language_add_text_hash(uint32_t hash, const char *text);              /
 #define DAT          "UG1/UG1TRACKS.DAT"
 #define MAX_TRACKS   256u
 #define MAX_NAMES    512u
+#define PR_QUICKRACE 0xd4u         /* the profile (thiscall's this, 0x83A9E0 player 1's): its Quick Race settings (0x83AAB4) */
+#define QR_TRACK     0x18u         /* ... mode m's track (u16) at +0x18 + 20 m, 12 modes, ... */
+#define QR_TRACK_C   0x11cu        /* ... mode 0xC's 8 at +0x11C + 12 k (0x502910) */
 
 static struct {
     int read, ok;                 /* the pack read (once); usable */
@@ -118,4 +131,33 @@ void sub_005d3eb0(CPU *c){
     }
     MR32(G_TRACKS) = U.table;                                      /* (the same chunk again: the copy made for it) */
     MR32(G_NTRACKS) = U.count;
+}
+
+/* one of the pack's track numbers */
+static int pack_track(uint16_t num){
+    for (uint32_t i = 0; i < U.n; i++)
+        if ((uint16_t)(U.rec[TRACK_SZ * i + TI_NUMBER] | U.rec[TRACK_SZ * i + TI_NUMBER + 1] << 8) == num) return 1;
+    return 0;
+}
+/* netrace.c's override of the track lock (0x5156F0: the career's unlocks, which have none of the pack's): open */
+int ug1_open_track(uint32_t num){ return U.ok && pack_track((uint16_t)num); }
+/* garage.c's override of the profile's writer (0x52A280, thiscall on the profile), around the game's: the pack's picks
+ * out of its Quick Race settings for the write (ug1_qr_hide, -> how many), then back (ug1_qr_back) */
+static struct { uint32_t at[20]; uint16_t was[20]; int n; } H;
+int ug1_qr_hide(uint32_t profile){
+    uint32_t qr = profile + PR_QUICKRACE;
+    H.n = 0;
+    if (!U.n || !guest_ok_bytes(qr, 0x17cu)) return 0;
+    for (uint32_t m = 0; m < 20u; m++){
+        uint32_t a = m < 12u ? qr + QR_TRACK + 20u * m : qr + QR_TRACK_C + 12u * (m - 12u);
+        uint16_t v = MR16(a);
+        if (v && pack_track(v)){ H.at[H.n] = a; H.was[H.n] = v; H.n++; MR16(a) = 0; }
+    }
+    if (H.n) fprintf(stderr, "[ug1] the profile written with %d Quick Race pick%s of the pack's tracks as none (the stock game has not them)\n",
+                     H.n, H.n == 1 ? "" : "s");
+    return H.n;
+}
+void ug1_qr_back(void){
+    for (int i = 0; i < H.n; i++) MR16(H.at[i]) = H.was[i];
+    H.n = 0;
 }

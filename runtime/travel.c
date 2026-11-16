@@ -79,6 +79,10 @@ __attribute__((weak)) void host_status_set_n(const int *slot, const double *valu
 #define FRIEND_WAIT     900           /* frames in the world on the friend's map before it is "not found" (the hub's links) */
 #define ROAD_NEAR_M     100.f         /* on a race track's map: a road point this near the place, or no trip there */
 #define UG1_Z           300.f         /* an Underground 1 map's start: this high, till its road's height is known */
+#define UG1_ON_M        20.f          /* ... onto its nearest road point's height when that is this near the start line, */
+#define UG1_OVER_M      15.f          /* ... else this much over it (another level, maybe), */
+#define UG1_FAR_M       1000.f        /* ... and with none within ROAD_NEAR_M, the nearest within this, */
+#define UG1_FAR_OVER_M  30.f          /* ... this much over it */
 int ug1_on(void);                     /* ug1tracks.c: Underground 1 Tracks on, the server has its pack */
 
 /* where a trip goes: the track's map (its xx00), the room's key (a layout's number, roam_game.c), the start line */
@@ -275,15 +279,35 @@ static int road_near(const float at[3], float out[3]){
     }
     return found;
 }
-/* an Underground 1 map's start (its height not known before it loads: the car came high over it): onto the map's
- * road point nearest the start line, 1 m up, by the hot-position jump */
+/* an Underground 1 map's start (its height not known before it loads: the car came high over it), by the hot-position
+ * jump: 1 m over the map's road point nearest the start line when that is within UG1_ON_M; past that (a start line off
+ * the traffic's roads: the map's nearest road may be on another level) UG1_OVER_M over it, a short drop; with none
+ * within ROAD_NEAR_M (Highway 1's), UG1_FAR_OVER_M over the nearest within UG1_FAR_M.  None at all: the car stays
+ * where it came, high up, and drops */
 static void ug1_land(uint32_t car, float x, float y, uint16_t h, long f){
-    float at[3] = { x, y, UG1_Z }, out[3];
-    if (!car || !road_near(at, out)){ fprintf(stderr, "[travel] f=%ld no road near the start: the car stays where it came\n", f); return; }
-    MRF32(G_HOTPOS) = x; MRF32(G_HOTPOS + 4) = y; MRF32(G_HOTPOS + 8) = out[2] + 1.f;
+    float at[3] = { x, y, UG1_Z }, out[3], up = 1.f;
+    int ok = car && road_near(at, out);
+    float off = ok ? hypotf(out[0] - x, out[1] - y) : 0.f;
+    if (ok && off > UG1_ON_M) up = UG1_OVER_M;
+    if (car && !ok){
+        float bd = UG1_FAR_M * UG1_FAR_M;
+        for (uint32_t i = 0; i < 2048u; i++){
+            uint32_t r = guest_rd32(0x0088a334u + 4u * i);
+            if (!guest_ok(r, 0x8cu) || (int16_t)MR16(r + 0xau) != (int)i) continue;
+            int n = (int16_t)MR16(r + 0x34u);
+            for (int j = 0; j < n && j < 4096 && guest_ok(r + 0x8cu + 0x38u * (uint32_t)j, 0x38u); j++){
+                uint32_t nd = r + 0x8cu + 0x38u * (uint32_t)j;
+                float dx = MRF32(nd) - x, dy = MRF32(nd + 4u) - y, d = dx * dx + dy * dy;
+                if (d < bd){ bd = d; ok = 1; out[0] = MRF32(nd); out[1] = MRF32(nd + 4u); out[2] = (float)(int16_t)MR16(nd + 0x12u) / 8.f; }
+            }
+        }
+        if (ok){ off = hypotf(out[0] - x, out[1] - y); up = UG1_FAR_OVER_M; }
+    }
+    if (!ok){ fprintf(stderr, "[travel] f=%ld no road near the start: the car stays where it came\n", f); return; }
+    MRF32(G_HOTPOS) = x; MRF32(G_HOTPOS + 4) = y; MRF32(G_HOTPOS + 8) = out[2] + up;
     MR16(G_HOTPOS_ANGLE) = h; MR8(G_HOTPOS_VALID) = 1; MR8(G_HOTPOS_JUMP) = 1;
-    fprintf(stderr, "[travel] f=%ld the start onto the road: %.1f %.1f %.1f (its point %.1f m off)\n", f, (double)x, (double)y,
-            (double)out[2] + 1.0, (double)hypotf(out[0] - x, out[1] - y));
+    fprintf(stderr, "[travel] f=%ld the start onto the road: %.1f %.1f %.1f (its point %.1f m off, %.0f m up)\n", f, (double)x, (double)y,
+            (double)(out[2] + up), (double)off, (double)up);
 }
 /* the trip's word to the page */
 static void said(int what, int why, long f){

@@ -463,7 +463,16 @@ static int differ(const State *a, const State *b){
 /* thiscall profile (out, size): the payload, naming the stand-in for a car of
  * ours driven; what our slots are in it */
 void sub_0052a280_orig(CPU *c);
+int ug1_qr_hide(uint32_t profile);                 /* ug1tracks.c: Underground 1 Tracks' Quick Race picks out of it ... */
+void ug1_qr_back(void);                            /* ... and back */
+static void payload_cars(CPU *c);
+/* ... and no Quick Race pick of Underground 1 Tracks' (a track the stock game has not) */
 static void payload(CPU *c){
+    ug1_qr_hide(c->ecx);
+    payload_cars(c);
+    ug1_qr_back();
+}
+static void payload_cars(CPU *c){
     uint32_t db = c->ecx + PR_CARS, out = MR32(c->esp + 4u), size = MR32(c->esp + 8u);
     int p = player_of(db);
     if (!g_blk || p < 0 || size < P_NAME + 32u){ sub_0052a280_orig(c); return; }

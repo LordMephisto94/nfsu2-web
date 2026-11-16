@@ -197,9 +197,9 @@ export const MODS: readonly Mod[] = [
   {
     id: 'ug1-tracks', name: 'Underground 1 Tracks', authors: [{ name: 'RKBDI' }], links: {},
     kind: 'map', uses: 'original', control: { setting: 'ug1_tracks' },
-    line: N('Olympic City from the first Underground to drive in career free roam (F9, Tracks).'),
+    line: N('Olympic City from the first Underground in free roam (F9, Tracks) and Quick Race.'),
     details: 'The first Underground\'s Olympic City, Downtown and Mission, Highway 1 and Commercial, and the demo\'s two maps, each a map of its own beside the city. Pick one in the menu\'s Tracks while you drive in career free roam; Back to the city brings you back where you left. Friends you meet in free roam need it on to meet you there. Its maps download as you drive them.',
-    online: 'mine', sizeMB: 258, files: ['runtime/ug1tracks.c', 'runtime/travel.c', 'runtime/fileio.c'],
+    online: 'mine', sizeMB: 258, files: ['runtime/ug1tracks.c', 'runtime/travel.c', 'runtime/fileio.c', 'runtime/netrace.c', 'runtime/garage.c'],
   },
 
   // ---- Graphics

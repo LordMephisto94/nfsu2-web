@@ -57,10 +57,12 @@
 #define MSG_RIGHT   0xb5971bf1u
 #define RET_ARROWS  0x004b3218u    /* the return address of the arrows' own call of +0xc */
 
-/* the track lock: open for a network race, else the game's */
+/* the track lock: open for a network race and for Underground 1 Tracks' own (ug1tracks.c: no career unlocks them),
+ * else the game's */
+int ug1_open_track(uint32_t num);
 void sub_005156f0_orig(CPU *c);
 void sub_005156f0(CPU *c){
-    if (!(MR32(c->esp + 4u) & MASK_NET)){ sub_005156f0_orig(c); return; }
+    if (!(MR32(c->esp + 4u) & MASK_NET) && !ug1_open_track(MR32(c->esp + 8u))){ sub_005156f0_orig(c); return; }
     c->eax = (c->eax & 0xffffff00u) | 1u;
     POP32(c->eip);
 }
