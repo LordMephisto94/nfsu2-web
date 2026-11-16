@@ -1625,5 +1625,12 @@
   "Mods: {name}. Applies the next time you press Play.": "Mod: {name}. Ισχύει την επόμενη φορά που θα πατήσεις Παιχνίδι.",
   "The game's own textures, sharper.": "Οι υφές του ίδιου του παιχνιδιού, πιο καθαρές.",
   "Your car signals by itself before a turn on the GPS route.": "Το αυτοκίνητό σου βάζει φλας μόνο του πριν από μια στροφή στη διαδρομή του GPS.",
-  "Engine upgrades no longer swap a car's sound.": "Οι αναβαθμίσεις κινητήρα δεν αλλάζουν πια τον ήχο ενός αυτοκινήτου."
+  "Engine upgrades no longer swap a car's sound.": "Οι αναβαθμίσεις κινητήρα δεν αλλάζουν πια τον ήχο ενός αυτοκινήτου.",
+  "Olympic City from the first Underground to drive in career free roam (F9, Tracks).": "Το Olympic City του πρώτου Underground για ελεύθερη οδήγηση στην καριέρα (F9, Πίστες).",
+  "Olympic City (UG1)": "Olympic City (UG1)",
+  "Downtown and Mission (UG1)": "Downtown and Mission (UG1)",
+  "Highway 1 (UG1)": "Highway 1 (UG1)",
+  "Commercial (UG1)": "Commercial (UG1)",
+  "Olympic City (UG1 demo)": "Olympic City (UG1 demo)",
+  "Downtown (UG1 demo)": "Downtown (UG1 demo)"
 }

@@ -8,8 +8,9 @@ import { roomHash } from './players';
 
 /** the spots, in travel.c's SPOTS order (the game's number for one: its index + 1), each its room's key (a layout's
  *  number of its track) and its name: the race type and the place as the game's career names its races there
- *  (TRACK_NAME_<key>: Airport Circuit Track 1, Bayview Speedway Track 1, Parkade Drift 1 ...) */
-export const TRACKS: readonly { key: number; name: string }[] = [
+ *  (TRACK_NAME_<key>: Airport Circuit Track 1, Bayview Speedway Track 1, Parkade Drift 1 ...); ug1: Underground 1
+ *  Tracks' maps (runtime/ug1tracks.c: shown only with it on), their free roam's own track number the key */
+export const TRACKS: readonly { key: number; name: string; ug1?: true }[] = [
   { key: 4711, name: N('URL: Airport Circuit') },
   { key: 4701, name: N('URL: Bayview Speedway') },
   { key: 4311, name: N('Drift: Stadium') },
@@ -19,6 +20,12 @@ export const TRACKS: readonly { key: number; name: string }[] = [
   { key: 4221, name: N('Drag: South Runway') },
   { key: 4601, name: N('Street X: Industrial Park') },
   { key: 4605, name: N('Street X: Parkade') },
+  { key: 5002, name: N('Olympic City (UG1)'), ug1: true },
+  { key: 5004, name: N('Downtown and Mission (UG1)'), ug1: true },
+  { key: 5005, name: N('Highway 1 (UG1)'), ug1: true },
+  { key: 5006, name: N('Commercial (UG1)'), ug1: true },
+  { key: 5500, name: N('Olympic City (UG1 demo)'), ug1: true },
+  { key: 5700, name: N('Downtown (UG1 demo)'), ug1: true },
 ];
 
 /** the room of the spot with this key in the world whose room's hash is base (0 the main world): roam_game.c room_at */

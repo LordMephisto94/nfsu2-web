@@ -1745,5 +1745,12 @@
   "Mods: {name}. Applies the next time you press Play.": "Моди: {name}. Застосується, коли наступного разу натиснеш «Грати».",
   "The game's own textures, sharper.": "Власні текстури гри, чіткіші.",
   "Your car signals by itself before a turn on the GPS route.": "Твоя машина сама вмикає поворотник перед поворотом на маршруті GPS.",
-  "Engine upgrades no longer swap a car's sound.": "Покращення двигуна більше не змінюють звук машини."
+  "Engine upgrades no longer swap a car's sound.": "Покращення двигуна більше не змінюють звук машини.",
+  "Olympic City from the first Underground to drive in career free roam (F9, Tracks).": "Olympic City з першого Underground для вільної їзди в кар'єрі (F9, Траси).",
+  "Olympic City (UG1)": "Olympic City (UG1)",
+  "Downtown and Mission (UG1)": "Downtown and Mission (UG1)",
+  "Highway 1 (UG1)": "Highway 1 (UG1)",
+  "Commercial (UG1)": "Commercial (UG1)",
+  "Olympic City (UG1 demo)": "Olympic City (UG1 демо)",
+  "Downtown (UG1 demo)": "Downtown (UG1 демо)"
 }

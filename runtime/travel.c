@@ -12,6 +12,9 @@
  * short way, which leaves the car where it is, and the race status then took no SwitchTrack again).  Free roam's own
  * track number tells the maps apart: 4000 the city, xx00 a track's map.
  *
+ * With Underground 1 Tracks on (ug1tracks.c), its six maps too, each its region's free roam (5002, 5004, 5005, 5006,
+ * 5500, 5700), the start one of its races'.
+ *
  * The car starts on a race's start line (SPOTS: the line of the layout's Paths file, chunk 0x34148's first node,
  * heading to its second; the height of the map's road point there, 1 m up: "travel near"), or a little up its route
  * (Routes<n>F.bin: x, y, the distance) where the start's surroundings press the camera onto the car's roof (a tunnel,
@@ -75,18 +78,28 @@ __attribute__((weak)) void host_status_set_n(const int *slot, const double *valu
 #define FRIEND_BACK_M   12.f          /* the car goes this far behind the friend (on the nearest road) */
 #define FRIEND_WAIT     900           /* frames in the world on the friend's map before it is "not found" (the hub's links) */
 #define ROAD_NEAR_M     100.f         /* on a race track's map: a road point this near the place, or no trip there */
+#define UG1_Z           300.f         /* an Underground 1 map's start: this high, till its road's height is known */
+int ug1_on(void);                     /* ug1tracks.c: Underground 1 Tracks on, the server has its pack */
 
 /* where a trip goes: the track's map (its xx00), the room's key (a layout's number, roam_game.c), the start line */
-static const struct { uint16_t track, key; const char *name; float x, y, z; uint16_t heading; } SPOTS[] = {
-    { 4700, 4711, "the Airport Circuit (URL)",     2454.3f,   -272.7f, -10.0f, 0xbf04 },   /* 4712/4713/4715's start line */
-    { 4700, 4701, "Bayview Speedway (URL)",       -1987.4f,  -2040.1f,  35.6f, 0x6b33 },   /* 4701/4703-4705's */
-    { 4300, 4311, "the Stadium (drift)",          -1174.5f,   -617.1f,   7.6f, 0x81a7 },   /* 4311's */
-    { 4300, 4301, "the Parkade (drift)",            877.6f,   -425.4f,  23.1f, 0x57c0 },   /* 4301/4305/4306's */
-    { 4200, 4201, "Bayview Bridge (drag)",          994.6f,     36.4f,   3.2f, 0x6630 },   /* 305 m up 4201's route (its start: a tunnel) */
-    { 4200, 4211, "Central Station (drag)",        1440.5f,  -1388.1f,   1.5f, 0x9010 },   /* 41 m up 4211's */
-    { 4200, 4221, "South Runway (drag)",           2454.6f,  -1498.5f, -10.0f, 0x4000 },   /* 142 m up 4221's (a net over its start) */
-    { 4600, 4601, "Industrial Park (Street X)",    -356.3f,   -244.4f,   1.1f, 0xfeb3 },   /* 4601/4602's */
-    { 4600, 4605, "the Parkade (Street X)",       -1556.1f,  -2006.7f,  33.2f, 0xa1f4 },   /* 4605/4606/4608's */
+/* ug1: one of Underground 1 Tracks' maps (ug1tracks.c: only with it on), its height not known before it loads: the start
+ * high over the place, then on the map's road point nearest it (ug1_land) */
+static const struct { uint16_t track, key; const char *name; float x, y, z; uint16_t heading; uint8_t ug1; } SPOTS[] = {
+    { 4700, 4711, "the Airport Circuit (URL)",     2454.3f,   -272.7f, -10.0f, 0xbf04, 0 },   /* 4712/4713/4715's start line */
+    { 4700, 4701, "Bayview Speedway (URL)",       -1987.4f,  -2040.1f,  35.6f, 0x6b33, 0 },   /* 4701/4703-4705's */
+    { 4300, 4311, "the Stadium (drift)",          -1174.5f,   -617.1f,   7.6f, 0x81a7, 0 },   /* 4311's */
+    { 4300, 4301, "the Parkade (drift)",            877.6f,   -425.4f,  23.1f, 0x57c0, 0 },   /* 4301/4305/4306's */
+    { 4200, 4201, "Bayview Bridge (drag)",          994.6f,     36.4f,   3.2f, 0x6630, 0 },   /* 305 m up 4201's route (its start: a tunnel) */
+    { 4200, 4211, "Central Station (drag)",        1440.5f,  -1388.1f,   1.5f, 0x9010, 0 },   /* 41 m up 4211's */
+    { 4200, 4221, "South Runway (drag)",           2454.6f,  -1498.5f, -10.0f, 0x4000, 0 },   /* 142 m up 4221's (a net over its start) */
+    { 4600, 4601, "Industrial Park (Street X)",    -356.3f,   -244.4f,   1.1f, 0xfeb3, 0 },   /* 4601/4602's */
+    { 4600, 4605, "the Parkade (Street X)",       -1556.1f,  -2006.7f,  33.2f, 0xa1f4, 0 },   /* 4605/4606/4608's */
+    { 5002, 5002, "Olympic City (UG1)",            1080.8f,  -1377.2f, UG1_Z,  0x9ac2, 1 },   /* 5101's start line */
+    { 5004, 5004, "Downtown and Mission (UG1)",    1062.5f,      7.6f, UG1_Z,  0x80ad, 1 },   /* 5301's */
+    { 5005, 5005, "Highway 1 (UG1)",               1237.2f,     -3.4f, UG1_Z,  0x7fe6, 1 },   /* 5302's */
+    { 5006, 5006, "Commercial (UG1)",              1484.8f,     54.0f, UG1_Z,  0xa70f, 1 },   /* 5307's */
+    { 5500, 5500, "Olympic City (UG1 demo)",       1080.8f,  -1377.2f, UG1_Z,  0x9ac2, 1 },   /* 5501's */
+    { 5700, 5700, "Downtown (UG1 demo)",           1062.5f,      7.6f, UG1_Z,  0x80ad, 1 },   /* 5701's */
 };
 #define NSPOTS ((int)(sizeof SPOTS / sizeof SPOTS[0]))
 
@@ -169,6 +182,7 @@ static int why_not(int k){
  * free roam's setup reads it: a trip that never starts changes nothing) */
 static void go(CPU *c, int k, long f){
     const char *to = k ? SPOTS[k - 1].name : "the city";
+    if (k && SPOTS[k - 1].ug1 && !ug1_on()){ fprintf(stderr, "[travel] f=%ld a trip to %s asked: Underground 1 Tracks is off\n", f, to); return; }
     int why = why_not(k);
     if (why){ fprintf(stderr, "[travel] f=%ld a trip to %s asked: not now, %s\n", f, to, WHY[why]); return; }
     if (k == T.spot){ fprintf(stderr, "[travel] f=%ld a trip to %s asked: there already\n", f, to); return; }
@@ -261,6 +275,16 @@ static int road_near(const float at[3], float out[3]){
     }
     return found;
 }
+/* an Underground 1 map's start (its height not known before it loads: the car came high over it): onto the map's
+ * road point nearest the start line, 1 m up, by the hot-position jump */
+static void ug1_land(uint32_t car, float x, float y, uint16_t h, long f){
+    float at[3] = { x, y, UG1_Z }, out[3];
+    if (!car || !road_near(at, out)){ fprintf(stderr, "[travel] f=%ld no road near the start: the car stays where it came\n", f); return; }
+    MRF32(G_HOTPOS) = x; MRF32(G_HOTPOS + 4) = y; MRF32(G_HOTPOS + 8) = out[2] + 1.f;
+    MR16(G_HOTPOS_ANGLE) = h; MR8(G_HOTPOS_VALID) = 1; MR8(G_HOTPOS_JUMP) = 1;
+    fprintf(stderr, "[travel] f=%ld the start onto the road: %.1f %.1f %.1f (its point %.1f m off)\n", f, (double)x, (double)y,
+            (double)out[2] + 1.0, (double)hypotf(out[0] - x, out[1] - y));
+}
 /* the trip's word to the page */
 static void said(int what, int why, long f){
     static const char *const W[] = { "", "there", "a part of the city this career has not opened", "not found", "not now" };
@@ -326,7 +350,9 @@ void travel_frame(CPU *c){
     if (world && T.going && T.loaded){
         uint32_t want = T.going == 1 ? CITY : SPOTS[T.going - 2].track;
         if (track == want){
-            T.spot = T.going - 1; T.going = 0;
+            T.spot = T.going - 1;
+            if (T.spot && SPOTS[T.spot - 1].ug1 && !T.place) ug1_land(car, SPOTS[T.spot - 1].x, SPOTS[T.spot - 1].y, SPOTS[T.spot - 1].heading, f);
+            T.going = 0;
             roam_game_jumped();                       /* (others who came to the same start line stand there too) */
             fprintf(stderr, "[travel] f=%ld at %s (track %u, %.8s), the car at %.1f %.1f %.1f\n", f,
                     T.spot ? SPOTS[T.spot - 1].name : "the city", track, MR32(G_TRACKINFO) ? (const char *)(g_mem + MR32(G_TRACKINFO) + 0x40u) : "?",

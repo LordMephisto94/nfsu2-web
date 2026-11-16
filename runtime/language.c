@@ -153,22 +153,27 @@ int language_no_profile(const char *name){
 void dispatch_indirect(CPU *c, uint32_t addr);
 #define G_LANG      0x008383d8u
 #define G_LANG_N    0x008383d0u
-#define OWN_MAX     64         /* roam_game.c 4, sms.c 5, mpcredit.c 2, photo.c 1, vinylcat.c 1, modpacks.c a rim brand's each */
+#define OWN_MAX     192        /* roam_game.c 4, sms.c 5, mpcredit.c 2, photo.c 1, vinylcat.c 1, modpacks.c a rim brand's each,
+                                  * ug1tracks.c 76 */
 static struct { uint32_t hash; char text[1024]; } g_own[OWN_MAX];
 static int g_nown, g_own_merged;            /* texts named; how many of them the copy has */
 static uint32_t g_own_copy, g_own_from, g_own_from_n;   /* the copy, while the game points at it; the game's array */
 
-uint32_t language_add_text(const char *name, const char *text){
-    uint32_t h = 0xffffffffu;                   /* bStringHash (0x43DB50) */
-    for (const char *s = name; *s; s++) h = h * 33u + (uint8_t)*s;
+uint32_t language_add_text_hash(uint32_t h, const char *text){
     int i = 0;
     while (i < g_nown && g_own[i].hash != h) i++;
-    if (i == OWN_MAX){ fprintf(stderr, "language: no room for the text %s\n", name); return h; }
+    if (i == OWN_MAX){ fprintf(stderr, "language: no room for the text %08x\n", h); return h; }
     if (i == g_nown) g_nown++;
     g_own[i].hash = h;
     snprintf(g_own[i].text, sizeof g_own[i].text, "%s", text);
     g_own_merged = -1;                          /* a new copy, also for a text changed */
     return h;
+}
+/* a text under a name of ours (its hash: bStringHash, 0x43DB50) */
+uint32_t language_add_text(const char *name, const char *text){
+    uint32_t h = 0xffffffffu;
+    for (const char *s = name; *s; s++) h = h * 33u + (uint8_t)*s;
+    return language_add_text_hash(h, text);
 }
 
 /* operator new in guest memory, from the main-loop hook */

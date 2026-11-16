@@ -1715,5 +1715,12 @@
   "Mods: {name}. Applies the next time you press Play.": "Mods: {name}. Se aplica la próxima vez que pulses Jugar.",
   "The game's own textures, sharper.": "Las texturas del propio juego, más nítidas.",
   "Your car signals by itself before a turn on the GPS route.": "Tu coche pone el intermitente solo antes de un giro en la ruta del GPS.",
-  "Engine upgrades no longer swap a car's sound.": "Las mejoras de motor ya no cambian el sonido de un coche."
+  "Engine upgrades no longer swap a car's sound.": "Las mejoras de motor ya no cambian el sonido de un coche.",
+  "Olympic City from the first Underground to drive in career free roam (F9, Tracks).": "Olympic City del primer Underground para conducir en el modo libre de la carrera (F9, Circuitos).",
+  "Olympic City (UG1)": "Olympic City (UG1)",
+  "Downtown and Mission (UG1)": "Downtown and Mission (UG1)",
+  "Highway 1 (UG1)": "Highway 1 (UG1)",
+  "Commercial (UG1)": "Commercial (UG1)",
+  "Olympic City (UG1 demo)": "Olympic City (UG1 demo)",
+  "Downtown (UG1 demo)": "Downtown (UG1 demo)"
 }

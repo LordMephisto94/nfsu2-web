@@ -188,6 +188,10 @@ export const KEYS: readonly KeyDef[] = [
   // the city's region A with community mods' add-ons, from their packs in MODPACKS (runtime/fileio.c city_resolve)
   { key: 'open_tunnel', env: 'NFSU2_OPEN_TUNNEL', kind: 'bool', scope: 'web' },
   { key: 'car_parks', env: 'NFSU2_CAR_PARKS', kind: 'bool', scope: 'web' },
+  // Underground 1's Olympic City and its races as more tracks, on unless off (runtime/ug1tracks.c, its maps in the
+  // menu's Tracks: runtime/travel.c; its files from the game folder's MODPACKS/UG1, read only when on).  Not in
+  // bundle.m's table: there a lower-case key, so it reaches the runtime as NFSU2_UG1_TRACKS all the same
+  { key: 'ug1_tracks', env: 'NFSU2_UG1_TRACKS', kind: 'bool', scope: 'web' },
   // the players this one blocks in free roam, by name (the page's hello to the server: net/index.ts).  Not in bundle.m's
   // table: the Mac's free roam has no hub
   { key: 'roam_block', env: 'NFSU2_ROAM_BLOCK', kind: 'names', ic: true, scope: 'web' },
@@ -548,6 +552,11 @@ export const TEMPLATE = `# NFSU2 settings, read at every launch.
 # [NFSU2_OPEN_TUNNEL, NFSU2_CAR_PARKS]
 #open_tunnel = off
 #car_parks = off
+
+# Underground 1's Olympic City and its other maps to drive in career free
+# roam: the menu's Tracks (F9) (Mods: Underground 1 Tracks).
+# [NFSU2_UG1_TRACKS]
+#ug1_tracks = on
 # Textures without smoothing (point sampling), blocky like early PC games;
 # on overrides the game's Texture Filtering.  [NFSU2_PIXELATED_TEXTURES]
 #pixelated_textures = off
