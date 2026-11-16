@@ -241,13 +241,16 @@ export const KEYS: readonly KeyDef[] = [
   { key: 'roam_map_max', env: 'NFSU2_ROAM_MAP_MAX', kind: 'int', vals: '0..4096', ic: true, scope: 'web', device: true },
   // our own controls beside the game's (sitekeys.ts): each one's key and controller button, kept by this device (its
   // keyboard and controller).  The runtime reads those it handles (runtime/dinput_kbd.c dikbd_site_key: drift mode, the
-  // show-off, the horn, the headlights, hiding the HUD; and Message a friend's and Add friend's, whose clashes with the
+  // show-off, the horn, the headlights, the turn signals, hiding the HUD; and Message a friend's and Add friend's, whose clashes with the
   // game's controls it tells the page; dinput_pad.c: the buttons and the free look's switch), the page the rest.  Not in bundle.m's table: the Mac app passes them
   // on as NFSU2_KEY_* and NFSU2_BUTTON_* all the same
   { key: 'key_drift', env: 'NFSU2_KEY_DRIFT', kind: 'key', scope: 'web', device: true },
   { key: 'key_showoff', env: 'NFSU2_KEY_SHOWOFF', kind: 'key', scope: 'web', device: true },
   { key: 'key_horn', env: 'NFSU2_KEY_HORN', kind: 'key', scope: 'web', device: true },
   { key: 'key_lights', env: 'NFSU2_KEY_LIGHTS', kind: 'key', scope: 'web', device: true },
+  { key: 'key_signal_left', env: 'NFSU2_KEY_SIGNAL_LEFT', kind: 'key', scope: 'web', device: true },
+  { key: 'key_signal_right', env: 'NFSU2_KEY_SIGNAL_RIGHT', kind: 'key', scope: 'web', device: true },
+  { key: 'key_hazard', env: 'NFSU2_KEY_HAZARD', kind: 'key', scope: 'web', device: true },
   { key: 'key_message', env: 'NFSU2_KEY_MESSAGE', kind: 'key', scope: 'web', device: true },
   { key: 'key_friend', env: 'NFSU2_KEY_FRIEND', kind: 'key', scope: 'web', device: true },
   { key: 'key_lobby', env: 'NFSU2_KEY_LOBBY', kind: 'key', scope: 'web', device: true },
@@ -264,6 +267,9 @@ export const KEYS: readonly KeyDef[] = [
   { key: 'button_horn', env: 'NFSU2_BUTTON_HORN', kind: 'enum', vals: 'ls|rs|off', scope: 'web', device: true },
   { key: 'button_chat', env: 'NFSU2_BUTTON_CHAT', kind: 'enum', vals: 'rs|ls|off', scope: 'web', device: true },
   { key: 'button_look', env: 'NFSU2_BUTTON_LOOK', kind: 'enum', vals: 'auto|off', scope: 'web', device: true },
+  { key: 'button_signal_left', env: 'NFSU2_BUTTON_SIGNAL_LEFT', kind: 'enum', vals: 'dleft|dup|ddown|dright|off', scope: 'web', device: true },
+  { key: 'button_signal_right', env: 'NFSU2_BUTTON_SIGNAL_RIGHT', kind: 'enum', vals: 'dright|dup|ddown|dleft|off', scope: 'web', device: true },
+  { key: 'button_hazard', env: 'NFSU2_BUTTON_HAZARD', kind: 'enum', vals: 'dup|ddown|dleft|dright|off', scope: 'web', device: true },
   // the racers' visual crash damage, FRS Mods' Crashing Foreign Cars (runtime/damage.c), off unless asked for.  Not in
   // bundle.m's table
   { key: 'crash_damage', env: 'NFSU2_DAMAGE', kind: 'bool', scope: 'web' },
@@ -579,13 +585,15 @@ export const TEMPLATE = `# NFSU2 settings, read at every launch.
 # Controls, Site, sets them by a press): the browser's name of a key (KeyX,
 # Digit5, F6, Numpad7, Backquote ...) or off.  Drift mode and the hood,
 # trunk and doors (free roam), the horn (with other players), the
-# headlights (a tap off or on, held high beam), Message a friend and Add
+# headlights (a tap off or on, held high beam), the left and right turn
+# signals and the hazard lights (a press on or off), Message a friend and Add
 # friend (free roam), the race lobby card's next lobby, Friends & crew
 # only, AI opponents and invite (free roam), photo mode, hiding the HUD while driving
 # (off again at each Play), the page's menu (never off), the next song and
 # the frame-rate counter.  A key one of the game's controls is on (its
 # Options, Controls) stays the game's.
 # [NFSU2_KEY_DRIFT, NFSU2_KEY_SHOWOFF, NFSU2_KEY_HORN, NFSU2_KEY_LIGHTS,
+# NFSU2_KEY_SIGNAL_LEFT, NFSU2_KEY_SIGNAL_RIGHT, NFSU2_KEY_HAZARD,
 # NFSU2_KEY_MESSAGE, NFSU2_KEY_FRIEND, NFSU2_KEY_LOBBY, NFSU2_KEY_LOBBY_NEW,
 # NFSU2_KEY_LOBBY_PRIVATE, NFSU2_KEY_LOBBY_AI, NFSU2_KEY_LOBBY_INVITE,
 # NFSU2_KEY_PHOTO,
@@ -594,6 +602,9 @@ export const TEMPLATE = `# NFSU2 settings, read at every launch.
 #key_showoff = KeyO
 #key_horn = KeyN
 #key_lights = KeyG
+#key_signal_left = Comma
+#key_signal_right = Slash
+#key_hazard = Quote
 #key_message = KeyI
 #key_friend = KeyF
 #key_lobby = KeyE
@@ -612,13 +623,20 @@ export const TEMPLATE = `# NFSU2 settings, read at every launch.
 # horn and the one for quick chat: ls, rs or off; the free look round the
 # car while driving: auto (the right stick, the left one while the game's
 # controls read the right one) or off (no stick looks round, and stick up
-# no longer switches the headlights).  The game's Home button, or both
-# sticks pressed in, always opens the page's menu.
-# [NFSU2_BUTTON_HOLD, NFSU2_BUTTON_HORN, NFSU2_BUTTON_CHAT, NFSU2_BUTTON_LOOK]
+# no longer switches the headlights); the D-pad direction held half a
+# second (driving) for the left and right turn signals and the hazard
+# lights: dleft, dright, dup, ddown or off, a short press staying the
+# game's.  The game's Home button, or both sticks pressed in, always opens
+# the page's menu.
+# [NFSU2_BUTTON_HOLD, NFSU2_BUTTON_HORN, NFSU2_BUTTON_CHAT, NFSU2_BUTTON_LOOK,
+# NFSU2_BUTTON_SIGNAL_LEFT, NFSU2_BUTTON_SIGNAL_RIGHT, NFSU2_BUTTON_HAZARD]
 #button_hold = ddown
 #button_horn = ls
 #button_chat = rs
 #button_look = auto
+#button_signal_left = dleft
+#button_signal_right = dright
+#button_hazard = dup
 
 # ---- Multiplayer ---------------------------------------------------------
 

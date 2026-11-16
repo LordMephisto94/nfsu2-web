@@ -1,9 +1,9 @@
-// This site's own controls beside the game's: drift mode, the hood, trunk and doors, the horn, the headlights, the
-// controller's free look, quick chat, Message a friend, Add friend, the race lobby card's three, photo mode, hiding the HUD, the page's menu, the
+// This site's own controls beside the game's: drift mode, the hood, trunk and doors, the horn, the headlights, the turn
+// signals and hazard lights, the controller's free look, quick chat, Message a friend, Add friend, the race lobby card's three, photo mode, hiding the HUD, the page's menu, the
 // next song and the frame-rate counter.  Each has a key and, where one goes, a controller button, which the player sets
 // on the start page (Controls, Site) by pressing it, or turns off.  settings.ini keeps them (key_*, button_*:
 // settings.ts, this device's); the runtime reads the ones it handles (runtime/dinput_kbd.c dikbd_site_key: drift mode,
-// the hood, trunk and doors, the horn, the headlights, hiding the HUD (photo.c), and Message a friend's and Add
+// the hood, trunk and doors, the horn, the headlights, the turn signals (signals.c), hiding the HUD (photo.c), and Message a friend's and Add
 // friend's, whose clashes it tells the page: gamekeys.ts; dinput_pad.c the buttons), the page the others at Play
 // (applySiteKeys with the game's environment) and on the start page as they change.  (The headlights' controller has
 // no button to set: the look's stick pushed straight up, runtime/lightkey.c; the free look has no key, only its
@@ -13,7 +13,7 @@
 //             the browser's F5 and F11, quick chat's 1 to 4 and another of ours are refused; the ones that work in the menus too (the page's menu, photo mode, the next song, the counter)
 //             take only keys that type nothing (F6 to F12, Page Up, Page Down, Pause, Scroll Lock, Delete), and the
 //             page's menu is never off.  A controller's: a D-pad direction held a second (drift mode, the hood,
-//             trunk and doors: a short press stays the game's) or a stick's click (the horn, quick chat), and the free
+//             trunk and doors; half a second the turn signals and hazard lights: a short press stays the game's) or a stick's click (the horn, quick chat), and the free
 //             look Auto or Off; Home and both sticks pressed in always open the menu.  Hiding the HUD works only while
 //             driving, so its key need not be one that types nothing (F10 by default: the game has nothing on it, and
 //             the page keeps it from the browser's menu bar).
@@ -23,9 +23,10 @@ import { CODE_OF_DIK, CODES } from '../input/keymap';
 import { allPads } from '../input/steampad';
 import { N, t } from './i18n';
 
-export type OurId = 'drift' | 'showoff' | 'horn' | 'lights' | 'look' | 'chat' | 'message' | 'friend' | 'lobby' | 'lobbyNew' | 'lobbyPrivate' | 'lobbyAi' | 'lobbyInvite' |
+export type OurId = 'drift' | 'showoff' | 'horn' | 'lights' | 'sigLeft' | 'sigRight' | 'hazard' | 'look' | 'chat' | 'message' | 'friend' | 'lobby' | 'lobbyNew' | 'lobbyPrivate' | 'lobbyAi' | 'lobbyInvite' |
   'photo' | 'hud' | 'menu' | 'song' | 'fps';
-export type ButtonKey = 'button_hold' | 'button_horn' | 'button_chat' | 'button_look';
+export type ButtonKey = 'button_hold' | 'button_horn' | 'button_chat' | 'button_look' | 'button_signal_left' | 'button_signal_right' |
+  'button_hazard';
 
 export interface Our {
   id: OurId;
@@ -53,6 +54,11 @@ export const OURS: readonly Our[] = [
     def: 'KeyO', button: 'button_hold' },
   { id: 'horn', name: N('Horn'), line: N('Horn (with other players)'), key: 'key_horn', def: 'KeyN', button: 'button_horn' },
   { id: 'lights', name: N('Headlights'), line: N('Headlights off or on; hold for high beam'), key: 'key_lights', def: 'KeyG' },
+  { id: 'sigLeft', name: N('Left turn signal'), line: N('Left turn signal on or off'), key: 'key_signal_left', def: 'Comma',
+    button: 'button_signal_left' },
+  { id: 'sigRight', name: N('Right turn signal'), line: N('Right turn signal on or off'), key: 'key_signal_right', def: 'Slash',
+    button: 'button_signal_right' },
+  { id: 'hazard', name: N('Hazard lights'), line: N('Hazard lights on or off'), key: 'key_hazard', def: 'Quote', button: 'button_hazard' },
   { id: 'look', name: N('Free look'), line: N('Right stick looks round the car (Off: stick up no longer switches the headlights)'), button: 'button_look',
     toggle: true },
   { id: 'chat', name: N('Quick chat'), line: N('Quick chat (with other players): group, then phrase'), fixed: '1–4', button: 'button_chat' },
@@ -78,7 +84,12 @@ export const BUTTONS: Record<ButtonKey, readonly string[]> = {
   button_horn: ['ls', 'rs'],
   button_chat: ['rs', 'ls'],
   button_look: ['auto', 'off'],
+  button_signal_left: ['dleft', 'dup', 'ddown', 'dright'],
+  button_signal_right: ['dright', 'dup', 'ddown', 'dleft'],
+  button_hazard: ['dup', 'ddown', 'dleft', 'dright'],
 };
+/** the buttons that are a D-pad direction held: one direction each */
+const HELD: readonly ButtonKey[] = ['button_hold', 'button_signal_left', 'button_signal_right', 'button_hazard'];
 /** settings.ini's keys of ours (settings.ts has them too) */
 export const SITE_KEYS: readonly string[] = [...OURS.flatMap(o => o.key ? [o.key] : []), ...Object.keys(BUTTONS)];
 
@@ -198,11 +209,16 @@ export function refusal(id: OurId, code: string, others: (id: OurId) => string |
   for (const p of OURS) if (p.id !== id && others(p.id) === code) return t('{key} is already {what}.', { key: k, what: t(p.name) });
   return '';
 }
-/** why a button cannot have this choice ('' it can): the horn and quick chat on one click */
+/** why a button cannot have this choice ('' it can): the horn and quick chat on one click, two of the D-pad's holds on
+ *  one direction */
 export function buttonRefusal(k: ButtonKey, v: string, others: (k: ButtonKey) => string = siteButton): string {
   const other = k === 'button_horn' ? 'button_chat' : k === 'button_chat' ? 'button_horn' : null;
   if (other && v !== 'off' && others(other) === v)
     return t('{button} is already {what}.', { button: buttonName(v), what: t(other === 'button_horn' ? 'Horn' : 'Quick chat') });
+  if (HELD.includes(k) && v !== 'off') for (const h of HELD) {
+    if (h === k || others(h) !== v) continue;
+    return t('{button} is already {what}.', { button: buttonName(v), what: t(OURS.find(o => o.button === h)!.name) });
+  }
   return '';
 }
 
