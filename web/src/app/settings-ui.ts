@@ -144,13 +144,13 @@ const GROUPS: Group[] = [
     { key: 'fullscreen', label: N('Full screen on Play'), help: N('Off: play in the window; the menu has full screen. Hold Esc to leave it.'), c: { t: 'switch' } },
     { key: 'render', label: N('Resolution scale'), help: N('Lower is faster but softer: 50% renders a quarter of the pixels. Phones start at 75%.'), c: { t: 'seg', opts: [['scale:0.5', '50%'], ['scale:0.75', '75%'], ['backing', '100%'], ['scale:1.5', '150%'], ['scale:2', '200%']] } },
     { key: 'fps', label: N('Frame rate'), help: N('Auto matches the display. 30 is steadier on slow phones and saves battery. Online and LAN races run at up to 120; cutscenes at 30.'), c: { t: 'seg', opts: [['auto', N('Auto')], ['30', '30'], ['60', '60'], ['120', '120'], ['240', '240']] } },
+    { key: 'fps_counter', label: N('Frame-rate counter'), help: N('Its key (Controls, Site) switches it while you play.'), c: { t: 'seg', opts: [['off', N('Off')], ['on', N('On')], ['detailed', N('Detailed')]] } },
+    { key: 'fov_scale', label: N('3D proportions'), help: N('Corrected: true proportions and round wheels, a little more at the sides.'), c: { t: 'seg', opts: [['original', N('Original')], ['correct', N('Corrected')]] } },
+    { key: 'other_headlights', label: N('Other cars\' headlights'), help: N('Other cars light up the road like yours. Players: other players\' cars. All: AI racers and traffic too. Off: as in the original.'), c: { t: 'seg', opts: [['players', N('Players')], ['all', N('All cars')], ['off', N('Off')]] } },
     { key: 'pixelated_textures', label: N('Pixelated textures'), help: N('Textures without smoothing, blocky like early PC games. Overrides the game\'s Texture Filtering.'), c: { t: 'switch' }, more: true },
     { key: 'hud', label: N('Race HUD'), help: N('Wide anchors it to the screen edges; 4:3 is the original centred layout.'), c: { t: 'seg', opts: [['wide', N('Wide')], ['43', '4:3']] }, more: true },
     { key: 'movie_framing', label: N('Movie framing'), help: N('Fit keeps the 4:3 movies whole; fill crops them; stretch widens them.'), c: { t: 'seg', opts: [['fit', N('Fit')], ['fill', N('Fill')], ['stretch', N('Stretch')]] }, more: true },
     { key: 'cutscene_borders', label: N('Cutscene bars'), help: N('Letterbox bars across the whole width, or none.'), c: { t: 'seg', opts: [['full', N('Full')], ['off', N('Off')]] }, more: true },
-    { key: 'fov_scale', label: N('3D proportions'), help: N('Corrected: true proportions and round wheels, a little more at the sides.'), c: { t: 'seg', opts: [['original', N('Original')], ['correct', N('Corrected')]] }, more: true },
-    { key: 'other_headlights', label: N('Other cars\' headlights'), help: N('Other cars light up the road like yours. Players: other players\' cars. All: AI racers and traffic too. Off: as in the original.'), c: { t: 'seg', opts: [['players', N('Players')], ['all', N('All cars')], ['off', N('Off')]] }, more: true },
-    { key: 'fps_counter', label: N('Frame-rate counter'), help: N('Its key (Controls, Site) switches it while you play.'), c: { t: 'seg', opts: [['off', N('Off')], ['on', N('On')], ['detailed', N('Detailed')]] }, more: true },
     { key: 'resolution', label: N('Fixed render size'), help: N('Always render at this size, such as 2560x1440. Empty: the game\'s own setting.'), c: { t: 'text', placeholder: N('WxH') }, more: true },
     { key: 'max_pixels', label: N('Pixel limit'), help: N('Most pixels rendered at 100% and below (0 = no limit). 150% and 200% scale up from it.'), c: { t: 'num', min: 0, step: 100000 }, more: true },
   ] },
@@ -424,7 +424,7 @@ export interface SettingsDeps {
   /** a value saved that its row's own line explains, with no "applies the next time you press Play" (Your name: another
    *  name than the passphrase's claimed one, which Play does not use: claim-ui.ts) */
   quietSave?(key: string, value: string | null): boolean;
-  /** a row of another part of the page that goes after this key's row (the Last.fm row after the songs': lastfm-ui.ts) */
+  /** a row of another part of the page that goes after this key's row (the Music row after Movies, the Last.fm row after the drag and drift races' music: lastfm-ui.ts) */
   rowAfter?(key: string): HTMLElement | HTMLElement[] | null;
 }
 
