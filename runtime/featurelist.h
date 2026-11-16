@@ -84,6 +84,7 @@ void cameras_frame(CPU *c);
 void showoff_frame(CPU *c);
 void plates_frame(CPU *c);
 void lightkey_frame(CPU *c);
+void signals_frame(CPU *c);
 void photo_frame(CPU *c);
 void savegame_frame(void);
 void coop_frame(CPU *c);

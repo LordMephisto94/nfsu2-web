@@ -114,6 +114,9 @@ static int driving(void){
     return a[0] && !strcasecmp(a, b);
 }
 
+/* signals.c: the player drives (its keys work) */
+int lightkey_driving(void){ return driving(); }
+
 /* our lights now: high beam while held, else off when tapped off */
 int lightkey_mine(void){
     if (K.test >= 0) return K.test;

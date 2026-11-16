@@ -29,6 +29,7 @@ import { SITE_KEYS } from './sitekeys';
 import { copyText, copyToast } from './copy';
 import { MODS } from './mods';
 import { modName, modSections, rowHelp, rowName } from './mods-ui';
+import { PRESETS, presetValues, type Preset } from './mods';
 
 type Control =
   | { t: 'switch' }
@@ -76,7 +77,7 @@ const LANGUAGE_OPTS = LANGUAGES.map(l => [l, LANGUAGE_NAMES[l]] as [string, stri
  *  nowhere else: web/test/mods.test.mjs) */
 export const MOD_CONTROLS: Record<string, Control> = {
   ui_textures: { t: 'seg', opts: [['original', N('Original')], ['map', N('Map only')], ['uhud', N('Upscaled')]] },
-  roads_and_shadows: { t: 'seg', opts: [['original', N('Original')], ['roads-and-shadows', N('HD')]] },
+  sharper_textures: { t: 'switch' },
   subtitles: { t: 'switch' },
   songs: { t: 'seg', opts: [['uncensored', N('Uncensored')], ['original', N('Original')]] },
   gps_distance: { t: 'switch' },
@@ -86,7 +87,11 @@ export const MOD_CONTROLS: Record<string, Control> = {
   crash_damage: { t: 'switch' },
   catchup: { t: 'seg', opts: [['original', N('Original')], ['noboost', N('No boost')], ['off', N('Off')]] },
   gearbox_whine: { t: 'switch' },
+  keep_engine: { t: 'switch' },
+  gps_signals: { t: 'switch' },
   hq_vinyls: { t: 'switch' },
+  open_tunnel: { t: 'switch' },
+  car_parks: { t: 'switch' },
   // mod_rims: { t: 'switch' },   (the rims: out for now, mods.ts)
 };
 /** the Mods tab's one row that is no mod's: how other players' cars show the mods' looks (mods-ui.ts: first in "Seen by
@@ -188,7 +193,9 @@ const GROUP_OF = new Map(GROUPS.flatMap(g => g.items.map(i => [i.key, g] as cons
 const boolOn = (v: string) => v === 'on';
 const READ_ONLY = N('Read only: the game runs in another tab. Change settings there; this tab takes over when it closes.');
 const NOTE = N('Changes apply the next time you press Play.');
-const MODS_NOTE = N('The core gameplay is the original\'s, with a few improvements, fixes and multiplayer on top.');
+const PRESETS_LABEL = N('Mods at once');
+/** the presets' line when the settings are none of them */
+const PRESETS_OWN = N('Your own mix of mods.');
 /** a row's label as shown (a mod's row: its name, mods-ui.ts rowName) */
 const labelOf = (it: Item) => it.mod ? rowName(it.mod) : t(it.label);
 
@@ -518,14 +525,14 @@ export class SettingsPanel {
     const ro = this.ro();
     this.root.toggleAttribute('data-readonly', ro);
     this.root.querySelector('#settings-note')!.textContent = ro ? this.roText() : t(NOTE);
-    const modsNote = this.root.querySelector('#mods-note');
-    if (modsNote) modsNote.textContent = ro ? this.roText() : t(MODS_NOTE);
+    const modsNote = this.root.querySelector<HTMLElement>('#mods-note');
+    if (modsNote){ modsNote.textContent = ro ? this.roText() : ''; modsNote.hidden = !ro; }   /* (else the presets' line says it) */
     this.online.toggleAttribute('data-readonly', ro);
     const note = this.online.querySelector<HTMLElement>('#online-note')!;
     note.textContent = ro ? this.roText() : ''; note.hidden = !ro;
     const focusKey = (document.activeElement as HTMLElement | null)?.closest<HTMLElement>('.set')?.dataset.key;
     this.root.querySelector('#settings-body')!.replaceChildren(...GROUPS.filter(g => !g.own && !g.at).map(g => this.group(g)));
-    for (const g of GROUPS.filter(g => g.at)) this.root.querySelector(`#${g.at}`)?.replaceChildren(...g.mods ? modSections(key => this.row(ITEMS.get(key)!)) : [this.group(g)]);
+    for (const g of GROUPS.filter(g => g.at)) this.root.querySelector(`#${g.at}`)?.replaceChildren(...g.mods ? modSections(key => this.row(ITEMS.get(key)!), [this.presetBar()]) : [this.group(g)]);
     this.root.querySelector('#settings-lines')!.replaceChildren(...this.others());
     this.online.querySelector('#online-body')!.replaceChildren(...GROUPS.filter(g => g.own && !g.at).map(g => this.group(g)));
     this.syncRaw();
@@ -570,6 +577,44 @@ export class SettingsPanel {
       box.append(d);
     }
     return box;
+  }
+
+  /** what a preset writes (mods.ts presetValues), a setting at a time */
+  private preset(p: Preset) { return presetValues(p, k => { const d = keyDef(k); return d?.kind === 'enum' ? d.vals?.split('|') : undefined; }); }
+  /** the preset the settings are now (each of its settings at its value, a null at its default), or null: the player's own mix */
+  private presetNow(): Preset | null {
+    for (const p of PRESETS) {
+      let all = true;
+      for (const [k, v] of this.preset(p.id)) if (this.current(k).toLowerCase() !== (v ?? (this.deps.defaults?.[k] ?? DEFAULTS.get(k) ?? '')).toLowerCase()) { all = false; break; }
+      if (all) return p.id;
+    }
+    return null;
+  }
+  /** the Mods tab's first row: Default, Vanilla or Modded, every mod's setting at once, and what the one picked does */
+  private presetBar(): HTMLElement {
+    const box = document.createElement('div'); box.className = 'mods-presets';
+    const seg = document.createElement('div'); seg.className = 'seg'; seg.setAttribute('role', 'radiogroup'); seg.setAttribute('aria-label', t(PRESETS_LABEL));
+    const now = this.presetNow();
+    for (const p of PRESETS) {
+      const o = document.createElement('label'); o.className = 'opt';
+      const r = document.createElement('input'); r.type = 'radio'; r.name = 'mods-preset'; r.value = p.id; r.checked = p.id === now;
+      r.onchange = () => { if (r.checked) void this.putPreset(p.id); };
+      o.append(r, t(p.name));
+      seg.append(o);
+    }
+    const line = document.createElement('p'); line.className = 'set-help mods-preset-line';
+    line.textContent = now ? t(PRESETS.find(p => p.id === now)!.line) : t(PRESETS_OWN);
+    box.append(seg, line);
+    return box;
+  }
+  /** a preset written: each of its settings in one write */
+  private async putPreset(p: Preset) {
+    if (this.ro()) { this.deps.say?.(this.roText()); this.render(); return; }
+    let next = this.text ?? TEMPLATE;
+    for (const [k, v] of this.preset(p)) next = putKey(next, k, v).text;
+    await this.write(next);
+    const name = t(PRESETS.find(x => x.id === p)!.name);
+    this.deps.say?.(() => t('Mods: {name}. Applies the next time you press Play.', { name }));
   }
 
   /** "More ... settings", with how many of them the file changes: a changed setting is not out of sight unnoticed. */

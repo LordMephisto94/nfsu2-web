@@ -88,6 +88,7 @@ const GAME_TEXT = [
   N('The race is off: its host is gone'), N('The race is off: you are not in it'), N('The race could not start'), N('The race did not take you'),
   N('Everyone else left: the race waits for players again'), N('Multiplayer race: you quit it'), N('Multiplayer race: not finished'),
   N('You seemed away: the lobby is closed'), N('You left the race'), N('Call off your own race first: drive away from its start'),
+  N('You called off the race'),
 ];
 /** a race's kind in the page's language (an invite's line names it: friends.ts) */
 export const raceKindText = (s: string) => game(s);
@@ -143,6 +144,8 @@ function speedometer(vs: number): SVGSVGElement {
   return svg;
 }
 
+/** the host's Z held this long calls its race off (a press invites friends) */
+const CALL_OFF_MS = 600;
 /** quick chat: a phrase stays beside its player's name this long (ms) */
 const SAID_MS = 6000;
 
@@ -163,6 +166,7 @@ export class LobbyPanel {
     // (caught before the game's input, and only while the card offers it: E, V and Z are the game's for nothing in its
     // driving map, but a player may put one of its controls on them)
     window.addEventListener('keydown', e => this.key(e), { capture: true });
+    window.addEventListener('keyup', e => this.keyUp(e), { capture: true });
     // (a controller that starts or stops driving: the keys' caps change, lobby.ts cap)
     window.addEventListener(PAD_DRIVER_EVENT, () => { if (!this.panel.hidden) this.redraw(); });
   }
@@ -187,7 +191,7 @@ export class LobbyPanel {
       o.ai = () => d.act(LB_AI);
       if ((s.names?.length ?? 0) < (s.max ?? 6)) o.invite = () => d.invite();
     }
-    if (s.v === 'lobby' && (s.st === 'in' || s.st === 'asked') && s.far) o.invite = () => d.act(LB_LEAVE);
+    if (s.v === 'lobby' && (s.st === 'in' || s.st === 'asked')) o.invite = () => d.act(LB_LEAVE);   /* (at its start or from afar) */
     return o;
   }
 
@@ -197,10 +201,30 @@ export class LobbyPanel {
     return k && !gameHas(this.deps?.session(), KEYS[which].bit) ? k : null;
   }
 
+  /** the host's Z: a press invites friends (when it does on release), held CALL_OFF_MS it calls the race off */
+  private hold = 0;
+  private holdCode = '';
+  private hosting() { return this.st.v === 'lobby' && this.st.st === 'host'; }
+  private keyUp(e: KeyboardEvent) {
+    if (!this.hold || e.code !== this.holdCode) return;
+    clearTimeout(this.hold); this.hold = 0;
+    e.preventDefault(); e.stopImmediatePropagation();
+    const o = this.offers(this.st);
+    if (this.hosting() && o.invite) o.invite();
+  }
+
   private key(e: KeyboardEvent) {
     if (this.panel.hidden || e.metaKey || e.ctrlKey || e.altKey || !this.deps) return;
     const el = e.target as HTMLElement | null;
     if (el?.closest?.('input, textarea, select') || pageDialog() || this.panel.closest('.photo')) return;
+    if (this.hosting() && e.code === this.keyOf('invite')) {
+      e.preventDefault(); e.stopImmediatePropagation();
+      if (e.repeat || this.hold) return;
+      const d = this.deps;
+      this.holdCode = e.code;
+      this.hold = window.setTimeout(() => { this.hold = 0; if (this.hosting()) d.act(LB_LEAVE); }, CALL_OFF_MS);
+      return;
+    }
     const o = this.offers(this.st);
     const f = (Object.keys(KEYS) as (keyof typeof KEYS)[]).find(w => o[w] && this.keyOf(w) === e.code);
     if (!f) return;
@@ -376,9 +400,13 @@ export class LobbyPanel {
     }
     if (o.fresh) go.push(this.own('fresh', t('New lobby'), o.fresh, '←'));
     if (o.next) go.push(this.own('next', this.nextPage(s), o.next, '→'));
-    // (how to leave: drive away, but from a lobby joined from afar)
-    if (s.v === 'lobby' && s.st !== 'count' && s.st !== 'asked') go.push(el('div', 'ov-small', s.me === 0 ? t('Drive away to call it off')
-      : s.far ? t('You joined from afar: the race leaves from where you are') : t('Drive away to leave')));
+    // (the host calls it off by driving away; a player who joined leaves with Leave above, and from afar is told where
+    // the race leaves from)
+    if (s.v === 'lobby' && s.st !== 'count' && s.st !== 'asked' && (s.me === 0 || s.far)) {
+      const z = s.me === 0 && !touchFirst() && !drivingPad() ? this.keyOf('invite') : null;
+      go.push(el('div', 'ov-small', s.me !== 0 ? t('You joined from afar: the race leaves from where you are')
+        : z ? t('Drive away or hold {key} to call it off', { key: keyName(z) }) : t('Drive away to call it off')));
+    }
     const blocks = [block(...this.head(s))];
     if (s.v !== 'spot') blocks.push(block(this.players(s), ...this.gauge(s)));
     if (settings.length) blocks.push(block(...settings));

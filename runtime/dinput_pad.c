@@ -545,7 +545,7 @@ int pad_horn_ours(int *button){
 
 /* ---- the race lobby's card (roam_game.c mp_pad) ----------------------------------------------------
  * While the card offers them, D-pad left and right held LB_HOLD_S do its keys: left a new lobby at a start (its B), who
- * can join (V, hosting) or leave (Z, joined from afar), right the next lobby (E) or AI racers (L, hosting); let go
+ * can join (V, hosting) or leave (Z, joined), right the next lobby (E) or AI racers (L, hosting); let go
  * before, the game's own press (World Map, SMS by default), as D-pad down's hold does (showoff_pad).  Not on a
  * direction the player put another of the game's controls on (Joypad Configuration). */
 #define LB_HOLD_S       0.6
@@ -582,6 +582,66 @@ static uint32_t lobby_pad(uint32_t b, uint32_t ch, int wheel){
     return b;
 }
 
+/* ---- the turn signals (signals.c) ----------------------------------------------------------------------------
+ * While the player drives (signals.c offers them each frame), D-pad left, right and up held SIG_HOLD_S are the left
+ * signal, the right one and the hazard lights; let go before, the game's own press, as D-pad down's hold does
+ * (showoff_pad).  The player may give each another direction or none (the start page's Controls, Site: settings.ini
+ * button_signal_left, button_signal_right, button_hazard).  Not on the direction drift mode's and the show-off's hold
+ * is on (button_hold), nor one the player put another of the game's controls on (Joypad Configuration), nor while the
+ * race lobby's card takes it (lobby_pad, before this). */
+#define SIG_HOLD_S      0.5
+static double g_sig_at;                                    /* signals.c offered them then (LB_FRESH_S) */
+static int g_sig_fired;                                    /* the holds since signals.c took them (its SG_*) */
+static struct { int idx, bit; double t0, tap_until; int held, fired; } g_sigh[3] = {
+    { 18, PAD_DLEFT }, { 19, PAD_DRIGHT }, { 17, PAD_DUP } };
+void pad_signal_offer(void){ g_sig_at = lb_now(); }
+int pad_signal_take(void){ int a = g_sig_fired; g_sig_fired = 0; return a; }
+static void sig_config(void){
+    static int done;
+    if (done) return;
+    done = 1;
+    static const char *const env[3] = { "NFSU2_BUTTON_SIGNAL_LEFT", "NFSU2_BUTTON_SIGNAL_RIGHT", "NFSU2_BUTTON_HAZARD" };
+    static const struct { const char *v; int idx, bit; } C[] = {
+        {"ddown", 16, PAD_DDOWN}, {"dup", 17, PAD_DUP}, {"dleft", 18, PAD_DLEFT}, {"dright", 19, PAD_DRIGHT} };
+    for (int i = 0; i < 3; i++){
+        const char *v = getenv(env[i]);
+        if (!v || !*v) continue;
+        if (!strcasecmp(v, "off")){ g_sigh[i].idx = -1; continue; }
+        unsigned c = 0;
+        while (c < sizeof C / sizeof C[0] && strcasecmp(v, C[c].v)) c++;
+        if (c == sizeof C / sizeof C[0]){ fprintf(stderr, "[pad] %s=%s: not one of its buttons, the default\n", env[i], v); continue; }
+        g_sigh[i].idx = C[c].idx; g_sigh[i].bit = C[c].bit;
+    }
+    for (int i = 0; i < 3; i++) for (int j = 0; j < i; j++)
+        if (g_sigh[i].idx >= 0 && g_sigh[i].idx == g_sigh[j].idx){
+            fprintf(stderr, "[pad] %s: the same D-pad direction as %s, off\n", env[i], env[j]); g_sigh[i].idx = -1; }
+}
+static uint32_t signal_pad(uint32_t b, uint32_t ch, int wheel){
+    static const uint32_t tab[3] = {0x018u, 0x118u, 0x198u};
+    sig_config();
+    double t = lb_now();
+    int offered = t - g_sig_at <= LB_FRESH_S;
+    for (int k = 0; k < 3; k++){
+        if (g_sigh[k].idx < 0) continue;
+        if (k_ours[OUR_HOLD].idx == g_sigh[k].idx && g_ours[OUR_HOLD] != PAD_THEIRS) continue;   /* (the hold's) */
+        uint32_t D = 1u << g_sigh[k].bit, def = (wheel ? g_prof_wheel : g_prof_game)[g_sigh[k].idx];
+        int theirs = 0;
+        for (int i = 0; ch && i < 3 && !theirs; i++){ uint32_t a = MR32(ch + tab[i] + 4u * (uint32_t)g_sigh[k].idx); theirs = a && a != def; }
+        int down = (b & D) != 0;
+        if (down && !g_sigh[k].held && offered && !theirs){ g_sigh[k].held = 1; g_sigh[k].fired = 0; g_sigh[k].t0 = t; }
+        if (g_sigh[k].held){
+            if (!down){ g_sigh[k].held = 0; if (!g_sigh[k].fired) g_sigh[k].tap_until = t + LB_TAP_S; }
+            else if (!g_sigh[k].fired && t - g_sigh[k].t0 >= SIG_HOLD_S){
+                g_sigh[k].fired = 1;
+                if (offered) g_sig_fired = 1 << k;
+            }
+            b &= ~D;
+        }
+        if (t < g_sigh[k].tap_until) b |= D;
+    }
+    return b;
+}
+
 static void fill_state(uint8_t *buf, uint32_t size, Dev *d, const PadState *s){
     uint8_t st[0x110];
     memset(st, 0, sizeof st);
@@ -599,6 +659,7 @@ static void fill_state(uint8_t *buf, uint32_t size, Dev *d, const PadState *s){
     uint32_t hold = k_ours[OUR_HOLD].idx >= 0 ? 1u << k_ours[OUR_HOLD].bit : 0u;
     uint32_t b = MR32(G_GAMEMODE) == 4 || !hold || g_ours[OUR_HOLD] == PAD_THEIRS ? s->buttons : showoff_pad(s->buttons, hold);
     b = lobby_pad(b, ch, s->wheel);
+    b = signal_pad(b, ch, s->wheel);
     uint32_t pov[4] = { pov_of(!!(b & 1u << PAD_DUP), !!(b & 1u << PAD_DDOWN),
                                !!(b & 1u << PAD_DLEFT), !!(b & 1u << PAD_DRIGHT)),
                         stick_pov(d, s->axis[PAD_AXIS_LX], s->axis[PAD_AXIS_LY]),

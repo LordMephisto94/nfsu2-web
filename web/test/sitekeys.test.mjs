@@ -24,8 +24,9 @@ const K = await import('data:text/javascript;base64,' + Buffer.from(await build(
 
 test('the keys and buttons from the environment', () => {
   K.applySiteKeys({});
-  assert.deepEqual(K.OURS.map(o => K.siteKey(o.id)), ['KeyX', 'KeyO', 'KeyN', 'KeyG', null, null, 'KeyI', 'KeyF', 'KeyE', 'KeyB', 'KeyV', 'KeyL', 'KeyZ', 'F12', 'F10', 'F9', 'F7', 'F8']);
+  assert.deepEqual(K.OURS.map(o => K.siteKey(o.id)), ['KeyX', 'KeyO', 'KeyN', 'KeyG', 'Comma', 'Slash', 'Quote', null, null, 'KeyI', 'KeyF', 'KeyE', 'KeyB', 'KeyV', 'KeyL', 'KeyZ', 'F12', 'F10', 'F9', 'F7', 'F8']);
   assert.deepEqual(['button_hold', 'button_horn', 'button_chat', 'button_look'].map(K.siteButton), ['ddown', 'ls', 'rs', 'auto']);
+  assert.deepEqual(['button_signal_left', 'button_signal_right', 'button_hazard'].map(K.siteButton), ['dleft', 'dright', 'dup']);
   assert.ok(K.SITE_KEYS.includes('key_lights'), 'the headlights\' key is one of settings.ini\'s');
   assert.ok(K.SITE_KEYS.includes('key_hud') && K.SITE_KEYS.includes('button_look'), 'hiding the HUD\'s key and the free look\'s switch too');
   K.applySiteKeys({ NFSU2_BUTTON_LOOK: 'sideways' });
@@ -90,7 +91,12 @@ test('what may be picked', () => {
   assert.match(K.buttonRefusal('button_horn', 'rs'), /RS is already Quick chat/);
   assert.match(K.buttonRefusal('button_chat', 'ls'), /LS is already Horn/);
   assert.equal(K.buttonRefusal('button_chat', 'off'), '');
-  assert.equal(K.buttonRefusal('button_hold', 'dleft'), '');
+  assert.match(K.buttonRefusal('button_hold', 'dleft'), /already Left turn signal/, 'one D-pad hold a direction');
+  assert.match(K.buttonRefusal('button_hazard', 'dright'), /already Right turn signal/);
+  assert.equal(K.buttonRefusal('button_hazard', 'off'), '');
+  assert.equal(K.buttonRefusal('button_signal_left', 'dleft', k => ({ button_hold: 'ddown', button_signal_left: 'dleft',
+    button_signal_right: 'dright', button_hazard: 'dup' })[k] ?? 'off'), '', 'its own direction');
+  assert.match(K.buttonRefusal('button_signal_left', 'ddown', k => ({ button_hold: 'ddown' })[k] ?? 'off'), /already Drift mode/);
 });
 
 test('the keys the player put one of the game\'s controls on (registry.txt)', () => {

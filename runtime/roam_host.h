@@ -44,6 +44,10 @@
  *   rh_lights_mine()        the player's headlights: 0 as the game has them, 1 off, 2 high beam (lightkey.c's
  *                           lightkey_mine), 0 where there is no light key
  *   rh_lights_car(k, car, st)   slot k's car (0: none) and its player's headlights, to show (lightkey_car)
+ *   rh_signals_mine()       the player's turn signals (RC_SIG_L, RC_SIG_R, both the hazard lights: signals.c's
+ *                           signals_mine), 0 where there are none
+ *   rh_signals_car(car, sig, paused)   a shown car's signals and whether its player's game is paused, to show
+ *                           (signals_car)
  *   rh_damage_on()          the crash damage is on (damage.c's damage_net_on): friends' damage is shown, and the
  *                           HELLO asks for it (RC_HF_DENTS); 0 where there is no crash damage
  *   rh_damage_rev()         the player's car's crash damage as published: +1 for every change friends should see
@@ -90,6 +94,8 @@ uint8_t showoff_mine(void);              /* showoff.c */
 void showoff_car(CPU *c, int k, uint32_t car, uint8_t open);
 int  lightkey_mine(void);                /* lightkey.c */
 void lightkey_car(int k, uint32_t car, int st);
+int  signals_mine(void);                /* signals.c */
+void signals_car(uint32_t car, int sig, int paused);
 /* damage.c: the crash damage, where it is built in */
 __attribute__((weak)) int damage_net_on(void);
 __attribute__((weak)) uint32_t damage_net_rev(void);
@@ -134,6 +140,8 @@ uint32_t travel_room(void);              /* travel.c: on a race track's map, its
 #define rh_showoff_car(c, k, car, open) showoff_car((c), (k), (car), (open))
 #define rh_lights_mine() lightkey_mine()
 #define rh_lights_car(k, car, st) lightkey_car((k), (car), (st))
+#define rh_signals_mine() signals_mine()
+#define rh_signals_car(car, sig, paused) signals_car((car), (sig), (paused))
 #define rh_damage_on()   (damage_net_on ? damage_net_on() : 0)
 #define rh_damage_rev()  (damage_net_rev ? damage_net_rev() : 0u)
 #define rh_damage_mine(e, f, d, m) (damage_net_mine ? damage_net_mine((e), (f), (d), (m)) : 0)

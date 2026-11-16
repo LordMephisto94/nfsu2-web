@@ -62,6 +62,8 @@ uint64_t    roam_win_ns(void);
 /* no light key here either: the companion's lights are the game's, and friends' cars show theirs */
 #define rh_lights_mine() 0
 #define rh_lights_car(k, car, st) ((void)(k), (void)(car), (void)(st))
+#define rh_signals_mine() 0
+#define rh_signals_car(car, sig, paused) ((void)(car), (void)(sig), (void)(paused))
 /* no crash damage here: the companion sends none, asks for none (no RC_HF_DENTS) and shows friends' cars undamaged */
 #define rh_damage_on()   0
 #define rh_damage_rev()  0u

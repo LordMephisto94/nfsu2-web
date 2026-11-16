@@ -289,7 +289,8 @@ static uint32_t build_map(KDev *d, uint32_t af, uint32_t flags){
 }
 /* ---- our keys ----------------------------------------------------------------
  * The keys the runtime and the page add on top of the game's: X drift mode (drift.c), O the show-off (showoff.c), N
- * the horn (horn.c), G the headlights (lightkey.c), F10 hiding the HUD (photo.c), and the page's I (Message a friend:
+ * the horn (horn.c), G the headlights (lightkey.c), , / and ' the turn signals and hazard lights (signals.c), F10 hiding
+ * the HUD (photo.c), and the page's I (Message a friend:
  * web/src/app/messages.ts), F (Add friend: friends.ts), 1 to 4 and Numpad 1 to 4 (quick chat: quickchat.ts).  None is
  * one of the game's in its driving map (0x7fcac0; G and Numpad 1 to 4 are its debug camera's, which the game never
  * reads), but a player can put any of the game's controls on any key (Options > Controls > Keyboard Configuration).
@@ -327,7 +328,7 @@ static const struct { const char *code; uint8_t dik; } k_codes[] = {
     {"F15",0x66},{"NumpadDivide",0xB5},{"Pause",0xC5},{"Home",0xC7},{"PageUp",0xC9},{"End",0xCF},{"PageDown",0xD1},
     {"Insert",0xD2},{"Delete",0xD3},
 };
-/* drift.c, showoff.c, horn.c, lightkey.c, photo.c, page_keys: the key the variable env (NFSU2_KEY_DRIFT ...) gives one
+/* drift.c, showoff.c, horn.c, lightkey.c, signals.c, photo.c, page_keys: the key the variable env (NFSU2_KEY_DRIFT ...) gives one
  * of ours: its DIK, 0 for off; unset, or a name it does not know (said once), dflt */
 unsigned dikbd_site_key(const char *env, unsigned dflt){
     const char *v = getenv(env);
@@ -361,8 +362,8 @@ static void said_once(unsigned dik, uint32_t app, const char *name, const char *
     if (n < 32){ said[n].dik = (uint16_t)dik; said[n].app = app; n++; }
     fprintf(stderr, "[keys] %s is bound to %s in the game: %s stays off it\n", dik_name(dik) ? dik_name(dik) : "a key", name, what);
 }
-/* drift.c, showoff.c, horn.c, lightkey.c, photo.c: whether our control `what` takes the key dik now (1), or leaves it to
- * the game (0) */
+/* drift.c, showoff.c, horn.c, lightkey.c, signals.c, photo.c: whether our control `what` takes the key dik now (1), or
+ * leaves it to the game (0) */
 int dikbd_ours(unsigned dik, const char *what){
     const KDev *d = g_mapped;
     uint32_t app = d && d->fmt == FMT_ACTIONS ? rebound(d, dik) : NO_ACT;

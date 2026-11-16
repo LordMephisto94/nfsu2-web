@@ -724,6 +724,8 @@ static int car_state(uint32_t car, rc_state *s, int horn, uint8_t *thumps, int *
     int lights = car == player_car() ? rh_lights_mine() : 0;
     if (lights == 1) s->bits |= RC_BIT_DARK;
     s->hibeam = lights == 2;
+    /* the turn signals and hazard lights (signals.c, player 1's) */
+    s->sig = car == player_car() ? (uint8_t)rh_signals_mine() : 0;
     if (g_sync_paused > 1){ for (int i = 0; i < 3; i++){ s->v[i] = 0; s->w[i] = 0; } s->speed = 0; s->rpm = 0; for (int i = 0; i < 8; i++) s->slip[i] = 0; }
     for (int i = 0; i < 3; i++) if (!__builtin_isfinite(s->p[i]) || !__builtin_isfinite(s->v[i])) return 0;
     /* the stamp clock may run a little faster than the world (it is pulled
@@ -4529,9 +4531,18 @@ int roam_game_engine_files(CPU *c, uint32_t ride, char gin[2][32], float *idle, 
     gin[0][0] = gin[1][0] = 0; *idle = *most = 0.f;
     uint32_t st = gcall1(c, FN_SND_TYPE, 0, type), lvl = 0;
     if (st > 30u) return 0;
-    if (gcall1(c, FN_PERF_HAS, ride + 0x2f0u, 0x18u) & 0xffu) lvl = 3;
-    else if (gcall1(c, FN_PERF_HAS, ride + 0x2f0u, 0x13u) & 0xffu) lvl = 2;
-    else if (gcall1(c, FN_PERF_HAS, ride + 0x2f0u, 0xfu) & 0xffu) lvl = 1;
+    static int keep = -1;                     /* Keep engine sounds (keepengine.c): every car's stock engine (as setting_bool:
+                                               * unset, 0..., off, no, false: not) */
+    if (keep < 0){
+        const char *k = rh_opt("NFSU2_KEEP_ENGINE");
+        int a = k ? k[0] | 0x20 : 0, b = a ? k[1] | 0x20 : 0;
+        keep = k && *k && *k != '0' && !(a == 'o' && b == 'f') && a != 'n' && a != 'f';
+    }
+    if (!keep){
+        if (gcall1(c, FN_PERF_HAS, ride + 0x2f0u, 0x18u) & 0xffu) lvl = 3;
+        else if (gcall1(c, FN_PERF_HAS, ride + 0x2f0u, 0x13u) & 0xffu) lvl = 2;
+        else if (gcall1(c, FN_PERF_HAS, ride + 0x2f0u, 0xfu) & 0xffu) lvl = 1;
+    }
     uint32_t e = MR32(G_ENG_PICK + 12u * (st * 4u + lvl)), ent = G_ENGINES + 0x4cu * e, d = e < N_ENGINES ? MR32(ent + 0x14u) : N_ENG_DCL;
     if (e >= N_ENGINES || d >= N_ENG_DCL) return 0;
     cstr(MR32(ent + 0xcu), gin[0], 32);
@@ -4684,6 +4695,19 @@ static void lights_peers(void){
     for (int k = 0; k < NSLOT; k++){
         uint32_t car = g_sl[k].st == SL_ACTIVE && !g_sl[k].hidden ? g_sl[k].car : 0;
         rh_lights_car(k, ok(car, 0x9e0) ? car : 0, st[k]);
+    }
+}
+
+/* friends' turn signals (signals.c): as each shown car's pose has them (the extension's RC_OPEN_SIGL / RC_OPEN_SIGR),
+ * the hazard lights while its player's game is paused */
+static void signals_peers(void){
+    for (int i = 0; i < g_npv; i++){
+        const PeerView *v = &g_pv[i];
+        if (!v->visible || !v->have_pose) continue;
+        int sig = v->pose.ext ? v->pose.sig : 0;
+        for (int k = 0; k < NSLOT; k++)
+            if (g_sl[k].st == SL_ACTIVE && g_sl[k].peer_id == v->id && !g_sl[k].hidden && ok(g_sl[k].car, 0x9e0))
+                rh_signals_car(g_sl[k].car, sig, v->paused);
     }
 }
 
@@ -6585,7 +6609,7 @@ static void mp_far_join(int64_t host, int in_roam, uint32_t hid, uint32_t lid, u
     g_mp.asked_far = g_mp.far = 1;
     rlog("[roam] f=%ld race lobby %08x: joining from afar (an invite), %.0f m from its start\n", rh_frame(), lid, (double)mp_dist(l.x, l.y));
 }
-/* the page's lobby actions (roam_plat_lobby_act): the card's next lobby (E), who can join (V), leave (Z from afar), an
+/* the page's lobby actions (roam_plat_lobby_act): the card's next lobby (E), who can join (V), leave (Z, joined), an
  * invite's Join, a new lobby of our own here (B) */
 static void mp_act(int64_t host, int in_roam, int act, uint32_t a, uint32_t b, uint32_t r){
     switch (act){
@@ -6629,7 +6653,9 @@ static void mp_act(int64_t host, int in_roam, int act, uint32_t a, uint32_t b, u
         g_mp.tx_at = 0;                                                  /* (its adverts at once) */
         return;
     case ROAM_LB_LEAVE:
+        /* a player who joined leaves; the host (its Z held, lobby.ts) calls its race off, as driving away does */
         if (g_mp.st == MP_ASKED || g_mp.st == MP_IN) mp_close(host, RC_LL_LEFT, "You left the race");
+        else if (g_mp.st == MP_HOST) mp_close(host, RC_LL_GONE, "You called off the race");
         return;
     case ROAM_LB_JOIN:
         mp_far_join(host, in_roam, a, b, r);
@@ -6637,7 +6663,7 @@ static void mp_act(int64_t host, int in_roam, int act, uint32_t a, uint32_t b, u
     }
 }
 /* The card's keys on a controller (dinput_pad.c lobby_pad): D-pad left held a new lobby at a start, who can join
- * (hosting) or leave (joined from afar), right held the next lobby or AI racers (hosting); what each does now, while
+ * (hosting) or leave (joined), right held the next lobby or AI racers (hosting); what each does now, while
  * the card is up (the page
  * shows them in place of the keys while a controller drives: lobby.ts) */
 void pad_lobby_offer(int left, int right);
@@ -6650,7 +6676,7 @@ static void mp_pad(int64_t host, int in_roam){
             if (n >= 1 && mp_new_page(mp_spot_here(), n)) l = ROAM_LB_NEW;      /* (a start with no lobby: the game's Engage) */
             if (n >= 2) r = ROAM_LB_NEXT;
         } else if (g_mp.st == MP_HOST){ l = ROAM_LB_PRIVATE; r = ROAM_LB_AI; }
-        else if ((g_mp.st == MP_IN || g_mp.st == MP_ASKED) && g_mp.far) l = ROAM_LB_LEAVE;
+        else if (g_mp.st == MP_IN || g_mp.st == MP_ASKED) l = ROAM_LB_LEAVE;      /* (at its start or from afar) */
     }
     pad_lobby_offer(l, r);
 }
@@ -9931,6 +9957,7 @@ void roam_game_frame(CPU *c){
     sounds_update(have_ls ? &ls : 0, world_runs);
     showoff_peers(c);
     lights_peers();
+    signals_peers();
     damage_peers(c);
     plates_peers();
     stance_peers();

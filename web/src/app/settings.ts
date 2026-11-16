@@ -181,13 +181,22 @@ export const KEYS: readonly KeyDef[] = [
   // map turns on only that one (uiPack: no pack of the menus' and HUD's).  Not in bundle.m's table: the Mac's packs
   // are "textures"
   { key: 'ui_textures', env: 'NFSU2_UI_TEXTURES', kind: 'enum', vals: 'original|map|uhud', scope: 'web', device: true },
+  // the sharper textures' packs (runtime/web/texrep_web.c open_hd); roads_and_shadows = roads-and-shadows, its older
+  // key, still turns them on (no row: a settings.ini line of its own)
+  { key: 'sharper_textures', env: 'NFSU2_SHARPER_TEXTURES', kind: 'bool', scope: 'web' },
   { key: 'roads_and_shadows', env: 'NFSU2_ROADS_AND_SHADOWS', kind: 'enum', vals: 'original|roads-and-shadows', scope: 'web', device: true },
+  // the city's region A with community mods' add-ons, from their packs in MODPACKS (runtime/fileio.c city_resolve)
+  { key: 'open_tunnel', env: 'NFSU2_OPEN_TUNNEL', kind: 'bool', scope: 'web' },
+  { key: 'car_parks', env: 'NFSU2_CAR_PARKS', kind: 'bool', scope: 'web' },
   // the players this one blocks in free roam, by name (the page's hello to the server: net/index.ts).  Not in bundle.m's
   // table: the Mac's free roam has no hub
   { key: 'roam_block', env: 'NFSU2_ROAM_BLOCK', kind: 'names', ic: true, scope: 'web' },
   // the distance to the GPS destination under its arrow (runtime/gpsdistance.c).  Not in bundle.m's table: there a
   // lower-case key, so it reaches the runtime as NFSU2_GPS_DISTANCE all the same
   { key: 'gps_distance', env: 'NFSU2_GPS_DISTANCE', kind: 'bool', scope: 'web' },
+  // the car's turn signals by themselves before a turn on the GPS route, on unless off (runtime/signals.c).  Not in
+  // bundle.m's table: there a lower-case key, so it reaches the runtime as NFSU2_GPS_SIGNALS all the same
+  { key: 'gps_signals', env: 'NFSU2_GPS_SIGNALS', kind: 'bool', scope: 'web' },
   // the career's hidden races on the map like the others (runtime/hiddenraces.c).  Not in bundle.m's table: there a
   // lower-case key, so it reaches the runtime as NFSU2_SHOW_HIDDEN_RACES all the same
   { key: 'show_hidden_races', env: 'NFSU2_SHOW_HIDDEN_RACES', kind: 'bool', scope: 'web' },
@@ -222,6 +231,9 @@ export const KEYS: readonly KeyDef[] = [
   // its sounds from the game folder's MODPACKS/WHINE, read only when on: tools/whinepack.py).  Not in bundle.m's
   // table: there a lower-case key, so it reaches the runtime as NFSU2_GEARBOX_WHINE all the same
   { key: 'gearbox_whine', env: 'NFSU2_GEARBOX_WHINE', kind: 'bool', scope: 'web' },
+  // every car's stock engine sound, whatever its engine upgrades (runtime/keepengine.c).  Not in bundle.m's table:
+  // there a lower-case key, so it reaches the runtime as NFSU2_KEEP_ENGINE all the same
+  { key: 'keep_engine', env: 'NFSU2_KEEP_ENGINE', kind: 'bool', scope: 'web' },
   // the cars' skins painted again at 1024 from AdrienShadow's HQ Vinyls & Doorlines (runtime/hqvinyls.c, the page's
   // gpu/hqskin.ts; its pictures from the game folder's HQVINYLS/, read as cars are seen: tools/hqvinyls.py); on for
   // computers (device.ts deviceDefaults), the runtime's own default off.  Not in
@@ -241,13 +253,16 @@ export const KEYS: readonly KeyDef[] = [
   { key: 'roam_map_max', env: 'NFSU2_ROAM_MAP_MAX', kind: 'int', vals: '0..4096', ic: true, scope: 'web', device: true },
   // our own controls beside the game's (sitekeys.ts): each one's key and controller button, kept by this device (its
   // keyboard and controller).  The runtime reads those it handles (runtime/dinput_kbd.c dikbd_site_key: drift mode, the
-  // show-off, the horn, the headlights, hiding the HUD; and Message a friend's and Add friend's, whose clashes with the
+  // show-off, the horn, the headlights, the turn signals, hiding the HUD; and Message a friend's and Add friend's, whose clashes with the
   // game's controls it tells the page; dinput_pad.c: the buttons and the free look's switch), the page the rest.  Not in bundle.m's table: the Mac app passes them
   // on as NFSU2_KEY_* and NFSU2_BUTTON_* all the same
   { key: 'key_drift', env: 'NFSU2_KEY_DRIFT', kind: 'key', scope: 'web', device: true },
   { key: 'key_showoff', env: 'NFSU2_KEY_SHOWOFF', kind: 'key', scope: 'web', device: true },
   { key: 'key_horn', env: 'NFSU2_KEY_HORN', kind: 'key', scope: 'web', device: true },
   { key: 'key_lights', env: 'NFSU2_KEY_LIGHTS', kind: 'key', scope: 'web', device: true },
+  { key: 'key_signal_left', env: 'NFSU2_KEY_SIGNAL_LEFT', kind: 'key', scope: 'web', device: true },
+  { key: 'key_signal_right', env: 'NFSU2_KEY_SIGNAL_RIGHT', kind: 'key', scope: 'web', device: true },
+  { key: 'key_hazard', env: 'NFSU2_KEY_HAZARD', kind: 'key', scope: 'web', device: true },
   { key: 'key_message', env: 'NFSU2_KEY_MESSAGE', kind: 'key', scope: 'web', device: true },
   { key: 'key_friend', env: 'NFSU2_KEY_FRIEND', kind: 'key', scope: 'web', device: true },
   { key: 'key_lobby', env: 'NFSU2_KEY_LOBBY', kind: 'key', scope: 'web', device: true },
@@ -264,6 +279,9 @@ export const KEYS: readonly KeyDef[] = [
   { key: 'button_horn', env: 'NFSU2_BUTTON_HORN', kind: 'enum', vals: 'ls|rs|off', scope: 'web', device: true },
   { key: 'button_chat', env: 'NFSU2_BUTTON_CHAT', kind: 'enum', vals: 'rs|ls|off', scope: 'web', device: true },
   { key: 'button_look', env: 'NFSU2_BUTTON_LOOK', kind: 'enum', vals: 'auto|off', scope: 'web', device: true },
+  { key: 'button_signal_left', env: 'NFSU2_BUTTON_SIGNAL_LEFT', kind: 'enum', vals: 'dleft|dup|ddown|dright|off', scope: 'web', device: true },
+  { key: 'button_signal_right', env: 'NFSU2_BUTTON_SIGNAL_RIGHT', kind: 'enum', vals: 'dright|dup|ddown|dleft|off', scope: 'web', device: true },
+  { key: 'button_hazard', env: 'NFSU2_BUTTON_HAZARD', kind: 'enum', vals: 'dup|ddown|dleft|dright|off', scope: 'web', device: true },
   // the racers' visual crash damage, FRS Mods' Crashing Foreign Cars (runtime/damage.c), off unless asked for.  Not in
   // bundle.m's table
   { key: 'crash_damage', env: 'NFSU2_DAMAGE', kind: 'bool', scope: 'web' },
@@ -362,6 +380,11 @@ export const TEMPLATE = `# NFSU2 settings, read at every launch.
 # [NFSU2_GPS_DISTANCE]
 #gps_distance = off
 
+# Your car's turn signals come on by themselves before a turn on the GPS
+# route, and go off after it (Mods: Turn signals with the GPS).
+# [NFSU2_GPS_SIGNALS]
+#gps_signals = on
+
 # The car's visual rating set by the career's stage, not by its parts, as
 # thelink2012's Visual Reputation Remover (github.com/thelink2012/novisualrep)
 # has it: every DVD cover shoot of the stage is offered at the next free-roam
@@ -426,6 +449,11 @@ export const TEMPLATE = `# NFSU2 settings, read at every launch.
 # off = the original game.
 # [NFSU2_GEARBOX_WHINE]
 #gearbox_whine = off
+
+# Every car keeps its own engine sound when its engine is upgraded (Mods:
+# Keep engine sounds).
+# [NFSU2_KEEP_ENGINE]
+#keep_engine = off
 
 # The cars' vinyls and doorlines at 1024x1024, as AdrienShadow's High
 # Quality Vinyls & Doorlines has them: the game's designs and colours,
@@ -509,7 +537,17 @@ export const TEMPLATE = `# NFSU2 settings, read at every launch.
 # phones' GPUs decode the larger textures into four times the memory;
 # NFSU2_MAP_TEXTURES = original keeps the game's maps).  [NFSU2_UI_TEXTURES]
 #ui_textures = original
-#roads_and_shadows = original
+# The game's own textures, sharper: the roads, the city's buildings, signs
+# and neon, the cars' neon and the skies, where this server has their packs
+# (on on computers, off on phones).  [NFSU2_SHARPER_TEXTURES]
+#sharper_textures = on
+# Community mods' add-ons to the city, where this server has their packs
+# (MODPACKS): the tunnel the game keeps closed for construction open, and
+# the car parks drivable.  Players who meet in free roam should pick the
+# same, or one drives where the other's city has a wall.
+# [NFSU2_OPEN_TUNNEL, NFSU2_CAR_PARKS]
+#open_tunnel = off
+#car_parks = off
 # Textures without smoothing (point sampling), blocky like early PC games;
 # on overrides the game's Texture Filtering.  [NFSU2_PIXELATED_TEXTURES]
 #pixelated_textures = off
@@ -579,13 +617,15 @@ export const TEMPLATE = `# NFSU2 settings, read at every launch.
 # Controls, Site, sets them by a press): the browser's name of a key (KeyX,
 # Digit5, F6, Numpad7, Backquote ...) or off.  Drift mode and the hood,
 # trunk and doors (free roam), the horn (with other players), the
-# headlights (a tap off or on, held high beam), Message a friend and Add
+# headlights (a tap off or on, held high beam), the left and right turn
+# signals and the hazard lights (a press on or off), Message a friend and Add
 # friend (free roam), the race lobby card's next lobby, Friends & crew
 # only, AI opponents and invite (free roam), photo mode, hiding the HUD while driving
 # (off again at each Play), the page's menu (never off), the next song and
 # the frame-rate counter.  A key one of the game's controls is on (its
 # Options, Controls) stays the game's.
 # [NFSU2_KEY_DRIFT, NFSU2_KEY_SHOWOFF, NFSU2_KEY_HORN, NFSU2_KEY_LIGHTS,
+# NFSU2_KEY_SIGNAL_LEFT, NFSU2_KEY_SIGNAL_RIGHT, NFSU2_KEY_HAZARD,
 # NFSU2_KEY_MESSAGE, NFSU2_KEY_FRIEND, NFSU2_KEY_LOBBY, NFSU2_KEY_LOBBY_NEW,
 # NFSU2_KEY_LOBBY_PRIVATE, NFSU2_KEY_LOBBY_AI, NFSU2_KEY_LOBBY_INVITE,
 # NFSU2_KEY_PHOTO,
@@ -594,6 +634,9 @@ export const TEMPLATE = `# NFSU2 settings, read at every launch.
 #key_showoff = KeyO
 #key_horn = KeyN
 #key_lights = KeyG
+#key_signal_left = Comma
+#key_signal_right = Slash
+#key_hazard = Quote
 #key_message = KeyI
 #key_friend = KeyF
 #key_lobby = KeyE
@@ -612,13 +655,20 @@ export const TEMPLATE = `# NFSU2 settings, read at every launch.
 # horn and the one for quick chat: ls, rs or off; the free look round the
 # car while driving: auto (the right stick, the left one while the game's
 # controls read the right one) or off (no stick looks round, and stick up
-# no longer switches the headlights).  The game's Home button, or both
-# sticks pressed in, always opens the page's menu.
-# [NFSU2_BUTTON_HOLD, NFSU2_BUTTON_HORN, NFSU2_BUTTON_CHAT, NFSU2_BUTTON_LOOK]
+# no longer switches the headlights); the D-pad direction held half a
+# second (driving) for the left and right turn signals and the hazard
+# lights: dleft, dright, dup, ddown or off, a short press staying the
+# game's.  The game's Home button, or both sticks pressed in, always opens
+# the page's menu.
+# [NFSU2_BUTTON_HOLD, NFSU2_BUTTON_HORN, NFSU2_BUTTON_CHAT, NFSU2_BUTTON_LOOK,
+# NFSU2_BUTTON_SIGNAL_LEFT, NFSU2_BUTTON_SIGNAL_RIGHT, NFSU2_BUTTON_HAZARD]
 #button_hold = ddown
 #button_horn = ls
 #button_chat = rs
 #button_look = auto
+#button_signal_left = dleft
+#button_signal_right = dright
+#button_hazard = dup
 
 # ---- Multiplayer ---------------------------------------------------------
 
