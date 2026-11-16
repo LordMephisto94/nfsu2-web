@@ -55,7 +55,7 @@
 /* Career (G_CAREER) +: */
 #define C_STAGE         0x7af8u       /* the stage: 0 the prologue, 1 .. 5, 6 the career complete */
 #define C_STAGES        0x72d8u       /* the stages' records, 0x104 bytes each from stage 0: +0xDC outrun wins (u32), +0xFC */
-#define C_STAGE_SZ      0x104u        /*   complete (byte), +0x100 the stage's info (+0x28 its final event's hash) */
+#define C_STAGE_SZ      0x104u        /*   complete (byte), +0x100 the stage's info (+0x28 its final event's hash, 0 none: complete by its races) */
 #define C_NEVENTS       0x7afcu       /* the events' states: [C_NEVENTS] of 8 bytes at C_EVENTS: +0 the event's hash */
 #define C_EVENTS        0x7b00u       /*   (a race's +8, a cover shoot's +0x20), +6 1 won */
 

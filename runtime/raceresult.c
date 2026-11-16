@@ -24,7 +24,8 @@
  * The career as it stands, for the career's achievements, in one more slot, set when it changes (each 30 frames):
  *
  *   cr_state  0 outside the career (the game mode not 1), else: 1 | stage s complete << s (s 1 .. 5) |
- *             its outrun wins << (2 + 4 s) (4 bits, at most 15) | its final event won << (26 + s) |
+ *             its outrun wins << (2 + 4 s) (4 bits, at most 15) | its final event won << (26 + s) (a stage that
+ *             names none, complete by its races as stage 1 is: complete) |
  *             the prologue over (the stage 1 or more) << 32 | the prologue's outrun wins << 33 (4) |
  *             the prologue's three races won (STAGE_0_CIRCUIT_0, _1, STAGE_0_SPRINT_0), only while in it, << 37 |
  *             magazine covers done << 38 (6 bits) | DVD covers done << 44 (6) | the difficulty << 50 (2: 0 Easy ..)
@@ -204,7 +205,10 @@ static double career_state(int *mags, int *dvds){
         if (outruns > 15u) outruns = 15u;
         if (s == 0){ v |= (uint64_t)outruns << 33; continue; }
         v |= (uint64_t)(MR8(rec + 0xfcu) != 0) << s | (uint64_t)outruns << (2 + 4 * s);
-        if (committed(info + 0x28u, 4) && ev_won(MR32(info + 0x28u))) v |= 1ull << (26 + s);
+        /* (a stage without a final, its hash 0, is complete by its races, 0x532C60 -> 0x5130A0: stage 1; its last race
+         * is its final here) */
+        uint32_t fin = committed(info + 0x28u, 4) ? MR32(info + 0x28u) : 0;
+        if (fin ? ev_won(fin) : MR8(rec + 0xfcu) != 0) v |= 1ull << (26 + s);
     }
     if (stage >= 1u) v |= 1ull << 32;
     else if (race_won_named("STAGE_0_CIRCUIT_0") && race_won_named("STAGE_0_CIRCUIT_1") && race_won_named("STAGE_0_SPRINT_0"))
