@@ -11,6 +11,10 @@ first, then under `### Fixes` what was broken and works now, which the popup kee
 insides, the forum bot, logs, tests, docs and cheat checks. A change that may or may not belong here is asked about
 before the release, not guessed.
 
+## 2026-11-17 (4d8a6a08)
+
+- **Achievements:** new ones for the career: Welcome to Bayview, Yo Noobie, Bring My Car Back... Now!, Career (stages complete), Outrun ace, No mercy (stage finals won on Hard), Cover star (magazine covers) and On DVD (DVD covers). A save you load gives you the ones its career has already earned.
+
 ## 2026-11-16 (4e9e0c52)
 
 - **Turn signals:** `,` and `/` work the left and right turn signals and `'` the hazard lights; on a controller, hold D-pad left, right or up. You can change the keys in Controls. Friends in free roam and the other racers in a race see them.
