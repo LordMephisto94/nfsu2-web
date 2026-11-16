@@ -253,6 +253,7 @@ export const KEYS: readonly KeyDef[] = [
   { key: 'key_lobby', env: 'NFSU2_KEY_LOBBY', kind: 'key', scope: 'web', device: true },
   { key: 'key_lobby_new', env: 'NFSU2_KEY_LOBBY_NEW', kind: 'key', scope: 'web', device: true },
   { key: 'key_lobby_private', env: 'NFSU2_KEY_LOBBY_PRIVATE', kind: 'key', scope: 'web', device: true },
+  { key: 'key_lobby_ai', env: 'NFSU2_KEY_LOBBY_AI', kind: 'key', scope: 'web', device: true },
   { key: 'key_lobby_invite', env: 'NFSU2_KEY_LOBBY_INVITE', kind: 'key', scope: 'web', device: true },
   { key: 'key_photo', env: 'NFSU2_KEY_PHOTO', kind: 'key', scope: 'web', device: true },
   { key: 'key_hud', env: 'NFSU2_KEY_HUD', kind: 'key', scope: 'web', device: true },
@@ -580,13 +581,14 @@ export const TEMPLATE = `# NFSU2 settings, read at every launch.
 # trunk and doors (free roam), the horn (with other players), the
 # headlights (a tap off or on, held high beam), Message a friend and Add
 # friend (free roam), the race lobby card's next lobby, Friends & crew
-# only and invite (free roam), photo mode, hiding the HUD while driving
+# only, AI opponents and invite (free roam), photo mode, hiding the HUD while driving
 # (off again at each Play), the page's menu (never off), the next song and
 # the frame-rate counter.  A key one of the game's controls is on (its
 # Options, Controls) stays the game's.
 # [NFSU2_KEY_DRIFT, NFSU2_KEY_SHOWOFF, NFSU2_KEY_HORN, NFSU2_KEY_LIGHTS,
 # NFSU2_KEY_MESSAGE, NFSU2_KEY_FRIEND, NFSU2_KEY_LOBBY, NFSU2_KEY_LOBBY_NEW,
-# NFSU2_KEY_LOBBY_PRIVATE, NFSU2_KEY_LOBBY_INVITE, NFSU2_KEY_PHOTO,
+# NFSU2_KEY_LOBBY_PRIVATE, NFSU2_KEY_LOBBY_AI, NFSU2_KEY_LOBBY_INVITE,
+# NFSU2_KEY_PHOTO,
 # NFSU2_KEY_HUD, NFSU2_KEY_MENU, NFSU2_KEY_SONG, NFSU2_KEY_FPS]
 #key_drift = KeyX
 #key_showoff = KeyO
@@ -597,6 +599,7 @@ export const TEMPLATE = `# NFSU2 settings, read at every launch.
 #key_lobby = KeyE
 #key_lobby_new = KeyB
 #key_lobby_private = KeyV
+#key_lobby_ai = KeyL
 #key_lobby_invite = KeyZ
 #key_photo = F12
 #key_hud = F10

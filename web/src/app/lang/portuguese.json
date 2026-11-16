@@ -926,6 +926,11 @@
   "Your last game stopped with an error.": "Seu último jogo parou por causa de um erro.",
   "Results": "Resultados",
   "DNF": "Não terminou",
+  "AI opponent": "Adversário IA",
+  "AI opponents": "Adversários IA",
+  "Your race lobby: AI opponents in its empty spots, or none": "O teu lobby de corrida: adversários IA nos lugares vazios, ou nenhum",
+  "AI opponents fill empty spots": "Adversários IA ocupam os lugares vazios",
+  "No AI opponents": "Sem adversários IA",
   "{n} points": {
     "one": "{n} ponto",
     "many": "{n} de pontos",

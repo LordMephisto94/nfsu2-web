@@ -853,6 +853,11 @@
   "Your last game stopped with an error.": "Το τελευταίο σου παιχνίδι σταμάτησε με σφάλμα.",
   "Results": "Αποτελέσματα",
   "DNF": "ΔΕΝ ΤΕΡΜΑΤΙΣΕ",
+  "AI opponent": "Αντίπαλος AI",
+  "AI opponents": "Αντίπαλοι AI",
+  "Your race lobby: AI opponents in its empty spots, or none": "Το λόμπι του αγώνα σου: αντίπαλοι AI στις κενές θέσεις ή κανένας",
+  "AI opponents fill empty spots": "Αντίπαλοι AI γεμίζουν τις κενές θέσεις",
+  "No AI opponents": "Χωρίς αντιπάλους AI",
   "{n} points": {
     "one": "{n} πόντος",
     "other": "{n} πόντοι"

@@ -6,11 +6,11 @@
 import { language, N, t, tn } from './i18n';
 import { touchFirst } from './device';
 import { drivingPad, PAD_DRIVER_EVENT } from '../input/gamepad';
-import { gameHas, KEY_LOBBY, KEY_LOBBY_INVITE, KEY_LOBBY_NEW, KEY_LOBBY_PRIVATE } from './gamekeys';
+import { gameHas, KEY_LOBBY, KEY_LOBBY_AI, KEY_LOBBY_INVITE, KEY_LOBBY_NEW, KEY_LOBBY_PRIVATE } from './gamekeys';
 import { keyName, siteKey, type OurId } from './sitekeys';
 import { pageDialog } from './padnav';
 import { act, block, el } from './cards';
-import { LB_LEAVE, LB_NEW, LB_NEXT, LB_PRIVATE } from '../input/proto';
+import { LB_AI, LB_LEAVE, LB_NEW, LB_NEXT, LB_PRIVATE } from '../input/proto';
 import type { GameSession } from './game';
 
 /** what the game sends (roam_game.c mp_panel) */
@@ -46,6 +46,8 @@ interface LobbyState {
   /** lobby: Friends & crew only (hosting: its switch); far: we joined it from afar (an invite), so driving away does
    *  not leave it */
   priv?: number; far?: number;
+  /** AI opponents fill the race's empty spots (its host's choice: L) */
+  ai?: number;
   /** hosting: who can join (the card's V, runtime mp_act): stage, its race's stage (upto) and below and the host's
    *  friends and crew; friends, Friends & crew only; all, everyone */
   who?: 'stage' | 'friends' | 'all'; upto?: number;
@@ -68,7 +70,7 @@ export interface LobbyDeps {
 /** a player's points in a URL race's heats so far, me 1 ours */
 interface Standing { n: string; p: number; me?: number }
 /** a row of the race's results: the player's name, f 1 finished, t its time (s) or p a drift's points, me 1 ours */
-interface RaceResult { n: string; f: number; t?: number; p?: number; me?: number }
+interface RaceResult { n: string; f: number; t?: number; p?: number; me?: number; ai?: number }
 
 /** a race's time as the game shows it: 1:02.34 */
 const raceTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toFixed(2).padStart(5, '0')}`;
@@ -148,9 +150,9 @@ const SAID_MS = 6000;
 
 /** the card's keys: the player's for each (sitekeys.ts), and the status bit that says the game has one of its controls
  *  on it (then the key is the game's: gamekeys.ts) */
-const KEYS: Record<'next' | 'fresh' | 'priv' | 'invite', { id: OurId; bit: number }> = {
+const KEYS: Record<'next' | 'fresh' | 'priv' | 'ai' | 'invite', { id: OurId; bit: number }> = {
   next: { id: 'lobby', bit: KEY_LOBBY }, fresh: { id: 'lobbyNew', bit: KEY_LOBBY_NEW }, priv: { id: 'lobbyPrivate', bit: KEY_LOBBY_PRIVATE },
-  invite: { id: 'lobbyInvite', bit: KEY_LOBBY_INVITE },
+  ai: { id: 'lobbyAi', bit: KEY_LOBBY_AI }, invite: { id: 'lobbyInvite', bit: KEY_LOBBY_INVITE },
 };
 
 export class LobbyPanel {
@@ -175,13 +177,14 @@ export class LobbyPanel {
   /** what the card offers now, by its keys: at a start the next lobby (two or more) and a new one beside them (where
    *  the start takes one: the game's pages, pgs, are its lobbies, nl, and a new one's), who can join and invite
    *  (hosting), leave (from afar) */
-  private offers(s: LobbyState): { next?: () => void; fresh?: () => void; priv?: () => void; invite?: () => void } {
-    const d = this.deps, o: { next?: () => void; fresh?: () => void; priv?: () => void; invite?: () => void } = {};
+  private offers(s: LobbyState): { next?: () => void; fresh?: () => void; priv?: () => void; ai?: () => void; invite?: () => void } {
+    const d = this.deps, o: { next?: () => void; fresh?: () => void; priv?: () => void; ai?: () => void; invite?: () => void } = {};
     if (!d) return o;
     if (s.v === 'join' && (s.nl ?? 0) > 1) o.next = () => d.act(LB_NEXT);
     if (s.v === 'join' && (s.pgs ?? 0) > (s.nl ?? 0)) o.fresh = () => d.act(LB_NEW);
     if (s.v === 'lobby' && s.st === 'host') {
       o.priv = () => d.act(LB_PRIVATE);
+      o.ai = () => d.act(LB_AI);
       if ((s.names?.length ?? 0) < (s.max ?? 6)) o.invite = () => d.invite();
     }
     if (s.v === 'lobby' && (s.st === 'in' || s.st === 'asked') && s.far) o.invite = () => d.act(LB_LEAVE);
@@ -364,6 +367,10 @@ export class LobbyPanel {
         settings.push(this.own('priv', who === 'stage' ? t('Stage {n} and below can join', { n: s.upto ?? 1 })
           : who === 'friends' ? t('Friends & crew can join') : t('Everyone can join'), o.priv, '←'));
       }
+      // AI opponents in the race's empty spots (the host's L, D-pad right held); the others see what it chose (split
+      // screen's word for them too)
+      if (o.ai) settings.push(this.own('ai', s.ai ? t('AI opponents fill empty spots') : t('No AI opponents'), o.ai, '→'));
+      else if (s.ai) settings.push(el('div', '', t('AI opponents fill empty spots')));
       // (no invite on a controller's card: the menu's Friends has it)
       if (o.invite && (!mine || !drivingPad() || touchFirst())) settings.push(this.own('invite', mine ? t('Invite friends') : t('Leave'), o.invite, mine ? undefined : '←'));
     }
@@ -390,7 +397,7 @@ export class LobbyPanel {
     let place = 0;
     for (const r of s.res ?? []) {
       const li = el('li', r.me ? 'taken mine' : 'taken');
-      li.append(el('span', 'lobby-n', r.f ? String(++place) : '–'), el('span', 'lobby-name', r.n));
+      li.append(el('span', 'lobby-n', r.f ? String(++place) : '–'), el('span', 'lobby-name', r.ai ? t('AI opponent') : r.n));
       const what = !r.f ? t('DNF') : r.p !== undefined ? tn(r.p, '{n} point', '{n} points') : r.t !== undefined ? raceTime(r.t) : '';
       if (what) li.append(el('span', 'lobby-time', what));
       if (r.me && s.credit && s.credited !== -1) li.append(el('span', 'lobby-prize', `★ ${s.credit === 2 ? t('Friend\'s win') : t('Career win')}`));

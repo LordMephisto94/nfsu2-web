@@ -905,6 +905,11 @@
   "Your last game stopped with an error.": "Ditt senaste spel stoppades av ett fel.",
   "Results": "Resultat",
   "DNF": "Gick ej i mål",
+  "AI opponent": "AI-motståndare",
+  "AI opponents": "AI-motståndare",
+  "Your race lobby: AI opponents in its empty spots, or none": "Din tävlingslobby: AI-motståndare på de tomma platserna, eller inga",
+  "AI opponents fill empty spots": "AI-motståndare fyller tomma platser",
+  "No AI opponents": "Inga AI-motståndare",
   "{n} points": {
     "one": "{n} poäng",
     "other": "{n} poäng"

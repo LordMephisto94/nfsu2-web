@@ -220,12 +220,14 @@ void racenet_carspam(CPU *c, const uint8_t *m, int n, uint32_t from);   /*   a j
 void racenet_list(const uint8_t *m, int n, uint32_t from);              /*   and the creator's list of the joiners */
 void mprace_quit_heard(uint8_t *m, int n, uint32_t from);              /* mprace.c: a racer that quit the race */
 void racecars_heard(const uint8_t *m, int n, uint32_t from);           /* racecars.c: a racer's car from its game */
+void lobbyai_finish_heard(const uint8_t *m, int n, uint32_t from);     /* lobbyai.c: the host's AI racer over the line */
 static void got(CPU *c, uint8_t *m, int n, uint32_t from, uint32_t now){
     if (n >= 4 && !memcmp(m, "N2RS", 4)){ racecars_heard(m, n, from); return; }
     if (n >= 4 && !memcmp(m, "N2FS", 4)){ racenet_heard(m, n, from); return; }
     if (n >= 4 && !memcmp(m, "N2CS", 4)){ racenet_carspam(c, m, n, from); return; }
     if (n >= 4 && !memcmp(m, "N2PL", 4)){ racenet_list(m, n, from); return; }
     if (n >= 4 && !memcmp(m, "N2QT", 4)){ mprace_quit_heard(m, n, from); return; }
+    if (n >= 4 && !memcmp(m, "N2AF", 4)){ lobbyai_finish_heard(m, n, from); return; }
     if (n >= MSG_N && !memcmp(m, "N2QC", 4)){ if (m[4] == 1) qc_got(m, from, now); return; }
     if (n < MSG_N || memcmp(m, "N2HN", 4) || m[4] != 1) return;
     char name[NAME_N];

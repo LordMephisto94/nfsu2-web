@@ -36,6 +36,7 @@ void powerunits_install(void);
 
 /* ---- instruction hooks: 1 when the address is the hook's ------------------- */
 int splitscreen_hook(CPU *c, uint32_t ip);
+int lobbyai_hook(CPU *c, uint32_t ip);
 int coop_hook(CPU *c, uint32_t ip);
 int ws_hook(CPU *c, uint32_t ip);
 int roam_hook(CPU *c, uint32_t ip);
@@ -69,6 +70,7 @@ void carspot_frame(void);
 void walls_frame(void);
 void travel_frame(CPU *c);
 void mprace_frame(CPU *c);
+void lobbyai_frame(CPU *c);
 void mpcredit_frame(CPU *c);
 int  roam_asipeer_frame(CPU *c);           /* 1: the Windows plugin under Unicorn took roam_game_frame's place */
 void roam_game_frame(CPU *c);

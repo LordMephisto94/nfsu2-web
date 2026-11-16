@@ -115,6 +115,11 @@ static int publish(void){
         row[nr].top = rdf(x + 0x10cu);
         row[nr].dist = rdf(x + 0x110u) * secs;
         row[nr].finished = MR32(x + 8u) == 1u;
+        {   /* a lobby race's AI racer (its id its racer index, 100 ..: lobbyai.c): no network record behind its row, so
+             * +8 is not the game's; finished by its laps (below) and a time */
+            uint32_t id = MR32(x + 4u) & 0xffffu;
+            if (id >= 100u && id < 116u) row[nr].finished = t > 0u && t < 4000u * 3600u;
+        }
         if (row[nr].laps > far) far = row[nr].laps;
         nr++;
     }

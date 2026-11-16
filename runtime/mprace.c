@@ -880,7 +880,7 @@ int mprace_quit_fee(void){ return fee_of(mprace_prize_of(1)); }
 static void credit_decide(void){
     int first = -1, second = -1;
     for (int k = 0; k < M.nres; k++) if (M.res[k].finished){ if (first < 0) first = k; else if (second < 0) second = k; }
-    snprintf(M.winner, sizeof M.winner, "%s", first >= 0 ? M.res[first].name : "");
+    snprintf(M.winner, sizeof M.winner, "%s", first >= 0 && !M.res[first].ai ? M.res[first].name : "");   /* (an AI racer: none to credit) */
     M.credit = MPC_NONE; M.lead = 0.f;
     /* the winner's margin as the game measures it (mpcredit.h): the next finisher's time over the winner's,
      * (1 - t1 / t2) x 100, a drift race's points (p1 / p2 - 1) x 100; 100 when nobody else finished.  Ours when we
@@ -898,11 +898,13 @@ static void credit_decide(void){
     M.logged_credit = M.credit + 1; M.logged_cplace = M.place; snprintf(M.logged_winner, sizeof M.logged_winner, "%s", M.winner);
     fprintf(stderr, "[mprace] f=%ld the race in the career: %s (place %d, winner %s%s%s, margin %.2f)\n", autotest_frame(),
             !M.r.credit ? "it does not count for us" : M.credit == MPC_WON ? "we won it: it counts" : M.credit == MPC_FRIEND ? "our friend won it: it counts" : "not won",
-            M.place, M.winner[0] ? M.winner : "none", M.credit == MPC_FRIEND ? ", a friend" : "", "", (double)M.lead);
+            M.place, M.winner[0] ? M.winner : first >= 0 && M.res[first].ai ? "an AI racer" : "none", M.credit == MPC_FRIEND ? ", a friend" : "", "", (double)M.lead);
 }
 int mprace_credit(void){ return M.credit; }
 int mprace_credited(void){ return M.credited; }
 int mprace_counts(void){ return M.r.credit != 0; }
+const MpRace *mprace_lobby(void){ return M.goal == G_RACE_GOAL && M.phase != MPR_IDLE && M.phase != MPR_DONE && M.phase != MPR_FAILED ? &M.r : 0; }
+int mprace_lobby_racing(void){ return M.goal == G_RACE_GOAL && M.phase == MPR_RACE; }
 int mprace_topup(void){ return M.topup; }
 const char *mprace_winner(void){ return M.winner; }
 
@@ -1090,7 +1092,49 @@ static int results_place(void){
  * when the race ended too (30 s after the first was over the line: a player who stood still had a time and 2nd
  * place), so a racer finished where it came as many whole laps as the farthest (not the race's laps: a downhill drift
  * is one run of a 2-lap network race).  Into M.res; log: each in the log too */
+/* A lobby race with AI racers: the game ranks a network race's racers by the network's finishes, which only the
+ * players report, so its rows ([0x851044], the results screen's order) had a test's AI racers first and third behind
+ * players 8 s slower (AI 43.78 s, player 51.91 s, AI 44.03 s, player 51.91 s).  Here the rows go in the order they
+ * finished: those over the line (a player's row as results_read counts it, an AI racer's by its laps and time) by
+ * their time (a drift by its points), then the others by how far they came.  Every reader of the rows (the results
+ * screen, results_read, raceresult.c) then has the same order.  Only with an AI racer among the rows. */
+static void ai_rows_sort(void){
+    if (!(guest_rd32(G_GAMEMODE) & 0x200u) || M.goal != G_RACE_GOAL) return;
+    uint32_t n = guest_rd32(G_RESULTS_N), e[MPRACE_RESULTS_MAX]; int ne = 0, ai = 0;
+    if (!n || n > MPRACE_RESULTS_MAX) return;
+    float far = 0.f;
+    for (uint32_t k = 0; k < n; k++){
+        uint32_t x = guest_rd32(G_RESULTS + 4u * k);
+        if (!guest_ok(x, 0x224)) return;
+        e[ne++] = x;
+        uint32_t id = MR32(x + 4u) & 0xffffu;
+        ai |= id >= 100u && id < 116u;
+        if (MRF32(x + 0xc8u) > far && MRF32(x + 0xc8u) < 1000.f) far = MRF32(x + 0xc8u);
+    }
+    if (!ai) return;
+    int drift = guest_rd32(G_NET + N_MODE) == 3u, fin[MPRACE_RESULTS_MAX]; float key[MPRACE_RESULTS_MAX];
+    for (int k = 0; k < ne; k++){
+        uint32_t x = e[k], id = MR32(x + 4u) & 0xffffu, t = MR32(x + 0xcu);
+        float laps = MRF32(x + 0xc8u);
+        int over = far >= 1.f && laps < 1000.f && floorf(laps) >= floorf(far);
+        fin[k] = id >= 100u && id < 116u ? over && t > 0u && t < 4000u * 3600u : MR32(x + 8u) == 1u && over;
+        key[k] = fin[k] ? (drift ? -MRF32(x + 0x104u) : (float)t) : -laps;
+    }
+    int moved = 0;
+    for (int a = 1; a < ne; a++)
+        for (int b = a; b > 0 && (fin[b] > fin[b - 1] || (fin[b] == fin[b - 1] && key[b] < key[b - 1])); b--){
+            uint32_t tx = e[b]; e[b] = e[b - 1]; e[b - 1] = tx;
+            int tf = fin[b]; fin[b] = fin[b - 1]; fin[b - 1] = tf;
+            float tk = key[b]; key[b] = key[b - 1]; key[b - 1] = tk;
+            moved = 1;
+        }
+    if (!moved) return;
+    for (int k = 0; k < ne; k++) MR32(G_RESULTS + 4u * (uint32_t)k) = e[k];
+    static uint32_t said;
+    if (said != e[0]){ said = e[0]; fprintf(stderr, "[mprace] f=%ld the results' rows put in the order they finished (AI racers in the race)\n", autotest_frame()); }
+}
 static void results_read(int log){
+    ai_rows_sort();
     uint32_t pl = guest_rd32(G_PLAYER1), car = pl ? guest_rd32(pl + 4u) : 0, n = guest_rd32(G_RESULTS_N), e[MPRACE_RESULTS_MAX];
     int ours = guest_ok(car, 0xc) ? (int)(uint16_t)MR16(car + 0xau) : -1, drift = guest_rd32(G_NET + N_MODE) == 3u, ne = 0;
     float far = 0.f;
@@ -1105,6 +1149,7 @@ static void results_read(int log){
         MpResult *r = &M.res[M.nres++];
         memset(r, 0, sizeof *r);
         uint32_t id = MR32(e[k] + 4u) & 0xffffu, np = id < 8u ? guest_rd32(G_NETPLAYERS + 4u * id) : 0, t = MR32(e[k] + 0xcu);
+        r->ai = id >= 100u && id < 116u;               /* a lobby race's AI racer (its racer index: no network player) */
         float laps = MRF32(e[k] + 0xc8u), pts = MRF32(e[k] + 0x104u), avg = MRF32(e[k] + 0x110u), top = MRF32(e[k] + 0x10cu);
         if (guest_ok(np, 0x22)) for (int i = 0; i < (int)sizeof r->name - 1 && MR8(np + 0x12u + (uint32_t)i); i++) r->name[i] = (char)MR8(np + 0x12u + (uint32_t)i);
         r->ours = (int)id == ours;
@@ -1112,12 +1157,14 @@ static void results_read(int log){
         r->clock = t < 4000u * 3600u ? (float)t / 4000.f : 0.f;
         r->dist = avg >= 0.f && avg < 1000.f && t < 4000u * 3600u ? avg * (float)t / 4000.f : 0.f;
         r->finished = MR32(e[k] + 8u) == 1u && far >= 1.f && laps < 1000.f && floorf(laps) >= floorf(far);
+        /* an AI racer's row has no network record behind it (+8 as the game left it): finished by its laps and time */
+        if (r->ai) r->finished = far >= 1.f && laps < 1000.f && floorf(laps) >= floorf(far) && t > 0u && t < 4000u * 3600u;
         r->jump = r->ours ? 0.f : racenet_jump(r->name);
         if (r->finished && drift) r->points = pts > 0.f && pts < 1e7f ? (int)(pts + 0.5f) : 0;
         else if (r->finished) r->time = t < 4000u * 3600u ? (float)t / 4000.f : 0.f;
         if (log) fprintf(stderr, "[mprace]   row %d: car %04x%s, %s, %s, %.2f s, %.0f points, %.3f laps, "
                          "average %.2f m/s (%.0f m), top %.2f m/s, its largest jump %.1f m\n", k + 1, id, r->ours ? " (ours)" : "",
-                         r->name, r->finished ? "finished" : "not finished", (double)t / 4000.0, (double)pts, (double)laps,
+                         r->ai ? "an AI racer" : r->name, r->finished ? "finished" : "not finished", (double)t / 4000.0, (double)pts, (double)laps,
                          (double)avg, (double)r->dist, (double)top, (double)r->jump);
     }
 }

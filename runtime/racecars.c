@@ -124,6 +124,13 @@
 #define FN_DRIVEN    0x005a2a60u   /* a car of kind 3 driven by its states */
 #define RET_DRIVEN   0x005f8d0cu
 #define HORN_PORT    3659u
+/* a lobby race's AI racers (lobbyai.c): their cars carry their racer index as their race slot (100 ..), the
+ * creator's game drives them and sends their states as its own car's (N2RS with that slot); a joiner's copies have
+ * no driver (lobbyai.c) and are put from those states each frame, their physics off (ai_frame) */
+#define AI_SLOT0     100
+#define AI_SLOTS     8
+#define CAR_REC      0x14u         /* a car: its racer record (+4 its kind: 2 an AI racer) */
+#define CAR_DRIVER   0x24u         /* a car: its driver (3 an AI racer, 0 none) */
 
 #define HZ           60            /* our car's states a second at most */
 #define NSTATES      1             /* states a message (newest first: over a WebSocket nothing is lost) */
@@ -164,6 +171,8 @@
 int vlan_rt_send(uint16_t port, uint32_t ip_h, const void *p, int n);
 int racenet_race_peers(uint32_t *ip_h, int max);   /* racenet.c: the other racers' addresses */
 int racenet_slot_of(uint32_t ip_h);                /*   and the slot each drives (-1 none, -2 not known) */
+int racenet_is_creator(void);                      /*   this game created the race */
+int racenet_from_creator(uint32_t ip_h);           /*   a joiner: ip is the creator's */
 /* roam_game.c: free roam's friends' engines */
 void roam_game_engine_state(uint32_t car, rc_state *s);
 int  roam_game_engine_files(CPU *c, uint32_t ride, char gin[2][32], float *idle, float *most);
@@ -302,6 +311,7 @@ static void clock_frame(int racing){
 /* ---- the other racers ---- */
 typedef struct {
     uint32_t ip; int slot;                        /* its address, the slot it speaks for (-1: none yet) */
+    int ai;                                       /* an AI racer's car the creator drives (slot AI_SLOT0 ..) */
     uint32_t car;                                 /* its world car (by the slot) */
     char name[16];
     rc_interp mo;
@@ -320,6 +330,7 @@ typedef struct {
     float tp[3], tm[3]; float th; int thave;      /* NFSU2_RACECARS_TRACE: the place drawn last step, its move, the step */
     float putp[3], putv[3]; int puts;             /*   where we put it this pass, its velocity then, how often */
     float dist;
+    float com[3]; uint32_t remode;                /* an AI racer's car (ai_frame): its centre of mass, physics turned off */
     rc_pose eng; int eng_ok;                      /* its engine as drawn last step (eng, its volumes; eng_ok: its states carry one) */
     char gin[2][32]; float idle, most;            /* its engine's GIN files (roam_game_engine_files) for ... */
     uint32_t gin_car; int heard;                  /* ... this car; carsfx.c plays it (its AI engine silenced) */
@@ -332,10 +343,10 @@ typedef struct {
 } Rc;
 static Rc g_rc[NCARS];
 static uint32_t g_world;
-static struct { uint32_t refused, bad, sent_err; } S;
+static struct { uint32_t refused, bad, sent_err, ai_sent, ai_refused; } S;
 
 static Rc *rc_of_ip(uint32_t ip, int add){
-    for (int i = 0; i < NCARS; i++) if (g_rc[i].ip == ip) return &g_rc[i];
+    for (int i = 0; i < NCARS; i++) if (g_rc[i].ip == ip && !g_rc[i].ai) return &g_rc[i];
     if (!add) return 0;
     for (int i = 0; i < NCARS; i++) if (!g_rc[i].ip){
         memset(&g_rc[i], 0, sizeof g_rc[i]);
@@ -344,6 +355,26 @@ static Rc *rc_of_ip(uint32_t ip, int add){
         return &g_rc[i];
     }
     return 0;
+}
+/* an AI racer's car the creator at ip sends */
+static Rc *rc_of_ai(uint32_t ip, int slot, int add){
+    for (int i = 0; i < NCARS; i++) if (g_rc[i].ip == ip && g_rc[i].ai && g_rc[i].slot == slot) return &g_rc[i];
+    if (!add) return 0;
+    for (int i = 0; i < NCARS; i++) if (!g_rc[i].ip){
+        memset(&g_rc[i], 0, sizeof g_rc[i]);
+        g_rc[i].ip = ip; g_rc[i].slot = slot; g_rc[i].ai = 1; g_rc[i].gq[3] = 1.f;
+        snprintf(g_rc[i].name, sizeof g_rc[i].name, "AI %d", slot);
+        rc_interp_reset(&g_rc[i].mo);
+        return &g_rc[i];
+    }
+    return 0;
+}
+/* a car of an AI racer (its record's kind 2) with its race slot in AI_SLOT0 .. */
+static int ai_car(uint32_t car){
+    if (!guest_ok(car, 0x9e0)) return 0;
+    int slot = (int16_t)MR16(car + CAR_SLOT);
+    uint32_t rec = guest_rd32(car + CAR_REC);
+    return slot >= AI_SLOT0 && slot < AI_SLOT0 + AI_SLOTS && guest_ok(rec, 8) && MR8(rec + 4u) == 2u;
 }
 /* the racer whose car this is, while its states come */
 static Rc *rc_of_car(uint32_t car){
@@ -395,6 +426,25 @@ static int own_state(rc_state *s, uint32_t car){
     s->ext = s->eng != 0;
     return 1;
 }
+/* a car's state to every racer: N2RS with its slot */
+static void send_state(int slot, const rc_state *s, uint8_t epoch, const uint32_t *peers, int np){
+    int64_t t = now_us();
+    for (int k = 0; k < np; k++){
+        uint8_t m[24 + NSTATES * (RC_STATE_BYTES + RC_STATEX_BYTES)];
+        rc_w w; rc_w_init(&w, m, sizeof m);
+        rc_putb(&w, "N2RS", 4); rc_put8(&w, 1); rc_put8(&w, s->ext); rc_put8(&w, (uint32_t)slot); rc_put8(&w, 1);
+        rc_put8(&w, epoch); rc_put8(&w, K.clock); rc_put8(&w, K.paused > 1 ? RC_ST_PAUSED : RC_ST_ROAM); rc_put8(&w, 0);
+        rc_put32(&w, (uint32_t)t);
+        Rc *r = rc_of_ip(peers[k], 0);
+        int fresh = r && r->their_at && t - r->their_at < 2000000;
+        rc_put32(&w, fresh ? r->their_tx : 0u);
+        rc_put32(&w, fresh ? (uint32_t)(t - r->their_at) : 0u);
+        rc_state_put(&w, s, s->ext);
+        if (w.err) continue;
+        if (vlan_rt_send(HORN_PORT, peers[k], m, (int)w.n)) S.sent_err++;
+        else K.ndg++;
+    }
+}
 static void send_frame(void){
     uint32_t car = my_car();
     if (!guest_ok(car, 0x9e0)) return;
@@ -416,22 +466,39 @@ static void send_frame(void){
     K.sent = K.s; K.nsent++;
     int slot = (int16_t)MR16(car + CAR_SLOT);              /* as the others find our car (the game's G_MYSLOT is not the creator's own) */
     if (slot < 0 || slot >= 6) return;
-    int64_t t = now_us();
-    for (int k = 0; k < np; k++){
-        uint8_t m[24 + NSTATES * (RC_STATE_BYTES + RC_STATEX_BYTES)];
-        rc_w w; rc_w_init(&w, m, sizeof m);
-        rc_putb(&w, "N2RS", 4); rc_put8(&w, 1); rc_put8(&w, s.ext); rc_put8(&w, (uint32_t)slot); rc_put8(&w, 1);
-        rc_put8(&w, K.epoch); rc_put8(&w, K.clock); rc_put8(&w, K.paused > 1 ? RC_ST_PAUSED : RC_ST_ROAM); rc_put8(&w, 0);
-        rc_put32(&w, (uint32_t)t);
-        Rc *r = rc_of_ip(peers[k], 0);
-        int fresh = r && r->their_at && t - r->their_at < 2000000;
-        rc_put32(&w, fresh ? r->their_tx : 0u);
-        rc_put32(&w, fresh ? (uint32_t)(t - r->their_at) : 0u);
-        rc_state_put(&w, &s, s.ext);
-        if (w.err) continue;
-        if (vlan_rt_send(HORN_PORT, peers[k], m, (int)w.n)) S.sent_err++;
-        else K.ndg++;
+    send_state(slot, &s, K.epoch, peers, np);
+    /* the creator: its AI racers' cars too (lobbyai.c), each by its race slot */
+    if (racenet_is_creator()){
+        uint32_t w = guest_rd32(G_WORLD), x = guest_rd32(w);
+        for (int k = 0; x && x != w && k < 64 && guest_ok(x, 0x9e0); k++, x = guest_rd32(x)){
+            if (!ai_car(x) || guest_rd32(x + CAR_DRIVER) != 3u) continue;
+            rc_state a;
+            if (!own_state(&a, x)) continue;
+            send_state((int16_t)MR16(x + CAR_SLOT), &a, 0, peers, np);
+            S.ai_sent++;
+        }
     }
+}
+
+/* an AI racer's state from the creator (lobbyai.c): only the creator's, only for a car that is an AI
+ * racer's here, one entry an AI slot */
+static void ai_heard(const uint8_t *m, int n, uint32_t from, int slot, int ns){
+    uint32_t car = car_of_slot(slot);
+    if (!racenet_from_creator(from) || ns < 1 || ns > 3 || !ai_car(car)){ S.ai_refused++; return; }
+    Rc *r = rc_of_ai(from, slot, 1);
+    if (!r){ S.ai_refused++; return; }
+    rc_r rd; rc_r_init(&rd, m + 24, (uint32_t)n - 24u);
+    rc_state st[3];
+    for (int k = 0; k < ns; k++) if (rc_state_get(&rd, &st[k], m[5] & 1) != RC_OK){ S.bad++; return; }
+    r->car = car;
+    int64_t t = now_us();
+    if (r->n){
+        int64_t g = t - r->rx_at;
+        if (g > r->gap_max) r->gap_max = g;
+        r->g250 += g > 250000; r->g500 += g > 500000;
+    }
+    r->n++; r->rx_at = t;
+    for (int k = ns - 1; k >= 0; k--) rc_interp_insert(&r->mo, &st[k], m[8], m[9], m[10], (int64_t)K.s + (t - K.host), k == 0);
 }
 
 /* ---- an N2RS from the horn's port (racehorn.c, the game thread) ---- */
@@ -442,6 +509,7 @@ void racecars_heard(const uint8_t *m, int n, uint32_t from){
     for (int k = 0; k < np; k++) known |= peers[k] == from;
     int slot = m[6], ns = m[7];
     uint32_t me = my_car();
+    if (known && slot >= AI_SLOT0 && slot < AI_SLOT0 + AI_SLOTS){ ai_heard(m, n, from, slot, ns); return; }
     if (!known || slot >= 6 || !guest_ok(me, 0x9e0) || slot == (int16_t)MR16(me + CAR_SLOT) || ns < 1 || ns > 3){ S.refused++; return; }
     /* only the slot its game drives, as the creator knows it (racenet_slot_of) */
     int want = racenet_slot_of(from);
@@ -710,6 +778,85 @@ drawn:
     return 1;
 }
 
+/* Each frame after the world's step, before the render (racecars_frame): each AI racer's car the creator sends, put
+ * where its states say now, as free roam puts a friend's car (roam_game.c apply_pose).  Put before the world's step
+ * through the network's blend (0x5F8810) it went back to the grid the next step (a test: put 5.0, 5.1 .. 5.7 m a step
+ * from the same place): a car whose driver is none keeps its place in its physics, which the blend does not reach.
+ * So, as free roam's friends' cars: its physics off (SetPhysicsMode 0), and its place, the drawn place (+0x50: the
+ * place less its centre of mass, measured once in the car's own frame through 0x5F5010), velocity, orientation (both
+ * copies), spin, heading, speed, rpm, gear and controls written each frame, then the road tracker and the track
+ * section as Car::SetPosition updates them. */
+#define FN_CAR_SETPHYS  0x005f46a0u   /* thiscall (mode) */
+#define FN_CAR_SECTION  0x005f6cd0u   /* thiscall (): track section / collider after a move */
+#define FN_ROADTRACK    0x005da330u   /* thiscall (car +0x8D8, pos*) */
+#define FN_CAR_BODYPOS  0x005f5010u   /* thiscall (): +0x50 = +0x60 - centre-of-mass offset */
+static void ai_frame(CPU *c){
+    if (racenet_is_creator()) return;
+    uint32_t me = my_car();
+    float mp[3] = {0};
+    if (guest_ok(me, 0x9e0)) rd3(me + CAR_POS, mp);
+    int64_t t = now_us();
+    for (int i = 0; i < NCARS; i++){
+        Rc *r = &g_rc[i];
+        if (!r->ip || !r->ai || !r->mo.n || t - r->rx_at > STALE_US) continue;
+        uint32_t car = r->car;
+        if (!ai_car(car) || !in_world(guest_rd32(G_WORLD), car)){ r->car = car_of_slot(r->slot); r->gin_car = 0; r->dinit = 0; r->steps = 0; continue; }
+        if (guest_rd32(car + CAR_DRIVER) != 0u) continue;           /* (mprace.c takes its driver first) */
+        if (!r->steps){
+            /* the centre of mass in the car's own frame (roam_game.c's measure), its physics off */
+            gcall_main(c, FN_CAR_BODYPOS, car, 0, 0);
+            for (int k = 0; k < 3; k++){ r->com[k] = MRF32(car + 0x60u + 4u * (uint32_t)k) - MRF32(car + 0x50u + 4u * (uint32_t)k);
+                if (!__builtin_isfinite(r->com[k]) || __builtin_fabsf(r->com[k]) > 3.f) r->com[k] = 0; }
+        }
+        if (guest_rd32(car + 0x28u) != 0u){
+            uint32_t z = 0, was = guest_rd32(car + 0x28u);
+            gcall_main(c, FN_CAR_SETPHYS, car, 1, &z);
+            if (r->remode++ < 3) fprintf(stderr, "[racecars] %s: its physics off (mode %u -> %u)\n", r->name, was, guest_rd32(car + 0x28u));
+        }
+        double te = K.s + (double)O.lead_us;
+        int64_t fdt = r->evals ? (int64_t)(te - (double)r->last_eval) : 0;
+        if (fdt < 0) fdt = 0;
+        r->last_eval = (int64_t)te; r->evals++;
+        float cp[3]; rd3(car + CAR_POS, cp);
+        float d[3] = { cp[0] - mp[0], cp[1] - mp[1], cp[2] - mp[2] }, dist = len3(d);
+        if (!__builtin_isfinite(dist)) dist = 0.f;
+        r->dist = dist;
+        Rc *host = rc_of_ip(r->ip, 0);                               /* the creator's round trip, from its own car */
+        int32_t way = host ? rtt_min(host) / 2 : 0;
+        if (way > ONEWAY_MAX) way = ONEWAY_MAX;
+        float u = clampf((dist - O.near_m) / (O.far_m - O.near_m), 0.f, 1.f);
+        int64_t want = (int64_t)((1.f - u) * (float)(-way) + u * (float)O.ghost_us);
+        if (!r->dinit){ r->delay = want; r->dinit = 1; }
+        { int64_t lim = (int64_t)((double)fdt * SLEW) + 1, dd = want - r->delay; r->delay += dd > lim ? lim : dd < -lim ? -lim : dd; }
+        if (u < 0.5f) r->near_steps++; else r->far_steps++;
+        rc_pose o;
+        if (!rc_interp_eval(&r->mo, (int64_t)te, fdt, r->delay, CAP_US, &o)) continue;
+        r->eng = o; r->eng_ok = o.ext && o.eng > 0.f;
+        float vs = (float)(K.vscale > 0.05 ? K.vscale : 1.0), f[3], l[3], up[3];
+        if (!finite_n(o.p, 3) || !finite_n(o.q, 4) || !finite_n(o.v, 3)) continue;
+        rc_q2m(o.q, f, l, up);
+        for (uint32_t k = 0; k < 3; k++){
+            uint32_t of = 4u * k;
+            MRF32(car + 0x60u + of) = o.p[k];
+            MRF32(car + 0x50u + of) = o.p[k] - (r->com[0] * f[k] + r->com[1] * l[k] + r->com[2] * up[k]);
+            MRF32(car + 0x70u + of) = o.v[k] / vs; MRF32(car + 0x110u + of) = finite_n(o.w, 3) ? o.w[k] / vs : 0.f;
+            MRF32(car + 0x90u + of) = f[k]; MRF32(car + 0xa0u + of) = l[k]; MRF32(car + 0xb0u + of) = up[k];
+            MRF32(car + 0xd0u + of) = f[k]; MRF32(car + 0xe0u + of) = l[k]; MRF32(car + 0xf0u + of) = up[k];
+        }
+        MR16(car + 0x40cu) = (uint16_t)(int)(__builtin_atan2f(f[1], f[0]) / (2.f * 3.14159265f) * 65536.f);
+        MRF32(car + 0x42cu) = o.speed; MRF32(car + 0x430u) = o.speed; MRF32(car + 0x440u) = o.rpm;
+        MR32(car + 0x434u) = (uint32_t)(int32_t)o.gear;
+        controls(car, &o);
+        uint32_t pos = car + 0x60u;
+        gcall_main(c, FN_ROADTRACK, car + 0x8d8u, 1, &pos);
+        gcall_main(c, FN_CAR_SECTION, car, 0, 0);
+        { float dd[3] = { o.p[0] - cp[0], o.p[1] - cp[1], o.p[2] - cp[2] };
+          if (len3(dd) > BIG_M && r->steps && r->bigs++ < BIG_LINES)
+              fprintf(stderr, "[racecars] %s put %.1f m from where it was (%d states, %.0f m away)\n", r->name, (double)len3(dd), r->mo.n, (double)dist); }
+        r->steps++;
+    }
+}
+
 /* ---- the other cars' engines (above): carsfx.c, heard from the camera ---- */
 static int g_sounding;                            /* carsfx.c was given cars last frame */
 static void engines_frame(CPU *c, int racing){
@@ -759,11 +906,12 @@ void racecars_frame(CPU *c){
     int racing = O.on && in_race();
     uint32_t w = guest_rd32(G_WORLD);
     if (!racing || w != g_world){
-        if (!racing){ memset(g_rc, 0, sizeof g_rc); S.refused = S.bad = S.sent_err = 0; }
+        if (!racing){ memset(g_rc, 0, sizeof g_rc); S.refused = S.bad = S.sent_err = S.ai_sent = S.ai_refused = 0; }
         g_world = racing ? w : 0;
     }
     clock_frame(racing);
     if (racing) send_frame();
+    if (racing) ai_frame(c);
     engines_frame(c, racing);
     /* NFSU2_RACECARS_TRACE: a car moved between our put (the world's step) and here (before the frame is drawn) */
     if (racing && O.trace) for (int i = 0; i < NCARS; i++){
@@ -784,7 +932,8 @@ void racecars_frame(CPU *c){
 void racecars_log(double secs){
     if (!racecars_on()) return;
     fprintf(stderr, "[racecars]   our car: %u states to the others (%.1f/s), %u datagrams, %u not sent; %u refused, %u bad; "
-            "stamp clock set anew %u times\n", K.nsent, secs > 0 ? K.nsent / secs : 0., K.ndg, S.sent_err, S.refused, S.bad, K.snaps);
+            "stamp clock set anew %u times; AI racers' states sent %u, refused %u\n", K.nsent, secs > 0 ? K.nsent / secs : 0., K.ndg,
+            S.sent_err, S.refused, S.bad, K.snaps, S.ai_sent, S.ai_refused);
     for (int i = 0; i < NCARS; i++){
         Rc *r = &g_rc[i];
         if (!r->ip) continue;

@@ -947,6 +947,11 @@
   "Your last game stopped with an error.": "Остання гра зупинилася через помилку.",
   "Results": "Результати",
   "DNF": "Без фінішу",
+  "AI opponent": "ШІ-суперник",
+  "AI opponents": "ШІ-суперники",
+  "Your race lobby: AI opponents in its empty spots, or none": "Твоє лобі гонки: ШІ-суперники на вільних місцях або без них",
+  "AI opponents fill empty spots": "ШІ-суперники займають вільні місця",
+  "No AI opponents": "Без ШІ-суперників",
   "{n} points": {
     "one": "{n} очко",
     "few": "{n} очки",

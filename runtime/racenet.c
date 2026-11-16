@@ -637,6 +637,10 @@ int racenet_slot_of(uint32_t ip){
     for (uint32_t k = 0; k < g_pl.n; k++) if (g_pl.ip[k] == ip) return g_pl.slot[k];
     return -1;
 }
+/* a lobby race's AI racers (racecars.c): this game created the race; ip is the creator's (on a joiner, the address
+ * its list came from) */
+int racenet_is_creator(void){ return is_host(); }
+int racenet_from_creator(uint32_t ip){ return !is_host() && g_pl.at && ip == g_pl.from; }
 /* the creator's list to each joiner: the others and their slots (every
  * PL_MS, racenet_frame).  Only the race peers the game's race link sends to
  * (its joiners), not everyone who sent a datagram to our UDP 3658 (above). */
