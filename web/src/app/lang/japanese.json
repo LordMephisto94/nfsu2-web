@@ -1601,5 +1601,6 @@
   "Your own mix of mods.": "あなた独自のMODの組み合わせ。",
   "Mods: {name}. Applies the next time you press Play.": "MOD：{name}。次に「プレイ」を押したときに反映されます。",
   "The game's own textures, sharper.": "ゲーム本来のテクスチャを、より鮮明に。",
-  "Your car signals by itself before a turn on the GPS route.": "GPSのルートで曲がる前に、車が自動でウインカーを出します。"
+  "Your car signals by itself before a turn on the GPS route.": "GPSのルートで曲がる前に、車が自動でウインカーを出します。",
+  "Engine upgrades no longer swap a car's sound.": "エンジンのアップグレードで車の音が変わらなくなります。"
 }

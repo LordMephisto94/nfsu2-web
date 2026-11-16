@@ -87,6 +87,7 @@ export const MOD_CONTROLS: Record<string, Control> = {
   crash_damage: { t: 'switch' },
   catchup: { t: 'seg', opts: [['original', N('Original')], ['noboost', N('No boost')], ['off', N('Off')]] },
   gearbox_whine: { t: 'switch' },
+  keep_engine: { t: 'switch' },
   gps_signals: { t: 'switch' },
   hq_vinyls: { t: 'switch' },
   open_tunnel: { t: 'switch' },

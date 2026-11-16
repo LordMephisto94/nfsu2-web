@@ -1624,5 +1624,6 @@
   "Your own mix of mods.": "Ο δικός σου συνδυασμός mod.",
   "Mods: {name}. Applies the next time you press Play.": "Mod: {name}. Ισχύει την επόμενη φορά που θα πατήσεις Παιχνίδι.",
   "The game's own textures, sharper.": "Οι υφές του ίδιου του παιχνιδιού, πιο καθαρές.",
-  "Your car signals by itself before a turn on the GPS route.": "Το αυτοκίνητό σου βάζει φλας μόνο του πριν από μια στροφή στη διαδρομή του GPS."
+  "Your car signals by itself before a turn on the GPS route.": "Το αυτοκίνητό σου βάζει φλας μόνο του πριν από μια στροφή στη διαδρομή του GPS.",
+  "Engine upgrades no longer swap a car's sound.": "Οι αναβαθμίσεις κινητήρα δεν αλλάζουν πια τον ήχο ενός αυτοκινήτου."
 }

@@ -1744,5 +1744,6 @@
   "Your own mix of mods.": "Twój własny zestaw modów.",
   "Mods: {name}. Applies the next time you press Play.": "Mody: {name}. Zadziała po następnym naciśnięciu Graj.",
   "The game's own textures, sharper.": "Własne tekstury gry, ostrzejsze.",
-  "Your car signals by itself before a turn on the GPS route.": "Twój samochód sam włącza kierunkowskaz przed skrętem na trasie GPS."
+  "Your car signals by itself before a turn on the GPS route.": "Twój samochód sam włącza kierunkowskaz przed skrętem na trasie GPS.",
+  "Engine upgrades no longer swap a car's sound.": "Ulepszenia silnika nie zmieniają już dźwięku samochodu."
 }

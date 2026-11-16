@@ -1744,5 +1744,6 @@
   "Your own mix of mods.": "Tvoja vlastná kombinácia módov.",
   "Mods: {name}. Applies the next time you press Play.": "Módy: {name}. Platí od ďalšieho stlačenia Hrať.",
   "The game's own textures, sharper.": "Vlastné textúry hry, ostrejšie.",
-  "Your car signals by itself before a turn on the GPS route.": "Tvoje auto samo zabliká pred odbočkou na trase GPS."
+  "Your car signals by itself before a turn on the GPS route.": "Tvoje auto samo zabliká pred odbočkou na trase GPS.",
+  "Engine upgrades no longer swap a car's sound.": "Vylepšenia motora už nemenia zvuk auta."
 }

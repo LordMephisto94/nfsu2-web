@@ -1744,5 +1744,6 @@
   "Your own mix of mods.": "Твой собственный набор модов.",
   "Mods: {name}. Applies the next time you press Play.": "Моды: {name}. Применится при следующем нажатии «Играть».",
   "The game's own textures, sharper.": "Собственные текстуры игры, чётче.",
-  "Your car signals by itself before a turn on the GPS route.": "Твоя машина сама включает поворотник перед поворотом на маршруте GPS."
+  "Your car signals by itself before a turn on the GPS route.": "Твоя машина сама включает поворотник перед поворотом на маршруте GPS.",
+  "Engine upgrades no longer swap a car's sound.": "Улучшения двигателя больше не меняют звук машины."
 }

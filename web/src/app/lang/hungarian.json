@@ -1600,5 +1600,6 @@
   "Your own mix of mods.": "A saját modválogatásod.",
   "Mods: {name}. Applies the next time you press Play.": "Modok: {name}. A Játék következő megnyomásakor lép életbe.",
   "The game's own textures, sharper.": "A játék saját textúrái, élesebben.",
-  "Your car signals by itself before a turn on the GPS route.": "Az autód magától indexel a GPS-útvonal kanyarai előtt."
+  "Your car signals by itself before a turn on the GPS route.": "Az autód magától indexel a GPS-útvonal kanyarai előtt.",
+  "Engine upgrades no longer swap a car's sound.": "A motorfejlesztések már nem cserélik le az autó hangját."
 }

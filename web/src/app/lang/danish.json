@@ -1684,5 +1684,6 @@
   "Your own mix of mods.": "Din egen blanding af mods.",
   "Mods: {name}. Applies the next time you press Play.": "Mods: {name}. Gælder næste gang du trykker på Spil.",
   "The game's own textures, sharper.": "Spillets egne teksturer, skarpere.",
-  "Your car signals by itself before a turn on the GPS route.": "Din bil blinker af sig selv før et sving på GPS-ruten."
+  "Your car signals by itself before a turn on the GPS route.": "Din bil blinker af sig selv før et sving på GPS-ruten.",
+  "Engine upgrades no longer swap a car's sound.": "Motoropgraderinger ændrer ikke længere en bils lyd."
 }

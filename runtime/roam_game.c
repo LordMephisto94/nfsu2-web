@@ -4531,9 +4531,18 @@ int roam_game_engine_files(CPU *c, uint32_t ride, char gin[2][32], float *idle, 
     gin[0][0] = gin[1][0] = 0; *idle = *most = 0.f;
     uint32_t st = gcall1(c, FN_SND_TYPE, 0, type), lvl = 0;
     if (st > 30u) return 0;
-    if (gcall1(c, FN_PERF_HAS, ride + 0x2f0u, 0x18u) & 0xffu) lvl = 3;
-    else if (gcall1(c, FN_PERF_HAS, ride + 0x2f0u, 0x13u) & 0xffu) lvl = 2;
-    else if (gcall1(c, FN_PERF_HAS, ride + 0x2f0u, 0xfu) & 0xffu) lvl = 1;
+    static int keep = -1;                     /* Keep engine sounds (keepengine.c): every car's stock engine (as setting_bool:
+                                               * unset, 0..., off, no, false: not) */
+    if (keep < 0){
+        const char *k = rh_opt("NFSU2_KEEP_ENGINE");
+        int a = k ? k[0] | 0x20 : 0, b = a ? k[1] | 0x20 : 0;
+        keep = k && *k && *k != '0' && !(a == 'o' && b == 'f') && a != 'n' && a != 'f';
+    }
+    if (!keep){
+        if (gcall1(c, FN_PERF_HAS, ride + 0x2f0u, 0x18u) & 0xffu) lvl = 3;
+        else if (gcall1(c, FN_PERF_HAS, ride + 0x2f0u, 0x13u) & 0xffu) lvl = 2;
+        else if (gcall1(c, FN_PERF_HAS, ride + 0x2f0u, 0xfu) & 0xffu) lvl = 1;
+    }
     uint32_t e = MR32(G_ENG_PICK + 12u * (st * 4u + lvl)), ent = G_ENGINES + 0x4cu * e, d = e < N_ENGINES ? MR32(ent + 0x14u) : N_ENG_DCL;
     if (e >= N_ENGINES || d >= N_ENG_DCL) return 0;
     cstr(MR32(ent + 0xcu), gin[0], 32);

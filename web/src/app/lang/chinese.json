@@ -1601,5 +1601,6 @@
   "Your own mix of mods.": "你自己的模组组合。",
   "Mods: {name}. Applies the next time you press Play.": "模组：{name}。下次按“开始”时生效。",
   "The game's own textures, sharper.": "游戏自带的纹理，更清晰。",
-  "Your car signals by itself before a turn on the GPS route.": "在 GPS 路线上转弯前，你的车会自动打转向灯。"
+  "Your car signals by itself before a turn on the GPS route.": "在 GPS 路线上转弯前，你的车会自动打转向灯。",
+  "Engine upgrades no longer swap a car's sound.": "引擎升级不再改变车的声音。"
 }

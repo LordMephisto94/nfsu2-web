@@ -1601,5 +1601,6 @@
   "Your own mix of mods.": "ชุดม็อดของคุณเอง",
   "Mods: {name}. Applies the next time you press Play.": "ม็อด: {name} มีผลเมื่อกดเล่นครั้งถัดไป",
   "The game's own textures, sharper.": "พื้นผิวของเกมเอง คมชัดขึ้น",
-  "Your car signals by itself before a turn on the GPS route.": "รถของคุณเปิดไฟเลี้ยวเองก่อนเลี้ยวตามเส้นทาง GPS"
+  "Your car signals by itself before a turn on the GPS route.": "รถของคุณเปิดไฟเลี้ยวเองก่อนเลี้ยวตามเส้นทาง GPS",
+  "Engine upgrades no longer swap a car's sound.": "การอัปเกรดเครื่องยนต์จะไม่เปลี่ยนเสียงรถอีกต่อไป"
 }

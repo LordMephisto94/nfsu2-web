@@ -231,6 +231,9 @@ export const KEYS: readonly KeyDef[] = [
   // its sounds from the game folder's MODPACKS/WHINE, read only when on: tools/whinepack.py).  Not in bundle.m's
   // table: there a lower-case key, so it reaches the runtime as NFSU2_GEARBOX_WHINE all the same
   { key: 'gearbox_whine', env: 'NFSU2_GEARBOX_WHINE', kind: 'bool', scope: 'web' },
+  // every car's stock engine sound, whatever its engine upgrades (runtime/keepengine.c).  Not in bundle.m's table:
+  // there a lower-case key, so it reaches the runtime as NFSU2_KEEP_ENGINE all the same
+  { key: 'keep_engine', env: 'NFSU2_KEEP_ENGINE', kind: 'bool', scope: 'web' },
   // the cars' skins painted again at 1024 from AdrienShadow's HQ Vinyls & Doorlines (runtime/hqvinyls.c, the page's
   // gpu/hqskin.ts; its pictures from the game folder's HQVINYLS/, read as cars are seen: tools/hqvinyls.py); on for
   // computers (device.ts deviceDefaults), the runtime's own default off.  Not in
@@ -446,6 +449,11 @@ export const TEMPLATE = `# NFSU2 settings, read at every launch.
 # off = the original game.
 # [NFSU2_GEARBOX_WHINE]
 #gearbox_whine = off
+
+# Every car keeps its own engine sound when its engine is upgraded (Mods:
+# Keep engine sounds).
+# [NFSU2_KEEP_ENGINE]
+#keep_engine = off
 
 # The cars' vinyls and doorlines at 1024x1024, as AdrienShadow's High
 # Quality Vinyls & Doorlines has them: the game's designs and colours,

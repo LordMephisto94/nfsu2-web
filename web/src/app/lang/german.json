@@ -1684,5 +1684,6 @@
   "Your own mix of mods.": "Deine eigene Auswahl an Mods.",
   "Mods: {name}. Applies the next time you press Play.": "Mods: {name}. Gilt ab dem nächsten Druck auf Spielen.",
   "The game's own textures, sharper.": "Die eigenen Texturen des Spiels, schärfer.",
-  "Your car signals by itself before a turn on the GPS route.": "Dein Wagen blinkt von selbst vor einer Abbiegung auf der GPS-Route."
+  "Your car signals by itself before a turn on the GPS route.": "Dein Wagen blinkt von selbst vor einer Abbiegung auf der GPS-Route.",
+  "Engine upgrades no longer swap a car's sound.": "Motor-Upgrades ändern den Klang eines Wagens nicht mehr."
 }

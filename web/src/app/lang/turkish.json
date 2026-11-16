@@ -1606,5 +1606,6 @@
   "Your own mix of mods.": "Kendi mod karışımın.",
   "Mods: {name}. Applies the next time you press Play.": "Modlar: {name}. Bir sonraki Oyna’ya bastığında uygulanır.",
   "The game's own textures, sharper.": "Oyunun kendi dokuları, daha net.",
-  "Your car signals by itself before a turn on the GPS route.": "Araban GPS rotasındaki bir dönüşten önce sinyali kendisi verir."
+  "Your car signals by itself before a turn on the GPS route.": "Araban GPS rotasındaki bir dönüşten önce sinyali kendisi verir.",
+  "Engine upgrades no longer swap a car's sound.": "Motor yükseltmeleri artık bir arabanın sesini değiştirmez."
 }

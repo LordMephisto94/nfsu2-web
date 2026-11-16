@@ -322,6 +322,13 @@ export const MODS: readonly Mod[] = [
     online: 'you', sizeMB: 0.5, files: ['runtime/whine.c', 'runtime/whine.h', 'tools/whinepack.py', 'licenses/UG2WhineGen.txt'],
   },
   {
+    id: 'keep-engine', name: 'Keep engine sounds', authors: [{ name: 'nfsu2.xyz' }], links: {},
+    kind: 'sound', uses: 'original', control: { setting: 'keep_engine' },
+    line: N('Engine upgrades no longer swap a car\'s sound.'),
+    details: 'In the original game, Street, Pro and Extreme engine upgrades give a car another engine sound. On, every car keeps the engine sound it has with no upgrades: yours, the AI racers\' and other players\' cars as you hear them. Only the sound changes: the upgrades work as before.',
+    online: 'you', files: ['runtime/keepengine.c', 'runtime/roam_game.c'],
+  },
+  {
     id: 'songs', name: 'Uncensored & Restored Soundtrack', authors: [{ name: 'xGMVx' }], links: { page: 'https://nfsmods.xyz/mod/3649' },
     kind: 'sound', uses: 'data', control: { setting: 'songs', values: ['uncensored'] },
     line: N('The EA Trax songs unedited.'),

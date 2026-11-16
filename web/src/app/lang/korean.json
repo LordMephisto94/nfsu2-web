@@ -1601,5 +1601,6 @@
   "Your own mix of mods.": "나만의 모드 조합.",
   "Mods: {name}. Applies the next time you press Play.": "모드: {name}. 다음에 플레이를 누르면 적용됩니다.",
   "The game's own textures, sharper.": "게임 자체 텍스처를 더 선명하게.",
-  "Your car signals by itself before a turn on the GPS route.": "GPS 경로에서 회전하기 전에 차가 알아서 방향 지시등을 켭니다."
+  "Your car signals by itself before a turn on the GPS route.": "GPS 경로에서 회전하기 전에 차가 알아서 방향 지시등을 켭니다.",
+  "Engine upgrades no longer swap a car's sound.": "엔진 업그레이드로 차의 소리가 더 이상 바뀌지 않습니다."
 }
