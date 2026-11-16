@@ -1,7 +1,7 @@
 // Tracks, career free roam on the race tracks' own maps (web/src/app/tracks.ts, runtime/travel.c):
 //   node --test web/test/tracks.test.mjs
 // - a spot's room: the world's room hash with the spot's key mixed in, as roam_game.c room_at makes it (uint32 maths:
-//   these numbers are the C's), never 0; the nine spots' rooms in travel.c's order
+//   these numbers are the C's), never 0; the spots' rooms in travel.c's order (Underground 1 Tracks' six last)
 // - the game's status "travel": where the car is and why a trip cannot go now, or no trips at all
 // - a friend's race track from the server's answer (its world's name, its room's hash), its world's name held against
 //   that hash, and the game's word on a trip to a friend ("travel_said")
@@ -28,11 +28,12 @@ test('a spot\'s room is the world\'s with the spot\'s key mixed in, as the game 
   assert.notEqual(T.trackRoom(base, 4711), base, 'not the world\'s own room');
 });
 
-test('the nine spots in travel.c\'s order, each a room of its own', () => {
-  assert.deepEqual(T.TRACKS.map(s => s.key), [4711, 4701, 4311, 4301, 4201, 4211, 4221, 4601, 4605]);
+test('the spots in travel.c\'s order, each a room of its own', () => {
+  assert.deepEqual(T.TRACKS.map(s => s.key), [4711, 4701, 4311, 4301, 4201, 4211, 4221, 4601, 4605, 5002, 5004, 5005, 5006, 5500, 5700]);
+  assert.deepEqual(T.TRACKS.map((s, i) => s.ug1 ? i + 1 : 0).filter(Boolean), [10, 11, 12, 13, 14, 15], 'Underground 1 Tracks\' maps');
   const rooms = T.trackRooms(0);
-  assert.equal(rooms.length, 9);
-  assert.equal(new Set(rooms).size, 9);
+  assert.equal(rooms.length, 15);
+  assert.equal(new Set(rooms).size, 15);
   assert.ok(!rooms.includes(0), 'none is the main world');
 });
 
@@ -43,7 +44,8 @@ test('the game\'s "travel": where the car is and why a trip cannot go now', () =
   assert.deepEqual(T.travelState(65536 + 3), { at: 3, why: 0 }, 'at the Stadium\'s drift');
   assert.deepEqual(T.travelState(65536 + 5 * 256 + 0), { at: 0, why: 5 }, 'on a marker');
   assert.deepEqual(T.travelState(65536 + 6 * 256 + 1), { at: 1, why: 6 }, 'on the way');
-  assert.equal(T.travelState(65536 + 10), null, 'a spot this page does not know');
+  assert.deepEqual(T.travelState(65536 + 10), { at: 10, why: 0 }, 'at Olympic City (UG1)');
+  assert.equal(T.travelState(65536 + 16), null, 'a spot this page does not know');
   assert.equal(T.travelState(65536 + 99 * 256), null, 'a reason this page does not know');
   assert.equal(T.whyText(0), '');
   assert.equal(T.whyText(5), 'Drive off the marker first.');

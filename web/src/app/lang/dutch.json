@@ -1685,5 +1685,12 @@
   "Mods: {name}. Applies the next time you press Play.": "Mods: {name}. Geldt de volgende keer dat je op Spelen drukt.",
   "The game's own textures, sharper.": "De eigen texturen van het spel, scherper.",
   "Your car signals by itself before a turn on the GPS route.": "Je auto geeft zelf richting aan voor een afslag op de gps-route.",
-  "Engine upgrades no longer swap a car's sound.": "Motorupgrades veranderen het geluid van een auto niet meer."
+  "Engine upgrades no longer swap a car's sound.": "Motorupgrades veranderen het geluid van een auto niet meer.",
+  "Olympic City from the first Underground in free roam (F9, Tracks) and Quick Race.": "Olympic City uit de eerste Underground in vrij rijden (F9, Circuits) en Snelle race.",
+  "Olympic City (UG1)": "Olympic City (UG1)",
+  "Downtown and Mission (UG1)": "Downtown and Mission (UG1)",
+  "Highway 1 (UG1)": "Highway 1 (UG1)",
+  "Commercial (UG1)": "Commercial (UG1)",
+  "Olympic City (UG1 demo)": "Olympic City (UG1 demo)",
+  "Downtown (UG1 demo)": "Downtown (UG1 demo)"
 }

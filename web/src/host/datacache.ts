@@ -45,8 +45,9 @@ const parts = (f: DataFile) => f.path.toLowerCase().split('/');
 /** The data the settings pick: a texture pack (TEXPACKS/<name>.pak, runtime/web/texrep_web.c; '' for none), the
  *  songs (settings.ini songs: 'original' reads pfdata/original's files in place of pfdata's, songsPath), the crash
  *  damage's scratches (MODPACKS/DAMAGE/, runtime/damage.c, which opens them only with crash_damage on) and the
- *  gearbox whine's sounds (MODPACKS/WHINE, runtime/whine.c: read only with gearbox_whine on). */
-export interface Packs { texpack: string; songs: string; damage?: boolean; whine?: boolean }
+ *  gearbox whine's sounds (MODPACKS/WHINE, runtime/whine.c: read only with gearbox_whine on) and Underground 1 Tracks'
+ *  maps (MODPACKS/UG1, runtime/ug1tracks.c: read only with ug1_tracks on). */
+export interface Packs { texpack: string; songs: string; damage?: boolean; whine?: boolean; ug1?: boolean }
 export const NO_PACKS: Packs = { texpack: '', songs: '' };
 /** The player's own copy of the game's music (app/own-music.ts), copied from their game folder into this OPFS folder
  *  and read by the I/O worker in place of the server's with NFSU2_MUSIC = own.  A game folder keeps the songs one of
@@ -80,7 +81,8 @@ export function songsPath(path: string): string | null {
  *  runtime/language.c) has a file of the same path, that one; no other language's pack; of the texture packs
  *  (TEXPACKS/<name>.pak and its <name>.tracks, runtime/web/texrep_web.c) only those picked (packs.texpack: their
  *  names, comma-separated; '' for none); pfdata/original's files only with the original songs, and then in place
- *  of pfdata's; the crash damage's (MODPACKS/DAMAGE/) only with it on, and MODPACKS/WHINE only with the gearbox whine on.
+ *  of pfdata's; the crash damage's (MODPACKS/DAMAGE/) only with it on, MODPACKS/WHINE only with the gearbox whine on and
+ *  MODPACKS/UG1 only with Underground 1 Tracks on.
  *  HQVINYLS/ never: the HQ vinyls' pictures (gpu/hqskin.ts) are read as cars are seen, 330 MB in all. */
 function gameFiles(files: DataFile[], language: string, packs: Packs): DataFile[] {
   const own = new Set(files.filter(f => { const p = parts(f); return p[0] === 'langpacks' && p[1] === language; })
@@ -93,6 +95,7 @@ function gameFiles(files: DataFile[], language: string, packs: Packs): DataFile[
     if (p[0] === 'texpacks') return p.length === 2 && packs.texpack.split(',').some(n => n && (p[1] === `${n}.pak` || p[1] === `${n}.tracks`));
     if (p[0] === 'modpacks' && p[1] === 'damage') return !!packs.damage;
     if (p[0] === 'modpacks' && p[1] === 'whine') return !!packs.whine;
+    if (p[0] === 'modpacks' && p[1] === 'ug1') return !!packs.ug1;
     if (p[0] === 'hqvinyls') return false;
     if (isOriginal(p)) return original;
     if (replaced.has(p.join('/'))) return false;

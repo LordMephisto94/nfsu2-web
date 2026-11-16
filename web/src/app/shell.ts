@@ -338,11 +338,14 @@ const sharper = (r: Resolved) => r.env.NFSU2_SHARPER_TEXTURES === '1' || (r.env.
 const texpack = (r: Resolved = resolved()) => [uiPack(r.env.NFSU2_UI_TEXTURES), r.env.NFSU2_MAP_TEXTURES]
   .map(v => (v ?? '').toLowerCase()).filter(v => v && v !== 'original').concat(sharper(r) ? HD_PACKS : []).join(',');
 /** the data the settings pick (datacache.ts Packs): the texture pack, the songs (EA's own: io-worker.ts dataFile), the
- *  crash damage's scratches and the gearbox whine's sounds (runtime/damage.c, runtime/whine.c: each read only with its
- *  switch on) */
+ *  crash damage's scratches, the gearbox whine's sounds and Underground 1 Tracks' maps (runtime/damage.c,
+ *  runtime/whine.c, runtime/ug1tracks.c: each read only with its switch on) */
 const packs = (r: Resolved = resolved()): Packs => ({ texpack: texpack(r), songs: (r.env.NFSU2_SONGS ?? '').trim().toLowerCase(),
-  damage: r.env.NFSU2_DAMAGE === '1', whine: r.env.NFSU2_GEARBOX_WHINE === '1' });
-const packsKey = (r: Resolved = resolved()) => { const p = packs(r); return `${language(r)}/${p.texpack}/${p.songs}/${p.damage ? 1 : 0}/${p.whine ? 1 : 0}`; };
+  damage: r.env.NFSU2_DAMAGE === '1', whine: r.env.NFSU2_GEARBOX_WHINE === '1', ug1: r.env.NFSU2_UG1_TRACKS !== '0' });
+const packsKey = (r: Resolved = resolved()) => {
+  const p = packs(r);
+  return `${language(r)}/${p.texpack}/${p.songs}/${p.damage ? 1 : 0}/${p.whine ? 1 : 0}/${p.ug1 ? 1 : 0}`;
+};
 
 // ----------------------------------------------------------------- play --
 function stageCanvas(): HTMLCanvasElement {
@@ -1876,7 +1879,9 @@ function drawTracks() {
     back.onclick = () => travelTo(0);
     rows.push(back);
   }
+  const ug1 = resolved().env.NFSU2_UG1_TRACKS !== '0';
   TRACKS.forEach((s, i) => {
+    if (s.ug1 && !ug1 && at !== i + 1) return;
     const b = el('button', { type: 'button', className: 'menu-row' });
     b.dataset.at = String(i + 1);
     const here = at === i + 1, n = trackCountsNow.get(trackRoom(base, s.key));

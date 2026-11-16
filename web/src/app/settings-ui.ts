@@ -89,6 +89,7 @@ export const MOD_CONTROLS: Record<string, Control> = {
   gearbox_whine: { t: 'switch' },
   keep_engine: { t: 'switch' },
   gps_signals: { t: 'switch' },
+  ug1_tracks: { t: 'switch' },
   hq_vinyls: { t: 'switch' },
   open_tunnel: { t: 'switch' },
   car_parks: { t: 'switch' },

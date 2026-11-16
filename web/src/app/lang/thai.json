@@ -1602,5 +1602,12 @@
   "Mods: {name}. Applies the next time you press Play.": "ม็อด: {name} มีผลเมื่อกดเล่นครั้งถัดไป",
   "The game's own textures, sharper.": "พื้นผิวของเกมเอง คมชัดขึ้น",
   "Your car signals by itself before a turn on the GPS route.": "รถของคุณเปิดไฟเลี้ยวเองก่อนเลี้ยวตามเส้นทาง GPS",
-  "Engine upgrades no longer swap a car's sound.": "การอัปเกรดเครื่องยนต์จะไม่เปลี่ยนเสียงรถอีกต่อไป"
+  "Engine upgrades no longer swap a car's sound.": "การอัปเกรดเครื่องยนต์จะไม่เปลี่ยนเสียงรถอีกต่อไป",
+  "Olympic City from the first Underground in free roam (F9, Tracks) and Quick Race.": "Olympic City จาก Underground ภาคแรก ในโหมดขับอิสระ (F9, สนาม) และแข่งด่วน",
+  "Olympic City (UG1)": "Olympic City (UG1)",
+  "Downtown and Mission (UG1)": "Downtown and Mission (UG1)",
+  "Highway 1 (UG1)": "Highway 1 (UG1)",
+  "Commercial (UG1)": "Commercial (UG1)",
+  "Olympic City (UG1 demo)": "Olympic City (UG1 เดโม)",
+  "Downtown (UG1 demo)": "Downtown (UG1 เดโม)"
 }

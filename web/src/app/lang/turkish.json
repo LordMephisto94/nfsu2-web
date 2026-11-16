@@ -1607,5 +1607,12 @@
   "Mods: {name}. Applies the next time you press Play.": "Modlar: {name}. Bir sonraki Oyna’ya bastığında uygulanır.",
   "The game's own textures, sharper.": "Oyunun kendi dokuları, daha net.",
   "Your car signals by itself before a turn on the GPS route.": "Araban GPS rotasındaki bir dönüşten önce sinyali kendisi verir.",
-  "Engine upgrades no longer swap a car's sound.": "Motor yükseltmeleri artık bir arabanın sesini değiştirmez."
+  "Engine upgrades no longer swap a car's sound.": "Motor yükseltmeleri artık bir arabanın sesini değiştirmez.",
+  "Olympic City from the first Underground in free roam (F9, Tracks) and Quick Race.": "İlk Underground'un Olympic City'si, serbest sürüşte (F9, Pistler) ve Hızlı Yarış'ta.",
+  "Olympic City (UG1)": "Olympic City (UG1)",
+  "Downtown and Mission (UG1)": "Downtown and Mission (UG1)",
+  "Highway 1 (UG1)": "Highway 1 (UG1)",
+  "Commercial (UG1)": "Commercial (UG1)",
+  "Olympic City (UG1 demo)": "Olympic City (UG1 demo)",
+  "Downtown (UG1 demo)": "Downtown (UG1 demo)"
 }

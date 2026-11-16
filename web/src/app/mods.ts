@@ -185,7 +185,7 @@ export const MODS: readonly Mod[] = [
     kind: 'map', uses: 'original', control: { setting: 'open_tunnel' },
     line: N('Drive through the Construction Tunnel in free roam.'),
     details: 'The tunnel the game keeps closed for construction is open, to drive through in your career\'s free roam. Only your own city changes: friends you meet in free roam should turn it on too, or you drive where their city has a wall. It needs this server to have its pack.',
-    online: 'mine', sizeMB: 2, files: ['runtime/fileio.c'],
+    online: 'mine', sizeMB: 2, files: ['runtime/fileio.c', 'tools/open_tunnel.py'],
   },
   {
     id: 'open-parking-lots', name: 'Open Parking Lots', authors: [{ name: 'nfsu2.xyz' }], links: {},
@@ -193,6 +193,13 @@ export const MODS: readonly Mod[] = [
     line: N('Drive into the airport\'s parking garage and more parking lots in the city.'),
     details: 'The airport\'s parking garage and more of the city\'s parking lots are open to drive into in your career\'s free roam. Only your own city changes: friends you meet in free roam should turn it on too, or you drive where their city has a wall. It needs this server to have its pack.',
     online: 'mine', sizeMB: 11, files: ['runtime/fileio.c'],
+  },
+  {
+    id: 'ug1-tracks', name: 'Underground 1 Tracks', authors: [{ name: 'RKBDI' }], links: {},
+    kind: 'map', uses: 'original', control: { setting: 'ug1_tracks' },
+    line: N('Olympic City from the first Underground in free roam (F9, Tracks) and Quick Race.'),
+    details: 'The first Underground\'s Olympic City, Downtown and Mission, Highway 1 and Commercial, and the demo\'s two maps, each a map of its own beside the city. Pick one in the menu\'s Tracks while you drive in career free roam; Back to the city brings you back where you left. Friends you meet in free roam need it on to meet you there. Its maps download as you drive them.',
+    online: 'mine', sizeMB: 258, files: ['runtime/ug1tracks.c', 'runtime/travel.c', 'runtime/fileio.c', 'runtime/netrace.c', 'runtime/garage.c'],
   },
 
   // ---- Graphics

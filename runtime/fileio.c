@@ -287,10 +287,16 @@ int fileio_mod_pack(const char *rel, char *out, size_t outsz){
     snprintf(out, outsz, "%s/%s", g_mroot, e->rel);
     return 1;
 }
-/* a game file that the game folder does not have, from the mod packs: 1 if they have it (out: its host path) */
+int ug1_on(void);                               /* ug1tracks.c */
+/* a game file that the game folder does not have, from the mod packs: 1 if they have it (out: its host path).  With
+ * Underground 1 Tracks on, also MODPACKS/UG1/<its path>: its regions, their streams, routes and maps (ug1tracks.c) */
 static int mpack_resolve(const char *win, char *out, size_t outsz){
     mpack_walk();
     const struct lfile *e = flist_find(&g_mp, win);
+    if (!e && g_mp.n && ug1_on()){
+        char rel[1024], k[1100]; rel_of(win, rel, sizeof rel); snprintf(k, sizeof k, "UG1/%s", rel);
+        e = flist_find(&g_mp, k);
+    }
     if (!e) return 0;
     snprintf(out, outsz, "%s/%s", g_mroot, e->rel);
     static int said;

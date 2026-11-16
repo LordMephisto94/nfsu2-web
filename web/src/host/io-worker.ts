@@ -392,7 +392,7 @@ async function getBlock(n: DNode, bi: number, pri: number): Promise<Uint8Array> 
 // (above), the nearest ones to the game's latest read first, until this PC has all of it (40 MB on the network for
 // the city's), and its sections then read from here.  Only while this PC keeps the game data: the memory alone has no
 // room for a whole track.  NFSU2_TRACK_AHEAD=0 turns it off.
-const isTrackStream = (n: DNode) => /^TRACKS\/STREAM[^/]*\.BUN$/i.test(n.path);
+const isTrackStream = (n: DNode) => /^(MODPACKS\/[^/]+\/)?TRACKS\/STREAM[^/]*\.BUN$/i.test(n.path);   // (a mod pack's too: UG1's maps)
 let ahead: { n: DNode; near: number; t0: number; got: number } | null = null, aheadLoops = 0;
 const aheadDone = new Set<DNode>();
 function readAhead(n: DNode, bi: number) {

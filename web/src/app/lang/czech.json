@@ -1745,5 +1745,12 @@
   "Mods: {name}. Applies the next time you press Play.": "Mody: {name}. Platí od příštího stisknutí Hrát.",
   "The game's own textures, sharper.": "Vlastní textury hry, ostřejší.",
   "Your car signals by itself before a turn on the GPS route.": "Tvoje auto samo zabliká před odbočkou na trase GPS.",
-  "Engine upgrades no longer swap a car's sound.": "Vylepšení motoru už nemění zvuk auta."
+  "Engine upgrades no longer swap a car's sound.": "Vylepšení motoru už nemění zvuk auta.",
+  "Olympic City from the first Underground in free roam (F9, Tracks) and Quick Race.": "Olympic City z prvního Underground ve volné jízdě (F9, Tratě) a v Rychlém závodě.",
+  "Olympic City (UG1)": "Olympic City (UG1)",
+  "Downtown and Mission (UG1)": "Downtown and Mission (UG1)",
+  "Highway 1 (UG1)": "Highway 1 (UG1)",
+  "Commercial (UG1)": "Commercial (UG1)",
+  "Olympic City (UG1 demo)": "Olympic City (UG1 demo)",
+  "Downtown (UG1 demo)": "Downtown (UG1 demo)"
 }

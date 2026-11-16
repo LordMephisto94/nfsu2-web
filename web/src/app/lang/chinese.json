@@ -1602,5 +1602,12 @@
   "Mods: {name}. Applies the next time you press Play.": "模组：{name}。下次按“开始”时生效。",
   "The game's own textures, sharper.": "游戏自带的纹理，更清晰。",
   "Your car signals by itself before a turn on the GPS route.": "在 GPS 路线上转弯前，你的车会自动打转向灯。",
-  "Engine upgrades no longer swap a car's sound.": "引擎升级不再改变车的声音。"
+  "Engine upgrades no longer swap a car's sound.": "引擎升级不再改变车的声音。",
+  "Olympic City from the first Underground in free roam (F9, Tracks) and Quick Race.": "初代地下狂飙的奥林匹克城，可在自由漫游（F9，赛道）和快速比赛中驾驶。",
+  "Olympic City (UG1)": "Olympic City (UG1)",
+  "Downtown and Mission (UG1)": "Downtown and Mission (UG1)",
+  "Highway 1 (UG1)": "Highway 1 (UG1)",
+  "Commercial (UG1)": "Commercial (UG1)",
+  "Olympic City (UG1 demo)": "Olympic City (UG1 试玩版)",
+  "Downtown (UG1 demo)": "Downtown (UG1 试玩版)"
 }
