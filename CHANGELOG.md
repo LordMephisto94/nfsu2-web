@@ -11,17 +11,23 @@ first, then under `### Fixes` what was broken and works now, which the popup kee
 insides, the forum bot, logs, tests, docs and cheat checks. A change that may or may not belong here is asked about
 before the release, not guessed.
 
-## 2026-11-16 (b694b5b6)
+## 2026-11-16 (7f2a5e7f)
 
 - **Turn signals:** `,` and `/` work the left and right turn signals and `'` the hazard lights; on a controller, hold D-pad left, right or up. You can change the keys in Controls. Friends in free roam and the other racers in a race see them.
 - **Mods:** Turn signals with the GPS: your car signals by itself before a turn on the GPS route and stops after it (Mods → Extras, on by default).
 - **Mods:** Keep engine sounds: engine upgrades no longer swap a car's engine sound (Mods → Sound).
 - **Mods:** Open Construction Tunnel and Open Parking Lots, in a new Map section: drive through the tunnel and into the airport's parking garage and more parking lots in free roam.
+- **Mods:** Underground 1 Tracks: Olympic City from the first Underground to drive in career free roam (F9, Tracks), and its races in Quick Race (Mods → Map, on by default).
 - **Mods:** Sharper textures: one switch for sharper roads, city, cars and skies, in place of Roads and Shadows' Original / HD.
 - **Mods:** the Mods tab has Default, Vanilla and Modded at the top to set every mod at once, and its rows in Cars, Map, Graphics, Extras, Game rules and Sound.
 - **Race lobbies:** the host can fill a race's empty spots with AI opponents: L on the lobby card, or hold D-pad right on a controller. A drag race takes up to 4 cars, the other races up to 6.
 - **Race lobbies:** every player races the same AI opponents, with the same names and cars, driven by the host's game; their places and times count in the results, the HUD and the prize money.
 - **Race lobbies:** Z or a tap leaves a lobby you joined at its start, and the host holds Z to call the race off.
+- **Game tab:** the settings in the same order as on nfsu2.xyz: Music comes after Movies, and Frame-rate counter, 3D proportions and Other cars' headlights show without opening More display settings.
+
+### Fixes
+
+- **Race lobbies:** in a race of two heats with AI opponents, the second heat has the same AI opponents for every player again, driving instead of standing still on the grid, and starts as soon as everyone is ready.
 
 ## 2026-11-15 (fa436c4c)
 
