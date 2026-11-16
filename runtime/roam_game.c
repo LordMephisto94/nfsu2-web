@@ -6644,7 +6644,9 @@ static void mp_act(int64_t host, int in_roam, int act, uint32_t a, uint32_t b, u
         g_mp.tx_at = 0;                                                  /* (its adverts at once) */
         return;
     case ROAM_LB_LEAVE:
+        /* a player who joined leaves; the host (its Z held, lobby.ts) calls its race off, as driving away does */
         if (g_mp.st == MP_ASKED || g_mp.st == MP_IN) mp_close(host, RC_LL_LEFT, "You left the race");
+        else if (g_mp.st == MP_HOST) mp_close(host, RC_LL_GONE, "You called off the race");
         return;
     case ROAM_LB_JOIN:
         mp_far_join(host, in_roam, a, b, r);
