@@ -131,6 +131,7 @@ static void press(int what, const char *how){
     }
     fprintf(stderr, "[signals] f=%ld %s: %s%s\n", autotest_frame(), how, sig_name(signals_mine()),
             S.hazard && S.turn ? " (the signal under them stays)" : "");
+    S.last = signals_mine();                                      /* (said: no "mine" line for it) */
 }
 /* the keys' presses since the last frame (none while the player does not drive, none on a key one of the game's
  * controls is on) */
@@ -173,7 +174,7 @@ void signals_frame(CPU *c){
     }
     if (guest_rd32(G_FLOW) != 6u){ S.turn = 0; S.hazard = 0; }
     int st = signals_mine();
-    if (st != S.last && S.last >= 0 && !p) fprintf(stderr, "[signals] f=%ld mine: %s\n", autotest_frame(), sig_name(st));
+    if (st != S.last && S.last >= 0) fprintf(stderr, "[signals] f=%ld mine: %s\n", autotest_frame(), sig_name(st));
     S.last = st;
     S.fr++;
 }
