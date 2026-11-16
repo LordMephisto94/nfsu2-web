@@ -28,11 +28,12 @@
  *    other player's car stood still on each screen).  Before CreateCars the AI racers take the spots no player has, by
  *    their indexes, the lowest first (lobbyai_grid);
  *  - the paint: each car is painted into the texture of its ride's skin number (RideInfo +0x584, the hash of
- *    "DUMMY_SKIN<n>", 0x61C280 sets it), one texture a number.  A player's number is its network slot + 1, an AI
- *    racer's its index less 98 (2, 3 ..): the host's red car was drawn in an AI racer's blue with its yellow hood
- *    vinyl.  The race's cars are painted as they come, right after the AI racers are added: there each AI racer whose
- *    number a player's slot (the network's players [0x89CF50 + 4 slot], our own one at that moment) or an AI racer
- *    before it has takes the lowest one free (1 .. 6, as a Quick Race's six racers), again before CreateCars;
+ *    "DUMMY_SKIN<n>", 0x61C280 sets it), one texture a number, as the car comes (0x61D790).  A player's number is its
+ *    network slot + 1, set as the race comes together, an AI racer's its index less 98 (2, 3 ..): the host's red car
+ *    was drawn in an AI racer's blue with its yellow hood vinyl, a player's number moved off an AI racer's took
+ *    another's, and a number moved after its car was painted was never painted (parts of that car had no texture).
+ *    So the AI racers take paint slots of the port's own past the game's six (AI_SKIN0 .., roam_game.c's, as co-op's
+ *    player 2), where no player's car ever is;
  *  - the names: the results and standings screens name a racer in a network race (0x5F00F0) by its network player
  *    (0x5F0220 on 0x89CF48, its slot; +0x12 its LAN name), else by its record (+0x90C).  An AI racer's slot is past
  *    that table of 6: two screens left the name out, two took whatever was there.  Right after each of those calls an
@@ -83,6 +84,8 @@
 #define FN_ADD_RACE_AI  0x0053ee90u   /* cdecl (count): AI racers 100 .., their cars by [0x89E7F4] */
 #define FN_RIDE_SKINS   0x0061c280u   /* thiscall ride (n): DUMMY_SKIN<n>, its wheels' and spinners' */
 #define RIDE_SKIN       0x584u        /* a RideInfo: its skin's hash (0: its car type has none) */
+#define AI_SKIN0        66u           /* the AI racers' paint slots: past free roam's friends' cars (5 .. 65; co-op's */
+#define AI_SKIN_LAST    69u           /*   player 2 53) to the last the port makes (roam_game.c g_skin_ok): 4 AI racers */
 #define FN_FINISH       0x00606cb0u   /* FinishRacer (above) */
 #define FN_SET_DRIVER   0x005eba30u   /* Car::SetDriverType (type): 1 the player, 3 an AI racer, 0 none */
 #define CAR_SLOT        0x0au
@@ -132,28 +135,20 @@ static int skin_number(uint32_t ride){
     for (int k = 1; h && k <= 8; k++) if (h == skin_hash(k)) return k;
     return 0;
 }
-/* the AI racers' skin numbers off the players' (their slots + 1, their rides') and one another's */
-static void ai_skins(CPU *c, const char *when){
+/* the AI racers' skin numbers: AI_SKIN0 + their place among them, paint slots of the port's own (roam_game.c
+ * skin_textures, made from one of the game's six when first needed) that no player has (theirs are 1 .. 6) */
+int roam_game_coop_skin(CPU *c, uint32_t n);          /* roam_game.c: paint slot n's textures (made once) */
+static void ai_skins(CPU *c){
     uint32_t n, base = racers(&n);
-    if (!base) return;
-    unsigned used = 0;
-    for (uint32_t k = 0; k < 6u; k++) if (guest_rd32(G_NETPLAYERS + 4u * k)) used |= 1u << (k + 1u);
-    for (uint32_t i = 0; i < n; i++){
+    for (uint32_t i = 0, k = 0; base && i < n; i++){
         uint32_t r = base + i * REC_SIZE;
-        if ((int8_t)MR8(r) <= 0 && guest_rd32(r + 4u) == KIND_PLAYER){ int k = skin_number(r + 0x10u); if (k) used |= 1u << k; }
-    }
-    for (uint32_t i = 0; i < n; i++){
-        uint32_t r = base + i * REC_SIZE;
-        if ((int8_t)MR8(r) > 0 || guest_rd32(r + 4u) != KIND_AI) continue;
-        int k = skin_number(r + 0x10u), to = k;
-        if (!k) continue;                                                    /* (a car type without a skin) */
-        if (used & 1u << k){ to = 0; for (int q = 1; q <= 6 && !to; q++) if (!(used & 1u << q)) to = q; }
-        if (!to){ fprintf(stderr, "[lobbyai] AI racer %u: no skin number free (%d, a player's too) %s\n", MR8(r + 1u), k, when); continue; }
-        if (to != k){
-            uint32_t a = (uint32_t)to; gcall(c, FN_RIDE_SKINS, r + 0x10u, 1, &a);
-            fprintf(stderr, "[lobbyai] AI racer %u: skin number %d -> %d (a player's, or another's) %s\n", MR8(r + 1u), k, to, when);
+        if ((int8_t)MR8(r) > 0 || guest_rd32(r + 4u) != KIND_AI || !guest_rd32(r + 0x10u + RIDE_SKIN)) continue;
+        uint32_t to = AI_SKIN0 + k++;
+        if (to > AI_SKIN_LAST || !roam_game_coop_skin(c, to)){
+            fprintf(stderr, "[lobbyai] AI racer %u: no paint slot of its own (%u): the game's %d\n", MR8(r + 1u), to, skin_number(r + 0x10u));
+            continue;
         }
-        used |= 1u << to;
+        gcall(c, FN_RIDE_SKINS, r + 0x10u, 1, &to);
     }
 }
 /* garage.c's 0x525ED0, the race's humans in: the lobby's AI racers, on every game of the race */
@@ -171,7 +166,7 @@ void lobbyai_humans_added(CPU *c){
     MR32(G_RACE_AI) = n; MR32(G_RAND) = seed; MR8(G_NET_RACE) = 0;
     gcall(c, FN_ADD_RACE_AI, c->ecx, 1, &n);
     MR8(G_NET_RACE) = net; MR32(G_RAND) = rnd;
-    ai_skins(c, "as they came");
+    ai_skins(c);
     char names[96]; int ln = 0; names[0] = 0;
     uint32_t nr, base = racers(&nr);
     for (uint32_t i = 0; base && i < nr; i++){
@@ -182,10 +177,9 @@ void lobbyai_humans_added(CPU *c){
     fprintf(stderr, "[lobbyai] %d AI racer(s) in the race's empty places, %s: %s\n", want,
             r->host ? "the host's game drives them" : "the host drives them", names);
 }
-/* roam.c's 0x6065B0, before CreateCars: the AI racers' skins again, and on the grid spots no player has */
+/* roam.c's 0x6065B0, before CreateCars: the AI racers on the grid spots no player has */
 void lobbyai_grid(CPU *c){
     if (!lan() || !mprace_lobby()) return;
-    ai_skins(c, "before the cars were made");
     uint32_t n, base = racers(&n);
     if (!base) return;
     unsigned used = 0; uint32_t order[16]; int k = 0;
