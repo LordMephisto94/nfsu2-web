@@ -313,7 +313,7 @@ static const char *city_dir(void){
         char p[1024];
         mpack_walk();
         int there = g_mroot[0] && resolve_in(g_mroot, dir, p, sizeof p);
-        fprintf(stderr, "file: the city%s%s: %s\n", tunnel ? ", its tunnel open" : "", parks ? ", its car parks drivable" : "",
+        fprintf(stderr, "file: the city%s%s: %s%s\n", tunnel ? ", its tunnel open" : "", parks ? ", its car parks drivable" : "",
                 there ? "MODPACKS/" : "this server has not the pack: the game's city", there ? dir : "");
         if (!there) dir = 0;
     }
@@ -322,7 +322,8 @@ static const char *city_dir(void){
 static int city_resolve(const char *win, char *out, size_t outsz){
     const char *dir = city_dir();
     if (!dir) return 0;
-    char k[1100]; snprintf(k, sizeof k, "%s\\%s", dir, win);
+    /* the game asks by its full path (C:\NFSU2/TRACKS\L4RA.BUN): the folder goes before the path in the game folder */
+    char rel[1024], k[1100]; rel_of(win, rel, sizeof rel); snprintf(k, sizeof k, "%s/%s", dir, rel);
     const struct lfile *e = flist_find(&g_mp, k);
     if (!e) return 0;
     snprintf(out, outsz, "%s/%s", g_mroot, e->rel);
