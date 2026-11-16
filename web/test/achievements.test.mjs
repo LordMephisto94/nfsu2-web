@@ -117,3 +117,38 @@ test('a file whose totals reach levels it does not have gets them on load, silen
   assert.equal(s.got.first_win, 5, 'an old key stays (it counts for nothing)');
   assert.equal(A.settle(s, 888), s, 'nothing more: the same object');
 });
+
+/** raceresult.c's cr_state */
+const career = c => 1 + (c.done ?? []).reduce((a, s) => a + 2 ** s, 0) +
+  [1, 2, 3, 4, 5].reduce((a, s) => a + ((c.outruns ?? {})[s] ?? 0) * 2 ** (2 + 4 * s), 0) +
+  (c.finals ?? []).reduce((a, s) => a + 2 ** (26 + s), 0) + (c.over ? 2 ** 32 : 0) + (c.p0outruns ?? 0) * 2 ** 33 +
+  (c.p0races ? 2 ** 37 : 0) + (c.mags ?? 0) * 2 ** 38 + (c.dvds ?? 0) * 2 ** 44 + (c.difficulty ?? 1) * 2 ** 50;
+
+test('the career\'s state unpacks as raceresult.c packs it', () => {
+  const c = fs.readFileSync(path.join(ROOT, 'runtime/raceresult.c'), 'utf8');
+  for (const s of ['<< s |', '<< (2 + 4 * s)', '<< (26 + s)', '1ull << 32', '<< 33', '1ull << 37', ') << 38', ') << 44', '3u) << 50', '"cr_state"'])
+    assert.ok(c.includes(s), s);
+  assert.equal(A.unpackCareer(0), null);
+  assert.deepEqual(A.unpackCareer(career({ done: [1, 2], outruns: { 1: 4, 2: 15, 3: 1 }, finals: [1, 2], over: true, p0outruns: 2,
+    mags: 3, dvds: 1, difficulty: 2 })), { stagesDone: [1, 2], finalsWon: [1, 2], outruns: 20, prologueOver: true, prologueOutruns: 2,
+    prologueRaces: false, magazines: 3, dvds: 1, difficulty: 2 });
+});
+
+test('the career\'s achievements: from a save as it loads; No mercy only for a final won on Hard while seen', () => {
+  let k = A.parse(null);
+  const loaded = A.unpackCareer(career({ done: [1], outruns: { 1: 5 }, finals: [1], over: true, p0outruns: 1, mags: 1, difficulty: 2 }));
+  let r = A.earnCareer(k, loaded, null, 1);
+  assert.deepEqual(r.got.map(g => A.levelKey(g.a, g.level)).sort(), ['bayview:1', 'career:1', 'magazines:1', 'noobie:1', 'outruns:1']);
+  assert.deepEqual(r.kept.totals.hardFinals, []);                                   // (stage 1's final: won before)
+  k = r.kept;
+  assert.equal(A.earnCareer(k, loaded, loaded, 2).got.length, 0);                    // the same state again: nothing
+  const won = A.unpackCareer(career({ done: [1], outruns: { 1: 5 }, finals: [1, 2], over: true, p0outruns: 1, mags: 1, dvds: 1, difficulty: 2 }));
+  r = A.earnCareer(k, won, loaded, 3);
+  assert.deepEqual(r.got.map(g => A.levelKey(g.a, g.level)).sort(), ['dvds:1', 'hard:1']);
+  const medium = A.unpackCareer(career({ finals: [3], difficulty: 1 }));
+  assert.deepEqual(A.earnCareer(r.kept, medium, won, 4).kept.totals.hardFinals, [2]);   // won on Medium: not counted
+  // another profile's smaller career takes nothing away
+  assert.equal(A.earnCareer(r.kept, A.unpackCareer(career({})), null, 5).kept.totals.stagesDone, 1);
+  // the prologue's races
+  assert.equal(A.earnCareer(A.parse(null), A.unpackCareer(career({ p0races: true })), null, 6).got[0].a.id, 'bring_back');
+});

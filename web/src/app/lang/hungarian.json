@@ -1608,5 +1608,36 @@
   "Highway 1 (UG1)": "Highway 1 (UG1)",
   "Commercial (UG1)": "Commercial (UG1)",
   "Olympic City (UG1 demo)": "Olympic City (UG1 demó)",
-  "Downtown (UG1 demo)": "Downtown (UG1 demó)"
+  "Downtown (UG1 demo)": "Downtown (UG1 demó)",
+  "Welcome to Bayview": "Üdv Bayview-ban",
+  "Yo Noobie": "Yo Noobie",
+  "Bring My Car Back... Now!": "Bring My Car Back... Now!",
+  "Career": "Karrier",
+  "Outrun ace": "Outrun-ász",
+  "No mercy": "Kegyetlen",
+  "Cover star": "Címlapsztár",
+  "On DVD": "DVD-n",
+  "Finish the prologue.": "Fejezd be a prológust.",
+  "Win an outrun in the prologue.": "Nyerj egy outrunt a prológusban.",
+  "Win the prologue's three races.": "Nyerd meg a prológus három versenyét.",
+  "Complete {n} stages of the career.": {
+    "one": "Teljesíts {n} szakaszt a karrierben.",
+    "other": "Teljesíts {n} szakaszt a karrierben."
+  },
+  "Win {n} outruns in the career.": {
+    "one": "Nyerj {n} outrunt a karrierben.",
+    "other": "Nyerj {n} outrunt a karrierben."
+  },
+  "Win the final race of {n} stages on Hard.": {
+    "one": "Nyerd meg egy szakasz döntőjét Nehéz fokozaton.",
+    "other": "Nyerd meg {n} szakasz döntőjét Nehéz fokozaton."
+  },
+  "Make {n} magazine covers.": {
+    "one": "Kerülj egy magazin címlapjára.",
+    "other": "Kerülj {n} magazin címlapjára."
+  },
+  "Make {n} DVD covers.": {
+    "one": "Kerülj egy DVD borítójára.",
+    "other": "Kerülj {n} DVD borítójára."
+  }
 }

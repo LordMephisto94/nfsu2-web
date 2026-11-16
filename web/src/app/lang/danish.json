@@ -1692,5 +1692,36 @@
   "Highway 1 (UG1)": "Highway 1 (UG1)",
   "Commercial (UG1)": "Commercial (UG1)",
   "Olympic City (UG1 demo)": "Olympic City (UG1 demo)",
-  "Downtown (UG1 demo)": "Downtown (UG1 demo)"
+  "Downtown (UG1 demo)": "Downtown (UG1 demo)",
+  "Welcome to Bayview": "Velkommen til Bayview",
+  "Yo Noobie": "Yo Noobie",
+  "Bring My Car Back... Now!": "Bring My Car Back... Now!",
+  "Career": "Karriere",
+  "Outrun ace": "Outrun-es",
+  "No mercy": "Ingen nåde",
+  "Cover star": "Forsidestjerne",
+  "On DVD": "På dvd",
+  "Finish the prologue.": "Gennemfør prologen.",
+  "Win an outrun in the prologue.": "Vind et outrun i prologen.",
+  "Win the prologue's three races.": "Vind prologens tre løb.",
+  "Complete {n} stages of the career.": {
+    "one": "Gennemfør {n} etape i karrieren.",
+    "other": "Gennemfør {n} etaper i karrieren."
+  },
+  "Win {n} outruns in the career.": {
+    "one": "Vind {n} outrun i karrieren.",
+    "other": "Vind {n} outruns i karrieren."
+  },
+  "Win the final race of {n} stages on Hard.": {
+    "one": "Vind en etapes finaleløb på Svær.",
+    "other": "Vind finaleløbet i {n} etaper på Svær."
+  },
+  "Make {n} magazine covers.": {
+    "one": "Kom på forsiden af et magasin.",
+    "other": "Kom på {n} magasinforsider."
+  },
+  "Make {n} DVD covers.": {
+    "one": "Kom på forsiden af en dvd.",
+    "other": "Kom på {n} dvd-forsider."
+  }
 }

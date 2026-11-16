@@ -47,6 +47,17 @@
 #define G_CAREER_CAR    0x00863480u   /* the career car's handle (CAREER_SLOT_n) */
 #define G_RACES         0x008383e0u   /* the career's race table: [G_NRACES] races of 0x88 bytes */
 #define G_NRACES        0x008383e4u
+#define G_STRPOOL       0x00838428u   /* the career tables' strings: a race's name at +[race +0] (u16) */
+#define G_SHOWS         0x0083840cu   /* the cover shoots (showcases): [G_NSHOWS] of 0x40 bytes: +0 name, +0x20 its event's
+                                       * hash, +0x25 stage, +0x34 kind (3 a magazine cover, 4 a DVD cover) */
+#define G_NSHOWS        0x00838408u
+#define G_DIFFICULTY    0x0083ac30u   /* byte: the career's difficulty, 0 Easy, 1 Medium, 2 Hard (Options) */
+/* Career (G_CAREER) +: */
+#define C_STAGE         0x7af8u       /* the stage: 0 the prologue, 1 .. 5, 6 the career complete */
+#define C_STAGES        0x72d8u       /* the stages' records, 0x104 bytes each from stage 0: +0xDC outrun wins (u32), +0xFC */
+#define C_STAGE_SZ      0x104u        /*   complete (byte), +0x100 the stage's info (+0x28 its final event's hash) */
+#define C_NEVENTS       0x7afcu       /* the events' states: [C_NEVENTS] of 8 bytes at C_EVENTS: +0 the event's hash */
+#define C_EVENTS        0x7b00u       /*   (a race's +8, a cover shoot's +0x20), +6 1 won */
 
 /* ---- network races ------------------------------------------------------- */
 #define G_NET_HOST      0x00866a14u   /* the host's race state, > 0: this game created the network race */

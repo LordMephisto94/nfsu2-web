@@ -1614,5 +1614,36 @@
   "Highway 1 (UG1)": "Highway 1 (UG1)",
   "Commercial (UG1)": "Commercial (UG1)",
   "Olympic City (UG1 demo)": "Olympic City (UG1 demo)",
-  "Downtown (UG1 demo)": "Downtown (UG1 demo)"
+  "Downtown (UG1 demo)": "Downtown (UG1 demo)",
+  "Welcome to Bayview": "Bayview'a hoş geldin",
+  "Yo Noobie": "Yo Noobie",
+  "Bring My Car Back... Now!": "Bring My Car Back... Now!",
+  "Career": "Kariyer",
+  "Outrun ace": "Outrun ası",
+  "No mercy": "Acımasız",
+  "Cover star": "Kapak yıldızı",
+  "On DVD": "DVD'de",
+  "Finish the prologue.": "Girişi bitir.",
+  "Win an outrun in the prologue.": "Girişte bir outrun kazan.",
+  "Win the prologue's three races.": "Girişin üç yarışını kazan.",
+  "Complete {n} stages of the career.": {
+    "one": "Kariyerin {n} aşamasını tamamla.",
+    "other": "Kariyerin {n} aşamasını tamamla."
+  },
+  "Win {n} outruns in the career.": {
+    "one": "Kariyerde {n} outrun kazan.",
+    "other": "Kariyerde {n} outrun kazan."
+  },
+  "Win the final race of {n} stages on Hard.": {
+    "one": "Bir aşamanın final yarışını Zor'da kazan.",
+    "other": "{n} aşamanın final yarışını Zor'da kazan."
+  },
+  "Make {n} magazine covers.": {
+    "one": "Bir derginin kapağına çık.",
+    "other": "{n} dergi kapağına çık."
+  },
+  "Make {n} DVD covers.": {
+    "one": "Bir DVD'nin kapağına çık.",
+    "other": "{n} DVD kapağına çık."
+  }
 }

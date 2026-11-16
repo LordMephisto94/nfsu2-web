@@ -1632,5 +1632,36 @@
   "Highway 1 (UG1)": "Highway 1 (UG1)",
   "Commercial (UG1)": "Commercial (UG1)",
   "Olympic City (UG1 demo)": "Olympic City (UG1 demo)",
-  "Downtown (UG1 demo)": "Downtown (UG1 demo)"
+  "Downtown (UG1 demo)": "Downtown (UG1 demo)",
+  "Welcome to Bayview": "Καλώς ήρθες στο Bayview",
+  "Yo Noobie": "Yo Noobie",
+  "Bring My Car Back... Now!": "Bring My Car Back... Now!",
+  "Career": "Καριέρα",
+  "Outrun ace": "Άσος του outrun",
+  "No mercy": "Χωρίς έλεος",
+  "Cover star": "Σταρ εξωφύλλου",
+  "On DVD": "Σε DVD",
+  "Finish the prologue.": "Ολοκλήρωσε τον πρόλογο.",
+  "Win an outrun in the prologue.": "Κέρδισε ένα outrun στον πρόλογο.",
+  "Win the prologue's three races.": "Κέρδισε τους τρεις αγώνες του προλόγου.",
+  "Complete {n} stages of the career.": {
+    "one": "Ολοκλήρωσε {n} στάδιο της καριέρας.",
+    "other": "Ολοκλήρωσε {n} στάδια της καριέρας."
+  },
+  "Win {n} outruns in the career.": {
+    "one": "Κέρδισε {n} outrun στην καριέρα.",
+    "other": "Κέρδισε {n} outrun στην καριέρα."
+  },
+  "Win the final race of {n} stages on Hard.": {
+    "one": "Κέρδισε τον τελικό αγώνα ενός σταδίου στο Δύσκολο.",
+    "other": "Κέρδισε τον τελικό αγώνα {n} σταδίων στο Δύσκολο."
+  },
+  "Make {n} magazine covers.": {
+    "one": "Βγες στο εξώφυλλο ενός περιοδικού.",
+    "other": "Βγες σε {n} εξώφυλλα περιοδικών."
+  },
+  "Make {n} DVD covers.": {
+    "one": "Βγες στο εξώφυλλο ενός DVD.",
+    "other": "Βγες σε {n} εξώφυλλα DVD."
+  }
 }

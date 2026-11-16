@@ -1752,5 +1752,46 @@
   "Highway 1 (UG1)": "Highway 1 (UG1)",
   "Commercial (UG1)": "Commercial (UG1)",
   "Olympic City (UG1 demo)": "Olympic City (UG1 demo)",
-  "Downtown (UG1 demo)": "Downtown (UG1 demo)"
+  "Downtown (UG1 demo)": "Downtown (UG1 demo)",
+  "Welcome to Bayview": "Witaj w Bayview",
+  "Yo Noobie": "Yo Noobie",
+  "Bring My Car Back... Now!": "Bring My Car Back... Now!",
+  "Career": "Kariera",
+  "Outrun ace": "As outrunów",
+  "No mercy": "Bez litości",
+  "Cover star": "Gwiazda okładki",
+  "On DVD": "Na DVD",
+  "Finish the prologue.": "Ukończ prolog.",
+  "Win an outrun in the prologue.": "Wygraj outrun w prologu.",
+  "Win the prologue's three races.": "Wygraj trzy wyścigi prologu.",
+  "Complete {n} stages of the career.": {
+    "one": "Ukończ {n} etap kariery.",
+    "few": "Ukończ {n} etapy kariery.",
+    "many": "Ukończ {n} etapów kariery.",
+    "other": "Ukończ {n} etapu kariery."
+  },
+  "Win {n} outruns in the career.": {
+    "one": "Wygraj {n} outrun w karierze.",
+    "few": "Wygraj {n} outruny w karierze.",
+    "many": "Wygraj {n} outrunów w karierze.",
+    "other": "Wygraj {n} outrunu w karierze."
+  },
+  "Win the final race of {n} stages on Hard.": {
+    "one": "Wygraj wyścig finałowy etapu na poziomie Trudny.",
+    "few": "Wygraj wyścig finałowy {n} etapów na poziomie Trudny.",
+    "many": "Wygraj wyścig finałowy {n} etapów na poziomie Trudny.",
+    "other": "Wygraj wyścig finałowy {n} etapu na poziomie Trudny."
+  },
+  "Make {n} magazine covers.": {
+    "one": "Traf na okładkę magazynu.",
+    "few": "Traf na {n} okładki magazynów.",
+    "many": "Traf na {n} okładek magazynów.",
+    "other": "Traf na {n} okładki magazynów."
+  },
+  "Make {n} DVD covers.": {
+    "one": "Traf na okładkę DVD.",
+    "few": "Traf na {n} okładki DVD.",
+    "many": "Traf na {n} okładek DVD.",
+    "other": "Traf na {n} okładki DVD."
+  }
 }

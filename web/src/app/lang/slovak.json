@@ -1752,5 +1752,46 @@
   "Highway 1 (UG1)": "Highway 1 (UG1)",
   "Commercial (UG1)": "Commercial (UG1)",
   "Olympic City (UG1 demo)": "Olympic City (UG1 demo)",
-  "Downtown (UG1 demo)": "Downtown (UG1 demo)"
+  "Downtown (UG1 demo)": "Downtown (UG1 demo)",
+  "Welcome to Bayview": "Vitaj v Bayview",
+  "Yo Noobie": "Yo Noobie",
+  "Bring My Car Back... Now!": "Bring My Car Back... Now!",
+  "Career": "Kariéra",
+  "Outrun ace": "Eso outrunov",
+  "No mercy": "Bez zľutovania",
+  "Cover star": "Hviezda obálky",
+  "On DVD": "Na DVD",
+  "Finish the prologue.": "Dokonči prológ.",
+  "Win an outrun in the prologue.": "Vyhraj outrun v prológu.",
+  "Win the prologue's three races.": "Vyhraj tri preteky prológu.",
+  "Complete {n} stages of the career.": {
+    "one": "Dokonči {n} etapu kariéry.",
+    "few": "Dokonči {n} etapy kariéry.",
+    "many": "Dokonči {n} etapy kariéry.",
+    "other": "Dokonči {n} etáp kariéry."
+  },
+  "Win {n} outruns in the career.": {
+    "one": "Vyhraj {n} outrun v kariére.",
+    "few": "Vyhraj {n} outruny v kariére.",
+    "many": "Vyhraj {n} outrunu v kariére.",
+    "other": "Vyhraj {n} outrunov v kariére."
+  },
+  "Win the final race of {n} stages on Hard.": {
+    "one": "Vyhraj finálové preteky etapy na obtiažnosť Ťažká.",
+    "few": "Vyhraj finálové preteky {n} etáp na obtiažnosť Ťažká.",
+    "many": "Vyhraj finálové preteky {n} etapy na obtiažnosť Ťažká.",
+    "other": "Vyhraj finálové preteky {n} etáp na obtiažnosť Ťažká."
+  },
+  "Make {n} magazine covers.": {
+    "one": "Dostaň sa na obálku časopisu.",
+    "few": "Dostaň sa na {n} obálky časopisov.",
+    "many": "Dostaň sa na {n} obálky časopisov.",
+    "other": "Dostaň sa na {n} obálok časopisov."
+  },
+  "Make {n} DVD covers.": {
+    "one": "Dostaň sa na obal DVD.",
+    "few": "Dostaň sa na {n} obaly DVD.",
+    "many": "Dostaň sa na {n} obalu DVD.",
+    "other": "Dostaň sa na {n} obalov DVD."
+  }
 }

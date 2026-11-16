@@ -1722,5 +1722,41 @@
   "Highway 1 (UG1)": "Highway 1 (UG1)",
   "Commercial (UG1)": "Commercial (UG1)",
   "Olympic City (UG1 demo)": "Olympic City (UG1 demo)",
-  "Downtown (UG1 demo)": "Downtown (UG1 demo)"
+  "Downtown (UG1 demo)": "Downtown (UG1 demo)",
+  "Welcome to Bayview": "Bem-vindo a Bayview",
+  "Yo Noobie": "Yo Noobie",
+  "Bring My Car Back... Now!": "Bring My Car Back... Now!",
+  "Career": "Carreira",
+  "Outrun ace": "Ás do outrun",
+  "No mercy": "Sem piedade",
+  "Cover star": "Estrela de capa",
+  "On DVD": "Em DVD",
+  "Finish the prologue.": "Termine o prólogo.",
+  "Win an outrun in the prologue.": "Vença um outrun no prólogo.",
+  "Win the prologue's three races.": "Vença as três corridas do prólogo.",
+  "Complete {n} stages of the career.": {
+    "one": "Complete {n} etapa da carreira.",
+    "many": "Complete {n} etapas da carreira.",
+    "other": "Complete {n} etapas da carreira."
+  },
+  "Win {n} outruns in the career.": {
+    "one": "Vença {n} outrun na carreira.",
+    "many": "Vença {n} outruns na carreira.",
+    "other": "Vença {n} outruns na carreira."
+  },
+  "Win the final race of {n} stages on Hard.": {
+    "one": "Vença a corrida final de uma etapa no Difícil.",
+    "many": "Vença a corrida final de {n} etapas no Difícil.",
+    "other": "Vença a corrida final de {n} etapas no Difícil."
+  },
+  "Make {n} magazine covers.": {
+    "one": "Saia na capa de uma revista.",
+    "many": "Saia em {n} capas de revista.",
+    "other": "Saia em {n} capas de revista."
+  },
+  "Make {n} DVD covers.": {
+    "one": "Saia na capa de um DVD.",
+    "many": "Saia em {n} capas de DVD.",
+    "other": "Saia em {n} capas de DVD."
+  }
 }

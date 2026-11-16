@@ -1692,5 +1692,36 @@
   "Highway 1 (UG1)": "Highway 1 (UG1)",
   "Commercial (UG1)": "Commercial (UG1)",
   "Olympic City (UG1 demo)": "Olympic City (UG1 demo)",
-  "Downtown (UG1 demo)": "Downtown (UG1 demo)"
+  "Downtown (UG1 demo)": "Downtown (UG1 demo)",
+  "Welcome to Bayview": "Welkom in Bayview",
+  "Yo Noobie": "Yo Noobie",
+  "Bring My Car Back... Now!": "Bring My Car Back... Now!",
+  "Career": "Carrière",
+  "Outrun ace": "Outrun-aas",
+  "No mercy": "Genadeloos",
+  "Cover star": "Coverster",
+  "On DVD": "Op dvd",
+  "Finish the prologue.": "Rond de proloog af.",
+  "Win an outrun in the prologue.": "Win een outrun in de proloog.",
+  "Win the prologue's three races.": "Win de drie races van de proloog.",
+  "Complete {n} stages of the career.": {
+    "one": "Voltooi {n} etappe van je carrière.",
+    "other": "Voltooi {n} etappes van je carrière."
+  },
+  "Win {n} outruns in the career.": {
+    "one": "Win {n} outrun in je carrière.",
+    "other": "Win {n} outruns in je carrière."
+  },
+  "Win the final race of {n} stages on Hard.": {
+    "one": "Win de finalerace van een etappe op Moeilijk.",
+    "other": "Win de finalerace van {n} etappes op Moeilijk."
+  },
+  "Make {n} magazine covers.": {
+    "one": "Kom op de cover van een tijdschrift.",
+    "other": "Kom op {n} tijdschriftcovers."
+  },
+  "Make {n} DVD covers.": {
+    "one": "Kom op de cover van een dvd.",
+    "other": "Kom op {n} dvd-covers."
+  }
 }
