@@ -1720,7 +1720,6 @@
   "Winning streak": "Серія перемог",
   "Reach {n} km/h in a race.": "Розженіться до {n} км/год у гонці.",
   "Race {n} km in all.": "Проїдьте в гонках загалом {n} км.",
-  "{name} could not be found in free roam.": "Гравця {name} не вдалося знайти у вільній їзді.",
   "Those are not the game's music files.": "Це не музичні файли гри.",
   "Not enough room in this browser for the songs.": "У цьому браузері недостатньо місця для пісень.",
   "Copying the songs stopped. Try again.": "Копіювання пісень перервалося. Спробуйте ще раз.",
@@ -1744,5 +1743,6 @@
   "Mods at once": "Моди разом",
   "Your own mix of mods.": "Твій власний набір модів.",
   "Mods: {name}. Applies the next time you press Play.": "Моди: {name}. Застосується, коли наступного разу натиснеш «Грати».",
-  "The game's own textures, sharper.": "Власні текстури гри, чіткіші."
+  "The game's own textures, sharper.": "Власні текстури гри, чіткіші.",
+  "Your car signals by itself before a turn on the GPS route.": "Твоя машина сама вмикає поворотник перед поворотом на маршруті GPS."
 }

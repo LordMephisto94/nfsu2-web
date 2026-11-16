@@ -237,6 +237,13 @@ export const MODS: readonly Mod[] = [
 
   // ---- Extras
   {
+    id: 'gps-signals', name: 'Turn signals with the GPS', authors: [{ name: 'nfsu2.xyz' }], links: {},
+    kind: 'extras', uses: 'original', control: { setting: 'gps_signals' },
+    line: N('Your car signals by itself before a turn on the GPS route.'),
+    details: 'While the GPS shows a route in free roam, your car\'s turn signal comes on before each turn on it and goes off after it. Your own signal keys come first; pressing the side that is already on turns it off until that turn is past. Other players see it like your own signals.',
+    online: 'seen', files: ['runtime/signals.c'],
+  },
+  {
     id: 'gps-distance', name: 'GPS Distance', authors: [{ name: 'roman01la', url: 'https://github.com/roman01la' }], links: {},
     kind: 'extras', uses: 'original', control: { setting: 'gps_distance' },
     line: N('Distance to your destination beneath the GPS arrow.'),

@@ -1576,7 +1576,6 @@
   "Winning streak": "Győzelmi sorozat",
   "Reach {n} km/h in a race.": "Érd el a {n} km/h-t egy versenyen.",
   "Race {n} km in all.": "Versenyezz összesen {n} km-t.",
-  "{name} could not be found in free roam.": "{name} nem található Felfedező módban.",
   "Those are not the game's music files.": "Ezek nem a játék zenefájljai.",
   "Not enough room in this browser for the songs.": "Ebben a böngészőben nincs elég hely a dalokhoz.",
   "Copying the songs stopped. Try again.": "A dalok másolása megszakadt. Próbáld újra.",
@@ -1600,5 +1599,6 @@
   "Mods at once": "Modok egyszerre",
   "Your own mix of mods.": "A saját modválogatásod.",
   "Mods: {name}. Applies the next time you press Play.": "Modok: {name}. A Játék következő megnyomásakor lép életbe.",
-  "The game's own textures, sharper.": "A játék saját textúrái, élesebben."
+  "The game's own textures, sharper.": "A játék saját textúrái, élesebben.",
+  "Your car signals by itself before a turn on the GPS route.": "Az autód magától indexel a GPS-útvonal kanyarai előtt."
 }

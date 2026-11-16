@@ -1660,7 +1660,6 @@
   "Winning streak": "Segersvit",
   "Reach {n} km/h in a race.": "Nå {n} km/h i ett race.",
   "Race {n} km in all.": "Kör totalt {n} km i race.",
-  "{name} could not be found in free roam.": "{name} hittades inte i läget Utforska.",
   "Those are not the game's music files.": "Det där är inte spelets musikfiler.",
   "Not enough room in this browser for the songs.": "Det finns inte tillräckligt med plats i den här webbläsaren för låtarna.",
   "Copying the songs stopped. Try again.": "Kopieringen av låtarna avbröts. Försök igen.",
@@ -1684,5 +1683,6 @@
   "Mods at once": "Moddar på en gång",
   "Your own mix of mods.": "Din egen mix av moddar.",
   "Mods: {name}. Applies the next time you press Play.": "Moddar: {name}. Gäller nästa gång du trycker på Spela.",
-  "The game's own textures, sharper.": "Spelets egna texturer, skarpare."
+  "The game's own textures, sharper.": "Spelets egna texturer, skarpare.",
+  "Your car signals by itself before a turn on the GPS route.": "Din bil blinkar av sig själv före en sväng på GPS-rutten."
 }

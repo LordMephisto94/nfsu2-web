@@ -1582,7 +1582,6 @@
   "Winning streak": "Galibiyet serisi",
   "Reach {n} km/h in a race.": "Bir yarışta {n} km/sa hıza ulaş.",
   "Race {n} km in all.": "Yarışlarda toplam {n} km kat et.",
-  "{name} could not be found in free roam.": "{name} serbest sürüşte bulunamadı.",
   "Those are not the game's music files.": "Bunlar oyunun müzik dosyaları değil.",
   "Not enough room in this browser for the songs.": "Bu tarayıcıda şarkılar için yeterli yer yok.",
   "Copying the songs stopped. Try again.": "Şarkıların kopyalanması durdu. Tekrar dene.",
@@ -1606,5 +1605,6 @@
   "Mods at once": "Modlar tek seferde",
   "Your own mix of mods.": "Kendi mod karışımın.",
   "Mods: {name}. Applies the next time you press Play.": "Modlar: {name}. Bir sonraki Oyna’ya bastığında uygulanır.",
-  "The game's own textures, sharper.": "Oyunun kendi dokuları, daha net."
+  "The game's own textures, sharper.": "Oyunun kendi dokuları, daha net.",
+  "Your car signals by itself before a turn on the GPS route.": "Araban GPS rotasındaki bir dönüşten önce sinyali kendisi verir."
 }

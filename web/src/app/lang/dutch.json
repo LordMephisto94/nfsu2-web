@@ -1660,7 +1660,6 @@
   "Winning streak": "Zegereeks",
   "Reach {n} km/h in a race.": "Haal {n} km/u in een race.",
   "Race {n} km in all.": "Race in totaal {n} km.",
-  "{name} could not be found in free roam.": "{name} was niet te vinden in Verkennen.",
   "Those are not the game's music files.": "Dat zijn niet de muziekbestanden van het spel.",
   "Not enough room in this browser for the songs.": "Niet genoeg ruimte in deze browser voor de nummers.",
   "Copying the songs stopped. Try again.": "Het kopiëren van de nummers is gestopt. Probeer het opnieuw.",
@@ -1684,5 +1683,6 @@
   "Mods at once": "Mods in één keer",
   "Your own mix of mods.": "Je eigen mix van mods.",
   "Mods: {name}. Applies the next time you press Play.": "Mods: {name}. Geldt de volgende keer dat je op Spelen drukt.",
-  "The game's own textures, sharper.": "De eigen texturen van het spel, scherper."
+  "The game's own textures, sharper.": "De eigen texturen van het spel, scherper.",
+  "Your car signals by itself before a turn on the GPS route.": "Je auto geeft zelf richting aan voor een afslag op de gps-route."
 }

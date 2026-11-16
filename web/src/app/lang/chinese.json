@@ -1577,7 +1577,6 @@
   "Win with {n} different cars.": "用 {n} 輛不同的車獲勝。",
   "Win {n} races with the same car.": "用同一輛車贏得 {n} 場比賽。",
   "Win {n} races against other players.": "在與其他玩家的比賽中獲勝 {n} 次。",
-  "{name} could not be found in free roam.": "在自由漫遊中找不到 {name}。",
   "Those are not the game's music files.": "這些不是遊戲的音樂檔案。",
   "Not enough room in this browser for the songs.": "此瀏覽器的空間不足以存放歌曲。",
   "Copying the songs stopped. Try again.": "歌曲複製已中斷。請再試一次。",
@@ -1601,5 +1600,6 @@
   "Mods at once": "一次性设置模组",
   "Your own mix of mods.": "你自己的模组组合。",
   "Mods: {name}. Applies the next time you press Play.": "模组：{name}。下次按“开始”时生效。",
-  "The game's own textures, sharper.": "游戏自带的纹理，更清晰。"
+  "The game's own textures, sharper.": "游戏自带的纹理，更清晰。",
+  "Your car signals by itself before a turn on the GPS route.": "在 GPS 路线上转弯前，你的车会自动打转向灯。"
 }

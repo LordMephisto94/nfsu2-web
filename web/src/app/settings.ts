@@ -194,6 +194,9 @@ export const KEYS: readonly KeyDef[] = [
   // the distance to the GPS destination under its arrow (runtime/gpsdistance.c).  Not in bundle.m's table: there a
   // lower-case key, so it reaches the runtime as NFSU2_GPS_DISTANCE all the same
   { key: 'gps_distance', env: 'NFSU2_GPS_DISTANCE', kind: 'bool', scope: 'web' },
+  // the car's turn signals by themselves before a turn on the GPS route, on unless off (runtime/signals.c).  Not in
+  // bundle.m's table: there a lower-case key, so it reaches the runtime as NFSU2_GPS_SIGNALS all the same
+  { key: 'gps_signals', env: 'NFSU2_GPS_SIGNALS', kind: 'bool', scope: 'web' },
   // the career's hidden races on the map like the others (runtime/hiddenraces.c).  Not in bundle.m's table: there a
   // lower-case key, so it reaches the runtime as NFSU2_SHOW_HIDDEN_RACES all the same
   { key: 'show_hidden_races', env: 'NFSU2_SHOW_HIDDEN_RACES', kind: 'bool', scope: 'web' },
@@ -373,6 +376,11 @@ export const TEMPLATE = `# NFSU2 settings, read at every launch.
 # Speedometer Units has it (Mods: GPS Distance).
 # [NFSU2_GPS_DISTANCE]
 #gps_distance = off
+
+# Your car's turn signals come on by themselves before a turn on the GPS
+# route, and go off after it (Mods: Turn signals with the GPS).
+# [NFSU2_GPS_SIGNALS]
+#gps_signals = on
 
 # The car's visual rating set by the career's stage, not by its parts, as
 # thelink2012's Visual Reputation Remover (github.com/thelink2012/novisualrep)

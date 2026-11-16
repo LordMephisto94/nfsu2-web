@@ -1690,7 +1690,6 @@
   "Winning streak": "Racha de victorias",
   "Reach {n} km/h in a race.": "Alcanza los {n} km/h en una carrera.",
   "Race {n} km in all.": "Recorre {n} km en carreras en total.",
-  "{name} could not be found in free roam.": "No se encontró a {name} en circulación libre.",
   "Those are not the game's music files.": "Esos no son los archivos de música del juego.",
   "Not enough room in this browser for the songs.": "No hay suficiente espacio en este navegador para las canciones.",
   "Copying the songs stopped. Try again.": "La copia de las canciones se detuvo. Inténtalo de nuevo.",
@@ -1714,5 +1713,6 @@
   "Mods at once": "Mods de una vez",
   "Your own mix of mods.": "Tu propia combinación de mods.",
   "Mods: {name}. Applies the next time you press Play.": "Mods: {name}. Se aplica la próxima vez que pulses Jugar.",
-  "The game's own textures, sharper.": "Las texturas del propio juego, más nítidas."
+  "The game's own textures, sharper.": "Las texturas del propio juego, más nítidas.",
+  "Your car signals by itself before a turn on the GPS route.": "Tu coche pone el intermitente solo antes de un giro en la ruta del GPS."
 }
