@@ -1735,5 +1735,7 @@
   "Choose game folder": "Вибрати папку гри",
   "Copying the songs: {percent} %": "Копіювання пісень: {percent} %",
   "Your own songs play ({size} MB in this browser).": "Грають ваші пісні ({size} МБ у цьому браузері).",
-  "The official playlist on Spotify": "Офіційний плейлист у Spotify"
+  "The official playlist on Spotify": "Офіційний плейлист у Spotify",
+  "Drive through the Construction Tunnel in free roam.": "Проїжджай крізь тунель, що будується, у вільній їзді.",
+  "Drive into the airport's parking garage and more parking lots in the city.": "Заїжджай у паркінг аеропорту та на інші парковки міста."
 }

@@ -45,6 +45,8 @@ const NOT_PORTS = {
   // the Mac's texture pack builder: its upscaling models' and a library's licences
   'tools/texpack/texpack.py': true,
 };
+/** authors named as a site is (the runtime names the site for other reasons) */
+const SITE_NAMES = ['nfsu2.xyz'];
 /** what the runtime names that is not the tab's */
 const NOT_THE_TABS = {
   // the language packs (KyoriAsh's Multi 13 languages and the other translations): the About panel's Translations tab
@@ -80,7 +82,7 @@ test('the entries: ids once each, in the sections\' order', () => {
   assert.equal(new Set(ids).size, ids.length, 'ids unique');
   for (const id of ids) assert.match(id, /^[a-z0-9-]+$/, id);
   const kinds = M.KINDS.map(k => k.kind);
-  assert.deepEqual(kinds, ['screen', 'shared', 'rules', 'car']);
+  assert.deepEqual(kinds, ['screen', 'shared', 'map', 'rules', 'car']);
   let at = 0;
   for (const m of MODS) {
     const k = kinds.indexOf(m.kind);
@@ -339,7 +341,9 @@ test('the runtime\'s credits: every file that names a mod is in its entry', () =
   const word = (s) => new RegExp(`(?<![\\w.])${s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?!\\w)`);
   const byName = new Map();
   const add = (n, mod) => byName.set(n, new Set([...(byName.get(n) ?? []), mod]));
-  for (const m of theirs) { add(modOf(m), modOf(m)); for (const a of m.authors) add(a.name, modOf(m)); }
+  // (an author named as the site is, nfsu2.xyz: the runtime names the site for its own reasons, its measurements and its
+  // title line, not as that author's mod)
+  for (const m of theirs) { add(modOf(m), modOf(m)); for (const a of m.authors) if (!SITE_NAMES.includes(a.name)) add(a.name, modOf(m)); }
   for (const [n, mod] of Object.entries(ALIASES)) {
     assert.ok(theirs.some(m => modOf(m) === mod), `ALIASES: ${mod} is an entry's`);
     add(n, mod);

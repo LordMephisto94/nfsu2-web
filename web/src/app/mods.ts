@@ -11,7 +11,7 @@
 import { N } from './i18n';
 
 /** the tab's sections, in this order */
-export type ModKind = 'screen' | 'shared' | 'rules' | 'car';
+export type ModKind = 'screen' | 'shared' | 'map' | 'rules' | 'car';
 /** where a row's setting is when the tab has no control for it */
 export type Place = 'display' | 'mainMenu';
 /** what changes for other players: mine, on your screen; you, sounds and menus only you get */
@@ -73,6 +73,7 @@ export interface Mod {
 export const KINDS: readonly { kind: ModKind; title: string }[] = [
   { kind: 'screen', title: N('On your screen') },
   { kind: 'shared', title: N('Seen by others') },
+  { kind: 'map', title: N('Map') },
   { kind: 'rules', title: N('Game rules') },
   { kind: 'car', title: N('Cars') },
 ];
@@ -256,6 +257,22 @@ export const MODS: readonly Mod[] = [
   //   details: 'Blitz, a brand of 24 rims, in the rim shop. Everyone\'s game has them, so a friend\'s car with them looks the same with this off. Off, the shop offers only the game\'s own brands; rims already on your car stay. Your saves still work in the original game: there the car has a similar rim of the game\'s in the same size.',
   //   online: 'seen', sizeMB: 1, files: ['runtime/modpacks.c', 'tools/modpacks.py'],
   // },
+
+  // ---- Map
+  {
+    id: 'open-tunnel', name: 'Open Construction Tunnel', authors: [{ name: 'roman01la' }], links: {},
+    kind: 'map', uses: 'data', control: { setting: 'open_tunnel' },
+    line: N('Drive through the Construction Tunnel in free roam.'),
+    details: 'The tunnel the game keeps closed for construction is open, to drive through in your career\'s free roam. Only your own city changes: friends you meet in free roam should turn it on too, or you drive where their city has a wall. It needs this server to have its pack.',
+    online: 'mine', sizeMB: 2, files: ['runtime/fileio.c'],
+  },
+  {
+    id: 'open-parking-lots', name: 'Open Parking Lots', authors: [{ name: 'nfsu2.xyz' }], links: {},
+    kind: 'map', uses: 'data', control: { setting: 'car_parks' },
+    line: N('Drive into the airport\'s parking garage and more parking lots in the city.'),
+    details: 'The airport\'s parking garage and more of the city\'s parking lots are open to drive into in your career\'s free roam. Only your own city changes: friends you meet in free roam should turn it on too, or you drive where their city has a wall. It needs this server to have its pack.',
+    online: 'mine', sizeMB: 11, files: ['runtime/fileio.c'],
+  },
 
   // ---- Game rules
   {

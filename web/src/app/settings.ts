@@ -182,6 +182,9 @@ export const KEYS: readonly KeyDef[] = [
   // are "textures"
   { key: 'ui_textures', env: 'NFSU2_UI_TEXTURES', kind: 'enum', vals: 'original|map|uhud', scope: 'web', device: true },
   { key: 'roads_and_shadows', env: 'NFSU2_ROADS_AND_SHADOWS', kind: 'enum', vals: 'original|roads-and-shadows', scope: 'web', device: true },
+  // the city's region A with community mods' add-ons, from their packs in MODPACKS (runtime/fileio.c city_resolve)
+  { key: 'open_tunnel', env: 'NFSU2_OPEN_TUNNEL', kind: 'bool', scope: 'web' },
+  { key: 'car_parks', env: 'NFSU2_CAR_PARKS', kind: 'bool', scope: 'web' },
   // the players this one blocks in free roam, by name (the page's hello to the server: net/index.ts).  Not in bundle.m's
   // table: the Mac's free roam has no hub
   { key: 'roam_block', env: 'NFSU2_ROAM_BLOCK', kind: 'names', ic: true, scope: 'web' },
@@ -516,6 +519,13 @@ export const TEMPLATE = `# NFSU2 settings, read at every launch.
 # NFSU2_MAP_TEXTURES = original keeps the game's maps).  [NFSU2_UI_TEXTURES]
 #ui_textures = original
 #roads_and_shadows = original
+# Community mods' add-ons to the city, where this server has their packs
+# (MODPACKS): the tunnel the game keeps closed for construction open, and
+# the car parks drivable.  Players who meet in free roam should pick the
+# same, or one drives where the other's city has a wall.
+# [NFSU2_OPEN_TUNNEL, NFSU2_CAR_PARKS]
+#open_tunnel = off
+#car_parks = off
 # Textures without smoothing (point sampling), blocky like early PC games;
 # on overrides the game's Texture Filtering.  [NFSU2_PIXELATED_TEXTURES]
 #pixelated_textures = off

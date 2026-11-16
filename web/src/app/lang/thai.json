@@ -1592,5 +1592,7 @@
   "Choose game folder": "เลือกโฟลเดอร์เกม",
   "Copying the songs: {percent} %": "กำลังคัดลอกเพลง: {percent} %",
   "Your own songs play ({size} MB in this browser).": "กำลังเล่นเพลงของคุณเอง ({size} MB ในเบราว์เซอร์นี้)",
-  "The official playlist on Spotify": "เพลย์ลิสต์ทางการบน Spotify"
+  "The official playlist on Spotify": "เพลย์ลิสต์ทางการบน Spotify",
+  "Drive through the Construction Tunnel in free roam.": "ขับผ่านอุโมงค์ที่กำลังก่อสร้างในโหมดขับอิสระ",
+  "Drive into the airport's parking garage and more parking lots in the city.": "ขับเข้าอาคารจอดรถของสนามบินและลานจอดรถอื่นๆ ในเมือง"
 }

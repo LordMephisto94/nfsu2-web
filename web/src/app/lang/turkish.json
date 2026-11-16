@@ -1597,5 +1597,7 @@
   "Choose game folder": "Oyun klasörünü seç",
   "Copying the songs: {percent} %": "Şarkılar kopyalanıyor: %{percent}",
   "Your own songs play ({size} MB in this browser).": "Kendi şarkıların çalıyor (bu tarayıcıda {size} MB).",
-  "The official playlist on Spotify": "Spotify'daki resmi çalma listesi"
+  "The official playlist on Spotify": "Spotify'daki resmi çalma listesi",
+  "Drive through the Construction Tunnel in free roam.": "Serbest sürüşte inşaat tünelinden geç.",
+  "Drive into the airport's parking garage and more parking lots in the city.": "Havalimanının otoparkına ve şehirdeki diğer otoparklara gir."
 }

@@ -1591,5 +1591,7 @@
   "Choose game folder": "Játékmappa kiválasztása",
   "Copying the songs: {percent} %": "Dalok másolása: {percent} %",
   "Your own songs play ({size} MB in this browser).": "A saját dalaid szólnak ({size} MB ebben a böngészőben).",
-  "The official playlist on Spotify": "A hivatalos lejátszási lista a Spotify-on"
+  "The official playlist on Spotify": "A hivatalos lejátszási lista a Spotify-on",
+  "Drive through the Construction Tunnel in free roam.": "Hajts át az építés alatt álló alagúton szabad kocsikázásban.",
+  "Drive into the airport's parking garage and more parking lots in the city.": "Hajts be a repülőtér parkolóházába és a város más parkolóiba."
 }

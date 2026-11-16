@@ -1705,5 +1705,7 @@
   "Choose game folder": "Choisir le dossier du jeu",
   "Copying the songs: {percent} %": "Copie des chansons : {percent} %",
   "Your own songs play ({size} MB in this browser).": "Vos propres chansons sont jouées ({size} Mo dans ce navigateur).",
-  "The official playlist on Spotify": "La playlist officielle sur Spotify"
+  "The official playlist on Spotify": "La playlist officielle sur Spotify",
+  "Drive through the Construction Tunnel in free roam.": "Traversez le tunnel en travaux en conduite libre.",
+  "Drive into the airport's parking garage and more parking lots in the city.": "Entrez dans le parking de l'aéroport et dans d'autres parkings de la ville."
 }

@@ -87,6 +87,8 @@ export const MOD_CONTROLS: Record<string, Control> = {
   catchup: { t: 'seg', opts: [['original', N('Original')], ['noboost', N('No boost')], ['off', N('Off')]] },
   gearbox_whine: { t: 'switch' },
   hq_vinyls: { t: 'switch' },
+  open_tunnel: { t: 'switch' },
+  car_parks: { t: 'switch' },
   // mod_rims: { t: 'switch' },   (the rims: out for now, mods.ts)
 };
 /** the Mods tab's one row that is no mod's: how other players' cars show the mods' looks (mods-ui.ts: first in "Seen by

@@ -1592,5 +1592,7 @@
   "Choose game folder": "ゲームのフォルダーを選ぶ",
   "Copying the songs: {percent} %": "曲をコピー中: {percent} %",
   "Your own songs play ({size} MB in this browser).": "自分の曲を再生します (このブラウザーに {size} MB)。",
-  "The official playlist on Spotify": "Spotify の公式プレイリスト"
+  "The official playlist on Spotify": "Spotify の公式プレイリスト",
+  "Drive through the Construction Tunnel in free roam.": "フリーロームで工事中のトンネルを走り抜ける。",
+  "Drive into the airport's parking garage and more parking lots in the city.": "空港の立体駐車場や街のほかの駐車場に入れる。"
 }
