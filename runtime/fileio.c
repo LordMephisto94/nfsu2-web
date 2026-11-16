@@ -300,9 +300,11 @@ static int mpack_resolve(const char *win, char *out, size_t outsz){
 /* Two add-ons of the city's region A (TRACKS\L4RA.BUN, its stream STREAML4RA.BUN and its free roam routes
  * ROUTESL4RA\PathsFreeRoam.bin), community mods, each a switch (the Mods tab): open_tunnel (NFSU2_OPEN_TUNNEL), the
  * tunnel the game keeps closed for construction open, and car_parks (NFSU2_CAR_PARKS), the car parks drivable.  Each
- * combination is a folder of MODPACKS with the game's own paths in it: TUNNEL, PARKADE, both TUNNELPARKADE.  With one
- * on, a file its folder has is read from there in place of the game's; without the folder (a server without the
- * packs) the game's own, and the log says so once. */
+ * combination is a folder of MODPACKS with the game's own paths in it: TUNNEL, PARKADE, both TUNNELPARKADE, each file
+ * a pack of the game's file as the other mod packs' (VPAK, vp_open: the game's file with a head and a tail, here the
+ * stream's new sections at its end; read whole in place of the game's file, it crashed free roam's load).  With one
+ * on, vp_path takes its folder's pack first; without the folder (a server without the packs) the game's own city, and
+ * the log says so once. */
 static const char *city_dir(void){
     static const char *dir; static int init;
     if (init) return dir;
@@ -319,19 +321,7 @@ static const char *city_dir(void){
     }
     return dir;
 }
-static int city_resolve(const char *win, char *out, size_t outsz){
-    const char *dir = city_dir();
-    if (!dir) return 0;
-    /* the game asks by its full path (C:\NFSU2/TRACKS\L4RA.BUN): the folder goes before the path in the game folder */
-    char rel[1024], k[1100]; rel_of(win, rel, sizeof rel); snprintf(k, sizeof k, "%s/%s", dir, rel);
-    const struct lfile *e = flist_find(&g_mp, k);
-    if (!e) return 0;
-    snprintf(out, outsz, "%s/%s", g_mroot, e->rel);
-    static int said;
-    if (said++ < 4) fprintf(stderr, "  [file] %s: MODPACKS/%s\n", win, e->rel);
-    return 1;
-}
-/* Read: the write root if the file is there, then the language pack, the city's add-ons, otherwise the game root. */
+/* Read: the write root if the file is there, then the language pack, otherwise the game root. */
 static int resolve(const char *win, char *out, size_t outsz){
     if (g_wroot[0] && !overlay_cannot_have(win)){
         char w[1024];
@@ -339,7 +329,6 @@ static int resolve(const char *win, char *out, size_t outsz){
             snprintf(out, outsz, "%s", w); return 1; }
     }
     if (lpack_resolve(win, out, outsz)) return 1;
-    if (city_resolve(win, out, outsz)) return 1;
     if (resolve_in(g_root, win, out, outsz)) return 1;
     char m[1024];                               /* a file only a mod pack has */
     if (mpack_resolve(win, m, sizeof m)){ snprintf(out, outsz, "%s", m); return 1; }
@@ -589,7 +578,13 @@ int fileio_pack_bytes(uint32_t a, uint32_t n, const char **pk, int64_t *off){
 /* the pack of the game file win (a vinyl pack's, else a mod pack's): its host path, and the folder's name */
 static int vp_path(const char *win, char *p, size_t psz, const char **dir){
     vpack_walk(); mpack_walk();
-    const struct lfile *e = flist_find(&g_vp, win);
+    const char *cd = city_dir();                      /* the city's add-ons first: MODPACKS/<their folder>/<the game's path> */
+    if (cd){
+        char rel[1024], k[1100]; rel_of(win, rel, sizeof rel); snprintf(k, sizeof k, "%s/%s", cd, rel);
+        const struct lfile *c = flist_find(&g_mp, k);
+        if (c){ snprintf(p, psz, "%s/%s", g_mroot, c->rel); if (dir) *dir = "MODPACKS"; return 1; }
+    }
+    const struct lfile *e = flist_find(&g_mp, win);
     if (e){ snprintf(p, psz, "%s/%s", g_vroot, e->rel); if (dir) *dir = "VINYLPACKS"; return 1; }
     if ((e = flist_find(&g_mp, win))){ snprintf(p, psz, "%s/%s", g_mroot, e->rel); if (dir) *dir = "MODPACKS"; return 1; }
     return 0;
