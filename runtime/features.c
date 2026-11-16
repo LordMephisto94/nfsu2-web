@@ -107,6 +107,7 @@ static const struct { const char *name; void (*frame)(CPU *c); } k_frames[] = {
     { "showoff",     showoff_frame },          /* the car's trunk, hood and doors open */
     { "plates",      plates_frame },           /* license plates with the players' own text */
     { "lightkey",    lightkey_frame },         /* the headlights on G (off, high beam), friends' too */
+    { "signals",     signals_frame },          /* turn signals and hazard lights (, / '), other players' too */
     { "photo",       photo_frame },            /* photo mode (F12, the pause menu's Photo Mode) */
     { "savegame",    f_savegame },             /* the pause menu's Save, once its save is over */
     { "coop",        coop_frame },             /* co-op free roam */

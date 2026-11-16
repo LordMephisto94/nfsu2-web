@@ -1374,11 +1374,15 @@ void sub_006162e0(CPU *c){
 }
 void sub_00615630_orig(CPU *c);
 void lightkey_flares(uint32_t ri);               /* lightkey.c: whose flares these are (high beam) */
+void signals_flares(CPU *c, uint32_t ri, const uint32_t *a);   /* signals.c: the turn signals', after the game's */
 void sub_00615630(CPU *c){
     if (photo_hides(c->ecx)){ POP32(c->eip); c->esp += 0x18u; return; }
-    lightkey_flares(c->ecx);
+    uint32_t ri = c->ecx, a[6];
+    for (uint32_t i = 0; i < 6u; i++) a[i] = MR32(c->esp + 4u + 4u * i);
+    lightkey_flares(ri);
     sub_00615630_orig(c);
     lightkey_flares(0);
+    signals_flares(c, ri, a);
 }
 
 /* the test script's "photo ..." (autotest.c): hello, on, off, orbit, free, other (Tab), reset, names [0|1], hold MASK,
