@@ -2601,7 +2601,7 @@ export async function boot() {
   // contents are at the Game tab's end since the Mods tab came (kept or named, #other opens Game there)
   bigTabs = panelTabs($('#settings'), { store: PAGE_TAB, hash: true, moved: { other: { tab: 'game', at: '#game-data' } } });
   panelTabs($('#about'));
-  // Last.fm: its row under the songs' settings, and the scrobbles of the songs the game plays (lastfm.ts)
+  // Last.fm: its row under the drag and drift races' music, and the scrobbles of the songs the game plays (lastfm.ts)
   const lastfmApi = new LastfmApi(), lastfmRow = new LastfmRow({ api: lastfmApi, log: logLine, say: pageToast });
   const scrobbler = new Scrobbler({ api: lastfmApi, folder: () => radio?.lastTrack ?? null, dropped: () => lastfmRow.dropped(), log: logLine });
   scrobbleWhilePlaying(radioPort, scrobbler, readSession);
@@ -2623,7 +2623,7 @@ export async function boot() {
     readOnly: () => !instance.owner, say: pageToast, confirm: confirmBox,
     nameRow: (row, input, ctl) => nameRow.attach(row, input, ctl),
     quietSave: (key, value) => key === 'roam_name' && nameRow.notPlayed(value),
-    rowAfter: key => key === 'race_music' ? [ownMusicRow.el, lastfmRow.el] : null,
+    rowAfter: key => key === 'movies' ? [ownMusicRow.el] : key === 'race_music' ? [lastfmRow.el] : null,
   }, $('#online'));
   // the language picker at the top: the same setting as the Game tab's Language
   const pick = $<HTMLSelectElement>('#lang-pick');

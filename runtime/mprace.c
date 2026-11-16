@@ -1315,7 +1315,8 @@ static int series_next(long f){
     if (!series_on() || series_last()) return 0;
     SerTab t; ser_tab(&t); ser_add(&t);
     S.n = t.n; for (int i = 0; i < t.n; i++){ memcpy(S.p[i].name, t.p[i].name, 16); S.p[i].points = t.p[i].points; S.p[i].last = t.p[i].last; S.p[i].in_last = t.p[i].in_last; }
-    int rows = M.nres;
+    int rows = 0;                                   /* the heat's players: its rows less the AI racers' (lobbyai.c fills the */
+    for (int k = 0; k < M.nres; k++) rows += !M.res[k].ai;   /* rest again, from the cars less these) */
     S.heat++;
     M.r.track = S.track[S.heat]; M.r.reverse = S.reverse[S.heat]; M.r.laps = S.laps[S.heat];
     if (M.r.host && rows >= 2) M.r.players = rows;

@@ -28,7 +28,7 @@
  * damage, the health bar and "totaled", the career's saved damage and repairs, the
  * neon and the sounds; nor the .asi's ProStreet textures (broken glass, cracked lenses: EA's),
  * so the windows crack as the game cracks them and a broken lamp only goes dark.  The game's own repair (SetDamageToZero: a race's start, the
- * garage) takes the damage away.
+ * garage) takes the damage away, and here a cover shoot's start too (shoot_repair: the picture of a repaired car).
  * In free roam friends see the player's damage (roam_core's RC_MSG_DENTS, to friends who show it, near, roam_game.c):
  * the player's dents are published (damage_net_*), and a friend's car gets the dents its player sent, within limits
  * that keep any other player's messages from slowing this game down or filling its memory (damagecore.cpp's free roam
@@ -40,6 +40,7 @@
 #include "game.h"
 #include "widescreen.h"           /* HOOK_SITE */
 #include "guest_span.h"           /* g_gwin_hi: the guest heap's window */
+#include "splitscreen_mem.h"      /* SPLIT_PLAYERS_INDEX: the players (+4 the car) */
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -268,9 +269,30 @@ int damage_texlist_engine(uint32_t ride){
            MR32(types + t * CT_SIZE_D + CT_USE_D) != 2u;
 }
 
+/* A cover shoot (DVD or magazine) pictures the car repaired: on the frame one starts (its byte set, as showoff.c reads
+ * it: 0x4CE770 sets it, 0x499FA0 clears it) the player's car gets the game's own repair (SetDamageToZero on its
+ * CarDamage, which the override above passes to the core first: dents, loose and lost parts, scratches and lights) */
+#define G_SHOWCASE      0x00836352u   /* byte: a cover shoot is on */
+#define FN_DAMAGE_ZERO  0x00637d70u   /* CarDamage::SetDamageToZero (thiscall, no arguments) */
+#define CAR_DAMAGE      0x958u        /* Car: its CarDamage */
+static void shoot_repair(CPU *c){
+    static uint8_t was;
+    uint8_t now = MR8(G_SHOWCASE);
+    if (now && !was){
+        uint32_t pl = guest_rd32(SPLIT_PLAYERS_INDEX), car = pl ? guest_rd32(pl + 4u) : 0;
+        uint32_t cd = car && guest_ok_bytes(car + CAR_DAMAGE, 4u) ? MR32(car + CAR_DAMAGE) : 0;
+        if (cd && guest_ok_bytes(cd, 0x40u)){
+            gcall_main(c, FN_DAMAGE_ZERO, cd, 0, 0);
+            fprintf(stderr, "[damage] a cover shoot: the car repaired for its picture\n");
+        }
+    }
+    was = now;
+}
+
 /* roam.c's main-loop hook, once a frame */
 void damage_frame(CPU *c){
     if (!on()) return;
     g_c = c;
     dmg_main_loop();
+    shoot_repair(c);
 }
