@@ -1692,5 +1692,48 @@
   "Highway 1 (UG1)": "Highway 1 (UG1)",
   "Commercial (UG1)": "Commercial (UG1)",
   "Olympic City (UG1 demo)": "Olympic City (UG1 demo)",
-  "Downtown (UG1 demo)": "Downtown (UG1 demo)"
+  "Downtown (UG1 demo)": "Downtown (UG1 demo)",
+  "Welcome to Bayview": "Välkommen till Bayview",
+  "Yo Noobie": "Yo Noobie",
+  "Bring My Car Back... Now!": "Bring My Car Back... Now!",
+  "Career": "Karriär",
+  "Outrun ace": "Outrun-ess",
+  "No mercy": "Ingen nåd",
+  "Cover star": "Omslagsstjärna",
+  "On DVD": "På dvd",
+  "Finish the prologue.": "Klara prologen.",
+  "Win an outrun in the prologue.": "Vinn en outrun i prologen.",
+  "Win the prologue's three races.": "Vinn prologens tre lopp.",
+  "Complete {n} stages of the career.": {
+    "one": "Klara {n} etapp i karriären.",
+    "other": "Klara {n} etapper i karriären."
+  },
+  "Win {n} outruns in the career.": {
+    "one": "Vinn {n} outrun i karriären.",
+    "other": "Vinn {n} outruns i karriären."
+  },
+  "Win the final race of {n} stages on Hard.": {
+    "one": "Vinn en etapps finallopp på Svår.",
+    "other": "Vinn finalloppet i {n} etapper på Svår."
+  },
+  "Make {n} magazine covers.": {
+    "one": "Hamna på ett tidningsomslag.",
+    "other": "Hamna på {n} tidningsomslag."
+  },
+  "Make {n} DVD covers.": {
+    "one": "Hamna på ett dvd-omslag.",
+    "other": "Hamna på {n} dvd-omslag."
+  },
+  "Riders on the Storm": "Riders on the Storm",
+  "Full clear": "Rent hus",
+  "SUV king": "SUV-kung",
+  "Finish the career.": "Klara karriären.",
+  "Win every race of {n} stages from stage 2 on, but their SUV and sponsor races.": {
+    "one": "Vinn varje lopp i en etapp från etapp 2, utom SUV- och sponsorlopp.",
+    "other": "Vinn varje lopp i {n} etapper från etapp 2, utom SUV- och sponsorlopp."
+  },
+  "Win every SUV race of {n} stages.": {
+    "one": "Vinn varje SUV-lopp i en etapp.",
+    "other": "Vinn varje SUV-lopp i {n} etapper."
+  }
 }

@@ -19,8 +19,27 @@
  * What it reads (as discord.c and mprace.c read them): the race parameters [0x89E7A0] (track, direction, kind, laps,
  * the racers and which is player 1), the results' rows [0x851044] x [0x85105C] (0x515DB0 fills them for the results
  * screen: +4 the car's id, +0xC its time in the game clock's 1/4000 s, +0xC8 laps done, +0x104 a drift's points,
- * +0x10C top speed and +0x110 average speed, m/s) and player 1's car [[PlayersByNumber] + 4]. */
+ * +0x10C top speed and +0x110 average speed, m/s) and player 1's car [[PlayersByNumber] + 4].
+ *
+ * The career as it stands, for the career's achievements, in one more slot, set when it changes (each 30 frames):
+ *
+ *   cr_state  0 outside the career (the game mode not 1), else: 1 | stage s complete << s (s 1 .. 5) |
+ *             its outrun wins << (2 + 4 s) (4 bits, at most 15) | its final event won << (26 + s) (a stage that
+ *             names none, complete by its races as stage 1 is: complete) |
+ *             the prologue over (the stage 1 or more) << 32 | the prologue's outrun wins << 33 (4) |
+ *             the prologue's three races won (STAGE_0_CIRCUIT_0, _1, STAGE_0_SPRINT_0), only while in it, << 37 |
+ *             magazine covers done << 38 (6 bits) | DVD covers done << 44 (6) | the difficulty << 50 (2: 0 Easy ..)
+ *
+ *   cr_more   0 outside the career, else: 1 | stage s (2 .. 5) fully cleared << s (every one of its races won but its
+ *             SUV races (S<s>_SUV_k), its sponsors' (S<s>_SPON_*: only the signed sponsor's can be raced) and its hidden
+ *             ones (S<s>_H_*: only the Show hidden races mod opens them)) | every SUV race of stage s won << (4 + s)
+ *
+ * From the career's own records (game.h: the stages' records, the events' states, the race table, the cover shoots
+ * and the difficulty), so a save gives what it has done as it loads.  A cover shoot is done when its event is won;
+ * its kind says magazine or DVD.  The game marks the prologue's own events won without a race (career.c), so its
+ * three races count only while the career is still in it (the page keeps what it saw).  Logged as "[career] state". */
 #include "cpu.h"
+#include "game.h"
 #include "splitscreen_mem.h"
 #include <math.h>
 #include <stdio.h>
@@ -33,7 +52,7 @@ const char *autotest_top_fng(void);
 int career_fe_active(const char *name);
 long autotest_frame(void);
 
-#define G_RACE        0x0089e7a0u   /* the race parameters, filled before a track loads */
+#define G_RACEP        0x0089e7a0u   /* the race parameters, filled before a track loads */
 #define   R_TRACK       0x00u       /*   int  track number */
 #define   R_REVERSE     0x04u       /*   int  1: reversed */
 #define   R_KIND        0x10u       /*   int  3: lap knockout */
@@ -46,8 +65,6 @@ long autotest_frame(void);
 #define   R_HUMAN       0x68u       /*   int  player 1's racer index */
 #define   R_RACERS      0x70u       /*   racer records, 0x940 bytes each: +0x10 car type */
 #define   R_NRACERS     0x74u
-#define G_GAMEMODE    0x00850078u   /* 1 career, 0x200 LAN */
-#define G_NET_ONLINE  0x0089cf69u   /* World::IsOnline's flag (byte) */
 #define G_RACEKIND    0x0089e7b0u   /* 0 free roam, 7 an outrun */
 #define G_RSTATUS     0x00890118u   /* the race coordinator*: +0 state, 4 racing */
 #define G_PLAYER1     SPLIT_PLAYERS_INDEX
@@ -86,12 +103,12 @@ static int results_up(void){
 }
 
 static int race_type(void){
-    if (rd8(G_RACE + R_DRAG))  return RR_DRAG;
-    if (rd8(G_RACE + R_DRIFT)) return RR_DRIFT;
-    if (rd8(G_RACE + R_SHORT)) return RR_STREETX;
-    if (rd8(G_RACE + R_URL))   return RR_URL;
-    if (rd(G_RACE + R_KIND) == 3u) return RR_KNOCKOUT;
-    return rd(G_RACE + R_P2P) ? RR_SPRINT : RR_CIRCUIT;
+    if (rd8(G_RACEP + R_DRAG))  return RR_DRAG;
+    if (rd8(G_RACEP + R_DRIFT)) return RR_DRIFT;
+    if (rd8(G_RACEP + R_SHORT)) return RR_STREETX;
+    if (rd8(G_RACEP + R_URL))   return RR_URL;
+    if (rd(G_RACEP + R_KIND) == 3u) return RR_KNOCKOUT;
+    return rd(G_RACEP + R_P2P) ? RR_SPRINT : RR_CIRCUIT;
 }
 
 static unsigned clampu(double v, unsigned max){ return v <= 0 ? 0u : v >= max ? max : (unsigned)(v + 0.5); }
@@ -140,12 +157,12 @@ static int publish(void){
     else if (place > 1 && first >= 0) margin = fabs(row[me].score - row[first].score);
     if (!drift) margin /= 10.0;                                                    /* ms -> centiseconds */
 
-    uint32_t gm = rd(G_GAMEMODE), base = rd(G_RACE + R_RACERS), hi = rd(G_RACE + R_HUMAN), nracers = rd(G_RACE + R_NRACERS);
+    uint32_t gm = rd(G_GAMEMODE), base = rd(G_RACEP + R_RACERS), hi = rd(G_RACEP + R_HUMAN), nracers = rd(G_RACEP + R_NRACERS);
     unsigned mode = (gm & 0x200u) || rd8(G_NET_ONLINE) ? 2u : gm == 1u ? 1u : 0u;
     unsigned cartype = base && hi < nracers && nracers <= 32 ? rd(base + hi * 0x940u + 0x10u) : 127u;
     if (cartype > 126u) cartype = 127u;
-    unsigned track = rd(G_RACE + R_TRACK) & 0xffffu, rev = rd(G_RACE + R_REVERSE) == 1u, type = (unsigned)race_type();
-    unsigned laps = clampu(rd(G_RACE + R_LAPS), 31), fin = place > 0;
+    unsigned track = rd(G_RACEP + R_TRACK) & 0xffffu, rev = rd(G_RACEP + R_REVERSE) == 1u, type = (unsigned)race_type();
+    unsigned laps = clampu(rd(G_RACEP + R_LAPS), 31), fin = place > 0;
     double score = fin ? row[me].score : 0;
     uint64_t race = (uint64_t)track | (uint64_t)rev << 16 | (uint64_t)type << 17 | (uint64_t)laps << 20 |
                     (uint64_t)clampu(place, 7) << 25 | (uint64_t)fin << 28 | (uint64_t)mode << 29 |
@@ -165,12 +182,109 @@ static int publish(void){
     return 1;
 }
 
+/* ---- the career's state (cr_state) ---- */
+static int ev_won(uint32_t h){
+    uint32_t n = rd(G_CAREER + C_NEVENTS);
+    if (!h || n > 0x181u || !committed(G_CAREER + C_EVENTS, 8u * n)) return 0;
+    for (uint32_t i = 0; i < n; i++) if (MR32(G_CAREER + C_EVENTS + 8u * i) == h) return MR8(G_CAREER + C_EVENTS + 6u + 8u * i) == 1;
+    return 0;
+}
+static int race_won_named(const char *name){
+    uint32_t t = rd(G_RACES), n = rd(G_NRACES), pool = rd(G_STRPOOL);
+    if (!t || !pool || n > 512u || !committed(t, n * 0x88u)) return 0;
+    for (uint32_t i = 0; i < n; i++){
+        uint32_t r = t + i * 0x88u, nm = pool + MR16(r);
+        if (committed(nm, 32) && !strncasecmp((const char *)g_mem + nm, name, 32) && ev_won(MR32(r + 8u))) return 1;
+    }
+    return 0;
+}
+/* cr_more: the stages' races by their names (S<s>_...), won or not */
+static double career_more(char *why, size_t n){
+    why[0] = 0;
+    if (rd(G_GAMEMODE) != 1u) return 0;
+    uint32_t t = rd(G_RACES), cnt = rd(G_NRACES), pool = rd(G_STRPOOL);
+    if (!t || !pool || cnt > 512u || !committed(t, cnt * 0x88u)) return 0;
+    unsigned all[6] = {0}, won[6] = {0}, suv[6] = {0}, suvwon[6] = {0};
+    for (uint32_t i = 0; i < cnt; i++){
+        uint32_t r = t + i * 0x88u, nm = pool + MR16(r);
+        if (!committed(nm, 32)) continue;
+        const char *x = (const char *)g_mem + nm;
+        if (x[0] != 'S' || x[1] < '2' || x[1] > '5' || x[2] != '_') continue;
+        int st = x[1] - '0', w = ev_won(MR32(r + 8u));
+        if (!strncmp(x + 3, "SUV_", 4)){ suv[st]++; suvwon[st] += w; continue; }
+        if (!strncmp(x + 3, "SPON_", 5) || !strncmp(x + 3, "H_", 2)) continue;
+        all[st]++; won[st] += w;
+    }
+    uint64_t v = 1; int k = 0;
+    for (int st = 2; st <= 5; st++){
+        if (all[st] && won[st] == all[st]) v |= 1ull << st;
+        if (suv[st] && suvwon[st] == suv[st]) v |= 1ull << (4 + st);
+        k += snprintf(why + k, n - (size_t)k, "%sstage %d %u of %u, SUV %u of %u", st > 2 ? "; " : "", st, won[st], all[st], suvwon[st], suv[st]);
+        if (k >= (int)n) break;
+    }
+    return (double)v;
+}
+static double career_state(int *mags, int *dvds){
+    *mags = *dvds = 0;
+    if (rd(G_GAMEMODE) != 1u) return 0;
+    uint32_t stage = rd(G_CAREER + C_STAGE);
+    if (stage > 6u || !committed(G_CAREER + C_STAGES, 6u * C_STAGE_SZ)) return 0;
+    uint64_t v = 1;
+    for (uint32_t s = 0; s <= 5u; s++){
+        uint32_t rec = G_CAREER + C_STAGES + s * C_STAGE_SZ, outruns = MR32(rec + 0xdcu), info = MR32(rec + 0x100u);
+        if (outruns > 15u) outruns = 15u;
+        if (s == 0){ v |= (uint64_t)outruns << 33; continue; }
+        v |= (uint64_t)(MR8(rec + 0xfcu) != 0) << s | (uint64_t)outruns << (2 + 4 * s);
+        /* (a stage without a final, its hash 0, is complete by its races, 0x532C60 -> 0x5130A0: stage 1; its last race
+         * is its final here) */
+        uint32_t fin = committed(info + 0x28u, 4) ? MR32(info + 0x28u) : 0;
+        if (fin ? ev_won(fin) : MR8(rec + 0xfcu) != 0) v |= 1ull << (26 + s);
+    }
+    if (stage >= 1u) v |= 1ull << 32;
+    else if (race_won_named("STAGE_0_CIRCUIT_0") && race_won_named("STAGE_0_CIRCUIT_1") && race_won_named("STAGE_0_SPRINT_0"))
+        v |= 1ull << 37;
+    uint32_t t = rd(G_SHOWS), n = rd(G_NSHOWS);
+    for (uint32_t i = 0; t && n <= 128u && i < n && committed(t + i * 0x40u, 0x40u); i++){
+        uint32_t q = t + i * 0x40u;
+        if (!ev_won(MR32(q + 0x20u))) continue;
+        if (MR8(q + 0x34u) == 4u) ++*dvds; else ++*mags;
+    }
+    v |= (uint64_t)(*mags > 63 ? 63 : *mags) << 38 | (uint64_t)(*dvds > 63 ? 63 : *dvds) << 44 |
+         (uint64_t)(rd8(G_DIFFICULTY) & 3u) << 50;
+    return (double)v;
+}
+static void career_frame(void){
+    static int slot[2] = { -2, -2 }; static double was = -1, was_more = -1; static long next;
+    long f = autotest_frame();
+    if (f < next) return;
+    next = f + 30;
+    int mags, dvds; char why[256];
+    double v = career_state(&mags, &dvds), more = career_more(why, sizeof why);
+    if (more != was_more){
+        was_more = more;
+        if (more) fprintf(stderr, "[career] f=%ld races won: %s\n", f, why);
+    }
+    if (slot[0] == -2){ slot[0] = host_status_slot("cr_state"); slot[1] = host_status_slot("cr_more"); }
+    double vals[2] = { v, more };
+    if (slot[0] >= 0 && slot[1] >= 0) host_status_set_n(slot, vals, 2);
+    if (v == was) return;
+    was = v;
+    if (!v){ fprintf(stderr, "[career] f=%ld state: not in the career\n", f); return; }
+    uint64_t b = (uint64_t)v;
+    fprintf(stderr, "[career] f=%ld state: stage %u, stages complete %02x, finals won %02x, outrun wins %u %u %u %u %u %u, "
+            "prologue's races %s, covers: %d magazine(s), %d DVD(s) (of %u cover shoots), difficulty %u\n", f,
+            rd(G_CAREER + C_STAGE), (unsigned)(b >> 1 & 0x1f), (unsigned)(b >> 27 & 0x1f), (unsigned)(b >> 33 & 15),
+            (unsigned)(b >> 6 & 15), (unsigned)(b >> 10 & 15), (unsigned)(b >> 14 & 15), (unsigned)(b >> 18 & 15),
+            (unsigned)(b >> 22 & 15), b >> 37 & 1 ? "won" : "-", mags, dvds, rd(G_NSHOWS), (unsigned)(b >> 50 & 3));
+}
+
 /* A race is raced from the frame its coordinator goes into "racing" (4, from its countdown or a restart): it stays
  * there behind the results screen too, and the results screen is not the top package every frame (another one
  * comes over it now and then), so neither "racing" nor the screen alone tells one race from the next.  One result a
  * race. */
 void raceresult_frame(CPU *c){
     (void)c;
+    career_frame();
     uint32_t rs = rd(G_RSTATUS), st = rs ? rd(rs) : 0;
     if (st == 4u && R.state != 4u && rd(G_RACEKIND) != 7u){ R.raced = 1; R.published = 0; }   /* (an outrun: none) */
     R.state = st;

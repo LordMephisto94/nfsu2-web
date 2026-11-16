@@ -1752,5 +1752,62 @@
   "Highway 1 (UG1)": "Highway 1 (UG1)",
   "Commercial (UG1)": "Commercial (UG1)",
   "Olympic City (UG1 demo)": "Olympic City (UG1 демо)",
-  "Downtown (UG1 demo)": "Downtown (UG1 демо)"
+  "Downtown (UG1 demo)": "Downtown (UG1 демо)",
+  "Welcome to Bayview": "Ласкаво просимо до Bayview",
+  "Yo Noobie": "Yo Noobie",
+  "Bring My Car Back... Now!": "Bring My Car Back... Now!",
+  "Career": "Кар'єра",
+  "Outrun ace": "Ас аутранів",
+  "No mercy": "Без жалю",
+  "Cover star": "Зірка обкладинки",
+  "On DVD": "На DVD",
+  "Finish the prologue.": "Пройди пролог.",
+  "Win an outrun in the prologue.": "Виграй аутран у пролозі.",
+  "Win the prologue's three races.": "Виграй три гонки прологу.",
+  "Complete {n} stages of the career.": {
+    "one": "Пройди {n} етап кар'єри.",
+    "few": "Пройди {n} етапи кар'єри.",
+    "many": "Пройди {n} етапів кар'єри.",
+    "other": "Пройди {n} етапу кар'єри."
+  },
+  "Win {n} outruns in the career.": {
+    "one": "Виграй {n} аутран у кар'єрі.",
+    "few": "Виграй {n} аутрани у кар'єрі.",
+    "many": "Виграй {n} аутранів у кар'єрі.",
+    "other": "Виграй {n} аутрану у кар'єрі."
+  },
+  "Win the final race of {n} stages on Hard.": {
+    "one": "Виграй фінальну гонку етапу на складності «Складно».",
+    "few": "Виграй фінальні гонки {n} етапів на складності «Складно».",
+    "many": "Виграй фінальні гонки {n} етапів на складності «Складно».",
+    "other": "Виграй фінальні гонки {n} етапу на складності «Складно»."
+  },
+  "Make {n} magazine covers.": {
+    "one": "Потрап на обкладинку журналу.",
+    "few": "Потрап на {n} обкладинки журналів.",
+    "many": "Потрап на {n} обкладинок журналів.",
+    "other": "Потрап на {n} обкладинки журналів."
+  },
+  "Make {n} DVD covers.": {
+    "one": "Потрап на обкладинку DVD.",
+    "few": "Потрап на {n} обкладинки DVD.",
+    "many": "Потрап на {n} обкладинок DVD.",
+    "other": "Потрап на {n} обкладинки DVD."
+  },
+  "Riders on the Storm": "Riders on the Storm",
+  "Full clear": "Повна зачистка",
+  "SUV king": "Король SUV",
+  "Finish the career.": "Пройди кар'єру.",
+  "Win every race of {n} stages from stage 2 on, but their SUV and sponsor races.": {
+    "one": "Виграй усі гонки етапу, починаючи з 2-го, крім гонок SUV і спонсорів.",
+    "few": "Виграй усі гонки {n} етапів, починаючи з 2-го, крім гонок SUV і спонсорів.",
+    "many": "Виграй усі гонки {n} етапів, починаючи з 2-го, крім гонок SUV і спонсорів.",
+    "other": "Виграй усі гонки {n} етапу, починаючи з 2-го, крім гонок SUV і спонсорів."
+  },
+  "Win every SUV race of {n} stages.": {
+    "one": "Виграй усі гонки SUV етапу.",
+    "few": "Виграй усі гонки SUV {n} етапів.",
+    "many": "Виграй усі гонки SUV {n} етапів.",
+    "other": "Виграй усі гонки SUV {n} етапу."
+  }
 }

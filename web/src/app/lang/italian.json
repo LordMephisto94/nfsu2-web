@@ -1718,5 +1718,55 @@
   "Highway 1 (UG1)": "Highway 1 (UG1)",
   "Commercial (UG1)": "Commercial (UG1)",
   "Olympic City (UG1 demo)": "Olympic City (UG1 demo)",
-  "Downtown (UG1 demo)": "Downtown (UG1 demo)"
+  "Downtown (UG1 demo)": "Downtown (UG1 demo)",
+  "Welcome to Bayview": "Benvenuto a Bayview",
+  "Yo Noobie": "Yo Noobie",
+  "Bring My Car Back... Now!": "Bring My Car Back... Now!",
+  "Career": "Carriera",
+  "Outrun ace": "Asso dell'outrun",
+  "No mercy": "Senza pietà",
+  "Cover star": "Star da copertina",
+  "On DVD": "Su DVD",
+  "Finish the prologue.": "Completa il prologo.",
+  "Win an outrun in the prologue.": "Vinci un outrun nel prologo.",
+  "Win the prologue's three races.": "Vinci le tre gare del prologo.",
+  "Complete {n} stages of the career.": {
+    "one": "Completa {n} fase della carriera.",
+    "many": "Completa {n} fasi della carriera.",
+    "other": "Completa {n} fasi della carriera."
+  },
+  "Win {n} outruns in the career.": {
+    "one": "Vinci {n} outrun nella carriera.",
+    "many": "Vinci {n} outrun nella carriera.",
+    "other": "Vinci {n} outrun nella carriera."
+  },
+  "Win the final race of {n} stages on Hard.": {
+    "one": "Vinci la gara finale di una fase a Difficile.",
+    "many": "Vinci la gara finale di {n} fasi a Difficile.",
+    "other": "Vinci la gara finale di {n} fasi a Difficile."
+  },
+  "Make {n} magazine covers.": {
+    "one": "Finisci sulla copertina di una rivista.",
+    "many": "Finisci su {n} copertine di riviste.",
+    "other": "Finisci su {n} copertine di riviste."
+  },
+  "Make {n} DVD covers.": {
+    "one": "Finisci sulla copertina di un DVD.",
+    "many": "Finisci su {n} copertine di DVD.",
+    "other": "Finisci su {n} copertine di DVD."
+  },
+  "Riders on the Storm": "Riders on the Storm",
+  "Full clear": "Fatto piazza pulita",
+  "SUV king": "Re dei SUV",
+  "Finish the career.": "Completa la carriera.",
+  "Win every race of {n} stages from stage 2 on, but their SUV and sponsor races.": {
+    "one": "Vinci tutte le gare di una fase dalla fase 2 in poi, tranne quelle SUV e degli sponsor.",
+    "many": "Vinci tutte le gare di {n} fasi dalla fase 2 in poi, tranne quelle SUV e degli sponsor.",
+    "other": "Vinci tutte le gare di {n} fasi dalla fase 2 in poi, tranne quelle SUV e degli sponsor."
+  },
+  "Win every SUV race of {n} stages.": {
+    "one": "Vinci tutte le gare SUV di una fase.",
+    "many": "Vinci tutte le gare SUV di {n} fasi.",
+    "other": "Vinci tutte le gare SUV di {n} fasi."
+  }
 }

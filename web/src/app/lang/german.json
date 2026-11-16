@@ -1692,5 +1692,48 @@
   "Highway 1 (UG1)": "Highway 1 (UG1)",
   "Commercial (UG1)": "Commercial (UG1)",
   "Olympic City (UG1 demo)": "Olympic City (UG1 Demo)",
-  "Downtown (UG1 demo)": "Downtown (UG1 Demo)"
+  "Downtown (UG1 demo)": "Downtown (UG1 Demo)",
+  "Welcome to Bayview": "Willkommen in Bayview",
+  "Yo Noobie": "Yo Noobie",
+  "Bring My Car Back... Now!": "Bring My Car Back... Now!",
+  "Career": "Karriere",
+  "Outrun ace": "Outrun-Ass",
+  "No mercy": "Gnadenlos",
+  "Cover star": "Titelstar",
+  "On DVD": "Auf DVD",
+  "Finish the prologue.": "Schließe den Prolog ab.",
+  "Win an outrun in the prologue.": "Gewinne im Prolog ein Outrun.",
+  "Win the prologue's three races.": "Gewinne die drei Rennen des Prologs.",
+  "Complete {n} stages of the career.": {
+    "one": "Schließe {n} Etappe der Karriere ab.",
+    "other": "Schließe {n} Etappen der Karriere ab."
+  },
+  "Win {n} outruns in the career.": {
+    "one": "Gewinne {n} Outrun in der Karriere.",
+    "other": "Gewinne {n} Outruns in der Karriere."
+  },
+  "Win the final race of {n} stages on Hard.": {
+    "one": "Gewinne das Finalrennen einer Etappe auf Schwer.",
+    "other": "Gewinne das Finalrennen von {n} Etappen auf Schwer."
+  },
+  "Make {n} magazine covers.": {
+    "one": "Komm auf ein Magazin-Cover.",
+    "other": "Komm auf {n} Magazin-Cover."
+  },
+  "Make {n} DVD covers.": {
+    "one": "Komm auf ein DVD-Cover.",
+    "other": "Komm auf {n} DVD-Cover."
+  },
+  "Riders on the Storm": "Riders on the Storm",
+  "Full clear": "Alles abgeräumt",
+  "SUV king": "SUV-König",
+  "Finish the career.": "Beende die Karriere.",
+  "Win every race of {n} stages from stage 2 on, but their SUV and sponsor races.": {
+    "one": "Gewinne ab Etappe 2 jedes Rennen einer Etappe, außer SUV- und Sponsorrennen.",
+    "other": "Gewinne ab Etappe 2 jedes Rennen von {n} Etappen, außer SUV- und Sponsorrennen."
+  },
+  "Win every SUV race of {n} stages.": {
+    "one": "Gewinne jedes SUV-Rennen einer Etappe.",
+    "other": "Gewinne jedes SUV-Rennen von {n} Etappen."
+  }
 }

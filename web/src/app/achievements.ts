@@ -1,10 +1,11 @@
-// Achievements: earned in the races the player finishes, kept with the saves (achievements.json in the save folder, so
+// Achievements: earned in the races the player finishes and in the career, kept with the saves (achievements.json in the save folder, so
 // a backup and the cloud saves carry them) and listed in the start page's Achievements tab.
 //
 // runtime/raceresult.c publishes each race's result in four status slots once its results screen is up (rr_n counts
 // them: a new value is a new race; rr_race, rr_score and rr_more hold it, packed as there).  While a game runs this
 // reads them twice a second, folds each new result into the totals (Totals) and unlocks what they reach, with a toast
-// over the game.  Nothing goes to the server: the totals are the player's own, from their own races.
+// over the game.  The career's are from its state as it stands (cr_state, raceresult.c), so a save gives what it has
+// done as it loads.  Nothing goes to the server: the totals are the player's own, from their own games.
 import type { GameSession } from './game';
 import { count, dateLocale, language, live, LOCALE, N, onLanguage, t, tn, type Msg } from './i18n';
 
@@ -29,17 +30,63 @@ export function unpack(race: number, score: number, more: number): RaceResult {
   };
 }
 
+/** the career as raceresult.c's cr_state has it (0: not in the career) */
+export interface CareerState {
+  stagesDone: number[]; finalsWon: number[]; outruns: number; prologueOver: boolean; prologueOutruns: number;
+  prologueRaces: boolean; magazines: number; dvds: number; difficulty: number;
+  /** cr_more's: the stages (2 .. 5) with every race won but their SUV, sponsor and hidden ones; with every SUV race won */
+  cleared: number[]; suv: number[];
+}
+export const HARD = 2;
+export function unpackCareer(v: number, more = 0): CareerState | null {
+  if (!bits(v, 0, 1)) return null;
+  const stages = [1, 2, 3, 4, 5], later = [2, 3, 4, 5], m = bits(more, 0, 1) ? more : 0;
+  return {
+    stagesDone: stages.filter(s => bits(v, s, 1)), finalsWon: stages.filter(s => bits(v, 26 + s, 1)),
+    outruns: stages.reduce((a, s) => a + bits(v, 2 + 4 * s, 4), 0), prologueOver: bits(v, 32, 1) === 1,
+    prologueOutruns: bits(v, 33, 4), prologueRaces: bits(v, 37, 1) === 1, magazines: bits(v, 38, 6), dvds: bits(v, 44, 6),
+    difficulty: bits(v, 50, 2),
+    cleared: later.filter(s => bits(m, s, 1)), suv: later.filter(s => bits(m, 4 + s, 1)),
+  };
+}
+
 /** what the results add up to (achievements.json's "totals") */
 export interface Totals {
   races: number; wins: number; streak: number; bestStreak: number; meters: number; topKmh: number; bestDrift: number;
   closeWin: boolean; playersWins: number;
   typesWon: number[]; tracks: string[]; wonOn: string[]; bothWays: boolean; carsWon: number[];
   winsByCar: Record<string, number>;
+  /** the career's (the most any of the player's careers reached): stages complete, outrun wins, the prologue's */
+  stagesDone: number; outruns: number; bayview: boolean; noobie: boolean; prologueRaces: boolean;
+  magazines: number; dvds: number; cleared: number[]; suv: number[];
+  /** the stages whose final the player won on Hard (seen as it was won) */
+  hardFinals: number[];
 }
 export const emptyTotals = (): Totals => ({
   races: 0, wins: 0, streak: 0, bestStreak: 0, meters: 0, topKmh: 0, bestDrift: 0, closeWin: false, playersWins: 0,
   typesWon: [], tracks: [], wonOn: [], bothWays: false, carsWon: [], winsByCar: {},
+  stagesDone: 0, outruns: 0, bayview: false, noobie: false, prologueRaces: false, magazines: 0, dvds: 0, cleared: [], suv: [],
+  hardFinals: [],
 });
+
+/** the career's state into the totals (a new object; t0 itself when nothing grows).  was: the state seen before in
+ *  this game (null: none yet, or out of the career since), so a final that is won between the two on Hard counts;
+ *  the finals a save had won already do not */
+export function addCareer(t0: Totals, c: CareerState, was: CareerState | null): Totals {
+  const s = structuredClone(t0);
+  s.stagesDone = Math.max(s.stagesDone, c.stagesDone.length);
+  s.outruns = Math.max(s.outruns, c.outruns);
+  s.bayview ||= c.prologueOver;
+  s.noobie ||= c.prologueOutruns > 0;
+  s.prologueRaces ||= c.prologueRaces;
+  s.magazines = Math.max(s.magazines, c.magazines);
+  s.dvds = Math.max(s.dvds, c.dvds);
+  for (const st of c.cleared) if (!s.cleared.includes(st)) s.cleared.push(st);
+  for (const st of c.suv) if (!s.suv.includes(st)) s.suv.push(st);
+  if (was && c.difficulty === HARD)
+    for (const st of c.finalsWon) if (!was.finalsWon.includes(st) && !s.hardFinals.includes(st)) s.hardFinals.push(st);
+  return JSON.stringify(s) === JSON.stringify(t0) ? t0 : s;
+}
 
 /** a result into the totals (a new object) */
 export function add(t0: Totals, r: RaceResult): Totals {
@@ -97,6 +144,28 @@ export const ACHIEVEMENTS: Achievement[] = [
     what: x => tn(x, 'Win {n} race with the same car.', 'Win {n} races with the same car.', n(x)) },
   { id: 'players', name: N('Bragging rights'), levels: [1, 10, 50], have: t => t.playersWins,
     what: x => tn(x, 'Win a race against other players.', 'Win {n} races against other players.', n(x)) },
+  // the career's
+  { id: 'bayview', name: N('Welcome to Bayview'), levels: [1], have: t => +t.bayview, what: () => t('Finish the prologue.') },
+  { id: 'noobie', name: N('Yo Noobie'), levels: [1], have: t => +t.noobie, what: () => t('Win an outrun in the prologue.') },
+  { id: 'bring_back', name: N('Bring My Car Back... Now!'), levels: [1], have: t => +t.prologueRaces,
+    what: () => t('Win the prologue\'s three races.') },
+  { id: 'career', name: N('Career'), levels: [1, 2, 3, 4, 5], have: t => t.stagesDone,
+    what: x => tn(x, 'Complete {n} stage of the career.', 'Complete {n} stages of the career.', n(x)) },
+  { id: 'outruns', name: N('Outrun ace'), levels: [3, 10, 20, 30], have: t => t.outruns,
+    what: x => tn(x, 'Win {n} outrun in the career.', 'Win {n} outruns in the career.', n(x)) },
+  { id: 'hard', name: N('No mercy'), levels: [1, 2, 4], have: t => t.hardFinals.length,
+    what: x => tn(x, 'Win a stage\'s final race on Hard.', 'Win the final race of {n} stages on Hard.', n(x)) },
+  { id: 'storm', name: N('Riders on the Storm'), levels: [1], have: t => +(t.stagesDone >= 5), what: () => t('Finish the career.') },
+  { id: 'full_clear', name: N('Full clear'), levels: [1, 2, 3, 4], have: t => t.cleared.length,
+    what: x => tn(x, 'Win every race of a stage from stage 2 on, but its SUV and sponsor races.',
+      'Win every race of {n} stages from stage 2 on, but their SUV and sponsor races.', n(x)) },
+  { id: 'suv', name: N('SUV king'), levels: [1, 2, 3, 4], have: t => t.suv.length,
+    what: x => tn(x, 'Win every SUV race of a stage.', 'Win every SUV race of {n} stages.', n(x)) },
+  // (the game's 30 cover shoots: 20 magazines, 10 DVDs)
+  { id: 'magazines', name: N('Cover star'), levels: [1, 5, 10, 20], have: t => t.magazines,
+    what: x => tn(x, 'Make a magazine cover.', 'Make {n} magazine covers.', n(x)) },
+  { id: 'dvds', name: N('On DVD'), levels: [1, 3, 6, 10], have: t => t.dvds,
+    what: x => tn(x, 'Make a DVD cover.', 'Make {n} DVD covers.', n(x)) },
 ];
 /** a level's key in achievements.json's "got" ("wins:2": Winner's second level) */
 export const levelKey = (a: Achievement, level: number) => `${a.id}:${level}`;
@@ -132,7 +201,14 @@ export function settle(k: Kept, when: number): Kept {
 }
 /** the result in: the new totals, and the levels it reached (at `when`), each achievement's in order */
 export function earn(k: Kept, r: RaceResult, when: number): { kept: Kept; got: { a: Achievement; level: number }[] } {
-  const totals = add(k.totals, r), got = { ...k.got }, now: { a: Achievement; level: number }[] = [];
+  return reach(k, add(k.totals, r), when);
+}
+/** the career's state in (was: the one seen before in this game), as earn */
+export function earnCareer(k: Kept, c: CareerState, was: CareerState | null, when: number): { kept: Kept; got: { a: Achievement; level: number }[] } {
+  return reach(k, addCareer(k.totals, c, was), when);
+}
+function reach(k: Kept, totals: Totals, when: number): { kept: Kept; got: { a: Achievement; level: number }[] } {
+  const got = { ...k.got }, now: { a: Achievement; level: number }[] = [];
   for (const a of ACHIEVEMENTS) {
     const have = a.have(totals);
     a.levels.forEach((need, i) => {
@@ -161,6 +237,9 @@ export class Achievements {
   private timer: ReturnType<typeof setInterval> | undefined;
   private seen = 0;
   private last = '';
+  /** the career's state as last seen in this game (cr_state; null: none yet, or out of the career) */
+  private career: CareerState | null = null;
+  private careerRaw = '';
   private queue: { a: Achievement; level: number }[] = [];
   private popping = false;
   private busy: Promise<void> = Promise.resolve();
@@ -179,7 +258,7 @@ export class Achievements {
 
   /** a game started: its results until stop() */
   start(s: GameSession) {
-    this.session = s; this.seen = 0; this.last = '';
+    this.session = s; this.seen = 0; this.last = ''; this.career = null; this.careerRaw = '';
     clearInterval(this.timer);
     this.timer = setInterval(() => this.poll(), 500);
   }
@@ -191,6 +270,13 @@ export class Achievements {
   private poll() {
     const st = this.session?.status?.read();
     if (!st) return;
+    const cr = st.get('cr_state') ?? 0, more = st.get('cr_more') ?? 0, careerRaw = `${cr} ${more}`;
+    if (careerRaw !== this.careerRaw) {
+      this.careerRaw = careerRaw;
+      const c = unpackCareer(cr, more), was = this.career;
+      this.career = c;
+      if (c) this.busy = this.busy.then(() => this.takeWith(k => earnCareer(k, c, was, Date.now())));
+    }
     const n = st.get('rr_n') ?? 0;
     if (n <= this.seen) return;
     this.seen = n;
@@ -202,10 +288,12 @@ export class Achievements {
     this.busy = this.busy.then(() => this.take(r));
   }
 
-  private async take(r: RaceResult) {
+  private take(r: RaceResult) { return this.takeWith(k => earn(k, r, Date.now())); }
+  private async takeWith(f: (k: Kept) => { kept: Kept; got: { a: Achievement; level: number }[] }) {
     // the file as it is now: another device's (the cloud saves) may have come since
     this.kept = parse(await this.deps.read().catch(() => JSON.stringify(this.kept)));
-    const { kept, got } = earn(this.kept, r, Date.now());
+    const { kept, got } = f(this.kept);
+    if (kept.totals === this.kept.totals) return;          // (nothing new: the file as it is)
     this.kept = kept;
     for (const { a, level } of got) {
       this.queue.push({ a, level });
