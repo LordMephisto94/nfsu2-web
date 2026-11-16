@@ -11,7 +11,7 @@
 import { N } from './i18n';
 
 /** the tab's sections, in this order */
-export type ModKind = 'screen' | 'shared' | 'map' | 'rules' | 'car';
+export type ModKind = 'car' | 'map' | 'graphics' | 'extras' | 'rules' | 'sound';
 /** where a row's setting is when the tab has no control for it */
 export type Place = 'display' | 'mainMenu';
 /** what changes for other players: mine, on your screen; you, sounds and menus only you get */
@@ -71,12 +71,41 @@ export interface Mod {
 }
 
 export const KINDS: readonly { kind: ModKind; title: string }[] = [
-  { kind: 'screen', title: N('On your screen') },
-  { kind: 'shared', title: N('Seen by others') },
-  { kind: 'map', title: N('Map') },
-  { kind: 'rules', title: N('Game rules') },
   { kind: 'car', title: N('Cars') },
+  { kind: 'map', title: N('Map') },
+  { kind: 'graphics', title: N('Graphics') },
+  { kind: 'extras', title: N('Extras') },
+  { kind: 'rules', title: N('Game rules') },
+  { kind: 'sound', title: N('Sound') },
 ];
+/** the tab's choices of every mod at once (settings-ui.ts presetBar): Default each mod setting's default (the page's
+ *  pick: the original game, sharper on a computer), Vanilla every mod off (but those whose off is not the original
+ *  game: off: false, which keep their default), Modded every mod on but the Game rules', which change a career */
+export type Preset = 'default' | 'vanilla' | 'modded';
+export const PRESETS: readonly { id: Preset; name: string; line: string }[] = [
+  { id: 'default', name: N('Default'), line: N('Our pick: the original game, sharper on a computer.') },
+  { id: 'vanilla', name: N('Vanilla'), line: N('Every mod off, the closest to the 2004 game. The parts under Always on and Our changes stay.') },
+  { id: 'modded', name: N('Modded'), line: N('Every mod on, except Game rules: those change your career, so you turn them on yourself.') },
+];
+/** what a preset writes, a setting at a time: null its default (the line out), a value, or nothing (left as it is).
+ *  vals: a setting's choices (settings.ts KEYS: undefined for a switch) */
+export function presetValues(p: Preset, vals: (key: string) => string[] | undefined): Map<string, string | null> {
+  const out = new Map<string, string | null>();
+  const by = new Map<string, Mod[]>();
+  for (const m of MODS) if ('setting' in m.control) by.set(m.control.setting, [...by.get(m.control.setting) ?? [], m]);
+  for (const [key, ms] of by) {
+    if (p === 'default') { out.set(key, null); continue; }
+    const v = vals(key), on = ms.map(m => ('setting' in m.control && m.control.values) || ['on']);
+    if (p === 'vanilla') {
+      if (ms.some(m => m.off === false)) out.set(key, null);
+      else out.set(key, v ? v.find(x => !on.flat().includes(x)) ?? v[0] : 'off');
+    } else if (!ms.some(m => m.kind === 'rules')) {
+      out.set(key, v ? on.flat().find(x => on.every(o => o.includes(x))) ?? on[0][0] : 'on');
+    }
+  }
+  return out;
+}
+
 /** the tab's last section: our own changes (ADDED) */
 export const OURS = { title: N('Our changes') };
 
@@ -121,99 +150,119 @@ export const LABELS = {
 } as const;
 
 export const MODS: readonly Mod[] = [
-  // ---- On your screen
+  // ---- Cars
+  {
+    id: 'crash-damage', name: 'Crash Damage', mod: 'Crashing Foreign Cars', authors: [{ name: 'Chrystian Farias (FRS Mods)' }],
+    links: { page: 'https://streetsmodz.com.br/mods/underground-2/crashing-foreign-cars' },
+    kind: 'car', uses: 'code', ownPort: true, control: { setting: 'crash_damage' },
+    line: N('Dents, loose parts and scratches.'),
+    details: 'The racers\' cars, yours and the AI\'s, dent where they are hit, scratch, break their lights and lose their bumpers, mirrors, hood, trunk lid and doors, which lie on the road for a while. Only what is seen: the car drives as in the original game. In free roam, other players who have it on see your car\'s damage; with it off you see every car undamaged. The game\'s own repair, at a race\'s start or in the garage, takes it away.',
+    online: 'seen', sizeMB: 1, files: ['runtime/damage.c', 'runtime/damagecore.cpp', 'runtime/damage/Dent.h',
+      'runtime/damage/Tessellate.h', 'runtime/damage_none.c', 'tools/damagepack.py', 'tools/damage/scratches.tpk'],
+  },
+  {
+    id: 'stance', name: 'Stance', mod: 'Stance Mod', authors: [{ name: 'Archie (AR4I)' }],
+    links: { page: 'https://nfsmods.xyz/mod/1687', source: 'https://github.com/ArchieGoldmill/NFSU2_StanceMod' },
+    kind: 'car', uses: 'findings', control: { setting: 'stance' },
+    line: N('Camber, offset and tire width for each car.'),
+    details: 'Each car\'s camber front and rear, how far its wheels stand out and how wide its tires are; only the look changes, the car drives as in the original game. To use it: turn it on, go to the garage\'s Body Shop and pick Stance (after Rims), choose a slider with up and down, move it with left and right, and Back keeps it for that car. In free roam other players see your car\'s stance, unless they set Mods on other cars to Original. Your saves still work in the original game: the stance is kept beside the profile, and stays there while this is off.',
+    online: 'seen', files: ['runtime/stance.c', 'runtime/stance.h'],
+  },
+  // The rims are out for now (with settings.ts's mod_rims and others_mod_parts, settings-ui.ts's rows and
+  // runtime/modpacks.c's shop switch); back with their makers' names and link:
+  // {
+  //   id: 'mod-rims', name: 'Blitz Rims', authors: [],
+  //   links: {},
+  //   kind: 'shared', uses: 'data', control: { setting: 'mod_rims' },
+  //   line: N('New rim brands in the rim shop.'),
+  //   details: 'Blitz, a brand of 24 rims, in the rim shop. Everyone\'s game has them, so a friend\'s car with them looks the same with this off. Off, the shop offers only the game\'s own brands; rims already on your car stay. Your saves still work in the original game: there the car has a similar rim of the game\'s in the same size.',
+  //   online: 'seen', sizeMB: 1, files: ['runtime/modpacks.c', 'tools/modpacks.py'],
+  // },
+
+  // ---- Map
+  {
+    id: 'open-tunnel', name: 'Open Construction Tunnel', authors: [{ name: 'roman01la' }], links: {},
+    kind: 'map', uses: 'original', control: { setting: 'open_tunnel' },
+    line: N('Drive through the Construction Tunnel in free roam.'),
+    details: 'The tunnel the game keeps closed for construction is open, to drive through in your career\'s free roam. Only your own city changes: friends you meet in free roam should turn it on too, or you drive where their city has a wall. It needs this server to have its pack.',
+    online: 'mine', sizeMB: 2, files: ['runtime/fileio.c'],
+  },
+  {
+    id: 'open-parking-lots', name: 'Open Parking Lots', authors: [{ name: 'nfsu2.xyz' }], links: {},
+    kind: 'map', uses: 'original', control: { setting: 'car_parks' },
+    line: N('Drive into the airport\'s parking garage and more parking lots in the city.'),
+    details: 'The airport\'s parking garage and more of the city\'s parking lots are open to drive into in your career\'s free roam. Only your own city changes: friends you meet in free roam should turn it on too, or you drive where their city has a wall. It needs this server to have its pack.',
+    online: 'mine', sizeMB: 11, files: ['runtime/fileio.c'],
+  },
+
+  // ---- Graphics
   {
     id: 'uhud', name: 'Upscaled HUD', authors: [{ name: 'LunicAura106' }], links: { page: 'https://nfsmods.xyz/mod/4319' },
-    kind: 'screen', uses: 'data', control: { setting: 'ui_textures', values: ['uhud'] },
+    kind: 'graphics', uses: 'data', control: { setting: 'ui_textures', values: ['uhud'] },
     line: N('Sharp menus, HUD and maps.'),
     details: 'The menus, the race HUD, the fonts and the car and brand logos, redrawn at four times their size. The game\'s layout stays as it is, and a language with fonts of its own keeps them. Most phones need four times the memory for them.',
     online: 'mine', sizeMB: 5, files: ['tools/texpacks.py', 'runtime/web/texrep_web.c'],
   },
   {
     id: 'detailed-map', name: 'Detailed Map', authors: [{ name: 'JeansBig' }], links: { page: 'https://nfsmods.xyz/mod/4485' },
-    kind: 'screen', uses: 'data', row: 'uhud', control: { setting: 'ui_textures', values: ['map', 'uhud'] },
+    kind: 'graphics', uses: 'data', row: 'uhud', control: { setting: 'ui_textures', values: ['map', 'uhud'] },
     line: N('The minimap and the world map redrawn at 2048x2048.'),
     details: 'The minimap\'s, the world map\'s and the race menus\' maps redrawn at 2048x2048, with the missing shortcuts, and shortcuts and off-road in their own colour. With Map only, the menus and the HUD stay the game\'s own.',
     online: 'mine', sizeMB: 20, files: ['tools/texpacks.py', 'runtime/web/texrep_web.c'],
   },
   {
-    id: 'roads-and-shadows', name: 'HD textures', authors: [{ name: 'underground2.net' }],
-    links: { page: 'https://underground2.net' }, kind: 'screen', uses: 'data',
-    control: { setting: 'roads_and_shadows', values: ['roads-and-shadows'] },
-    line: N('HD roads, city, neon and skies, sharp at high resolutions.'),
-    details: 'Higher-resolution roads and pavements, the city\'s buildings, signs, trees and neon, the cars\' neon and the skies. More download data and GPU memory are needed, especially on phones.',
-    online: 'mine', sizeMB: 61, files: ['tools/texpacks.py', 'runtime/web/texrep_web.c'],
+    id: 'hq-vinyls', name: 'HQ Vinyls & Doorlines', mod: 'High Quality Vinyls & Doorlines (1024x Upscaled)',
+    authors: [{ name: 'AdrienShadow' }], links: { page: 'https://nfsmods.xyz/mod/8064' },
+    kind: 'graphics', uses: 'data', control: { setting: 'hq_vinyls' },
+    line: N('Sharp vinyls and doorlines.'),
+    details: 'Every vinyl and doorline of the 31 cars redrawn at 1024x1024, so a car\'s paint stays sharp up close, with the game\'s own designs, colours and shine. A car with one of Art Factory 28 to 34 keeps the game\'s look. On a computer only: phones keep the game\'s. Each car\'s pictures download as you see it, about 100 KB.',
+    online: 'mine', phones: 'off', files: ['runtime/hqvinyls.c', 'web/src/gpu/hqskin.ts', 'tools/hqvinyls.py'],
+  },
+  {
+    id: 'sharper-textures', name: 'Sharper textures', authors: [{ name: 'nfsu2.xyz' }], links: {},
+    kind: 'graphics', uses: 'original', control: { setting: 'sharper_textures' },
+    line: N('The game\'s own textures, sharper.'),
+    details: 'The roads and pavements, the city\'s buildings, signs, trees and neon, the cars\' neon and the skies at a higher resolution, the game\'s own designs. On a computer only: phones keep the game\'s. More download data and GPU memory are needed.',
+    online: 'mine', phones: 'off', sizeMB: 61, files: ['tools/texpacks.py', 'runtime/web/texrep_web.c'],
   },
   {
     id: 'widescreen', name: 'Widescreen Fix', mod: 'Widescreen Fixes Pack', authors: [{ name: 'ThirteenAG' }, { name: 'Aero_' }, { name: 'xan1242' }],
     links: { page: 'https://nfsmods.xyz/mod/3327', source: 'https://github.com/ThirteenAG/WidescreenFixesPack' },
-    kind: 'screen', uses: 'findings', licence: 'MIT',
+    kind: 'graphics', uses: 'findings', licence: 'MIT',
     control: { elsewhere: 'display', keys: ['hud', 'fov_scale', 'movie_framing', 'cutscene_borders'] },
     line: N('Any screen shape without stretching.'),
     details: 'The game draws for 4:3. Here the 3D view widens to the screen, and the cutscene bars, rain drops, screen tints and markers over the world fit it. The race HUD can sit at the screen\'s edges, where the mod puts it, and the 3D proportions can be corrected.',
     online: 'mine', files: ['runtime/widescreen.c', 'licenses/WidescreenFixesPack.txt'],
   },
+
+  // ---- Extras
+  {
+    id: 'gps-distance', name: 'GPS Distance', authors: [{ name: 'roman01la', url: 'https://github.com/roman01la' }], links: {},
+    kind: 'extras', uses: 'original', control: { setting: 'gps_distance' },
+    line: N('Distance to your destination beneath the GPS arrow.'),
+    details: 'While the GPS arrow shows the way, the distance to its destination in a straight line, not by road, in metres or feet as Speedometer Units has it. None in races, or while the GPS finds no route.',
+    online: 'mine', files: ['runtime/gpsdistance.c', 'runtime/gpsdistance_format.h'],
+  },
+  {
+    id: 'subtitles', name: 'English Subtitles Fixed', authors: [{ name: 'VileStuff' }], links: { page: 'https://nfsmods.xyz/mod/5286' },
+    kind: 'extras', uses: 'data', control: { setting: 'subtitles' }, off: false,
+    line: N('Complete English subtitles in the movies.'),
+    details: 'The game\'s own English lines stop at their first apostrophe. These are whole, with each speaker\'s name. Other languages keep their own; the dubbed French, German, Italian and Spanish movies have none. Off: no subtitles in any language.',
+    online: 'mine', files: ['tools/langpacks.py', 'runtime/language.c'],
+  },
   {
     id: 'splitscreen', name: 'Split Screen', mod: 'NFSU2-SplitScreen', authors: [{ name: 'mihaits', url: 'https://github.com/mihaits' }, { name: 'BirdSentinel (Zack)', port: true }],
     links: { source: 'https://github.com/mihaits/NFSU2-SplitScreen' },
-    kind: 'screen', uses: 'code', licence: 'MIT', control: { menu: 'mainMenu' },
+    kind: 'extras', uses: 'code', licence: 'MIT', control: { menu: 'mainMenu' },
     line: N('2 to 4 players on one screen.'),
     details: 'The main menu\'s item after Quick Race. Each player gets their own view, HUD, minimap and camera, with a controller each, or two on one keyboard. 3 or 4 players need a fast computer.',
     online: 'offline', files: ['runtime/splitscreen.c', 'runtime/splitscreen_layout.h', 'runtime/splitscreen_mem.h', 'runtime/split_minimap.inc',
       'runtime/split_post.inc', 'runtime/split_reflections.inc', 'tools/split_reloc.py', 'licenses/NFSU2-SplitScreen.txt'],
   },
   {
-    id: 'subtitles', name: 'English Subtitles Fixed', authors: [{ name: 'VileStuff' }], links: { page: 'https://nfsmods.xyz/mod/5286' },
-    kind: 'screen', uses: 'data', control: { setting: 'subtitles' }, off: false,
-    line: N('Complete English subtitles in the movies.'),
-    details: 'The game\'s own English lines stop at their first apostrophe. These are whole, with each speaker\'s name. Other languages keep their own; the dubbed French, German, Italian and Spanish movies have none. Off: no subtitles in any language.',
-    online: 'mine', files: ['tools/langpacks.py', 'runtime/language.c'],
-  },
-  {
-    id: 'songs', name: 'Uncensored & Restored Soundtrack', authors: [{ name: 'xGMVx' }], links: { page: 'https://nfsmods.xyz/mod/3649' },
-    kind: 'screen', uses: 'data', control: { setting: 'songs', values: ['uncensored'] },
-    line: N('The EA Trax songs unedited.'),
-    details: 'Every EA Trax song in its full, unedited version, some from their newer remastered releases, made with BadHairDay\'s NFS U2 Music Importer. Uncensored, the default, plays them; Original plays the versions the game shipped with.',
-    online: 'you', files: ['tools/musicpack.py', 'web/src/host/io-worker.ts'],
-  },
-  {
-    id: 'high-fps-audio', name: 'High FPS Audio Fix', mod: 'NFSU2 High FPS Audio Fix', authors: [{ name: 'dstudnicki' }],
-    links: { source: 'https://github.com/dstudnicki/NFSU2HighFPSAudioFix' },
-    kind: 'screen', uses: 'findings', control: { always: true },
-    line: N('Engine sounds right above 60 fps.'),
-    details: 'The game updates its sounds at most every 15 ms, and then by one frame\'s time only: above 60 fps the engine\'s pitch and the gear shifts ran slow, at 120 fps at half speed. Here an update also gets the time of the frames it skipped. At 60 fps and below nothing changes.',
-    online: 'you', files: ['runtime/framerate.c'],
-  },
-  {
-    id: 'gps-distance', name: 'GPS Distance', authors: [{ name: 'roman01la', url: 'https://github.com/roman01la' }], links: {},
-    kind: 'screen', uses: 'original', control: { setting: 'gps_distance' },
-    line: N('Distance to your destination beneath the GPS arrow.'),
-    details: 'While the GPS arrow shows the way, the distance to its destination in a straight line, not by road, in metres or feet as Speedometer Units has it. None in races, or while the GPS finds no route.',
-    online: 'mine', files: ['runtime/gpsdistance.c', 'runtime/gpsdistance_format.h'],
-  },
-  {
-    id: 'hq-vinyls', name: 'HQ Vinyls & Doorlines', mod: 'High Quality Vinyls & Doorlines (1024x Upscaled)',
-    authors: [{ name: 'AdrienShadow' }], links: { page: 'https://nfsmods.xyz/mod/8064' },
-    kind: 'screen', uses: 'data', control: { setting: 'hq_vinyls' },
-    line: N('Sharp vinyls and doorlines.'),
-    details: 'Every vinyl and doorline of the 31 cars redrawn at 1024x1024, so a car\'s paint stays sharp up close, with the game\'s own designs, colours and shine. A car with one of Art Factory 28 to 34 keeps the game\'s look. On a computer only: phones keep the game\'s. Each car\'s pictures download as you see it, about 100 KB.',
-    online: 'mine', phones: 'off', files: ['runtime/hqvinyls.c', 'web/src/gpu/hqskin.ts', 'tools/hqvinyls.py'],
-  },
-  {
-    id: 'gearbox-whine', name: 'Transmission Whine', mod: 'Underground 2 Transmission Whine',
-    authors: [{ name: 'ropi', url: 'https://github.com/ropi336' }],
-    links: { page: 'https://nfsmods.xyz/mod/5927', source: 'https://github.com/ropi336/UG2WhineGen' },
-    kind: 'screen', uses: 'code', licence: 'No Rights Reserved', control: { setting: 'gearbox_whine' },
-    line: N('NFS Carbon\'s gearbox whine on your car.'),
-    details: 'The mod\'s sounds are NFS Carbon\'s: the BMW M3 GTR\'s gearbox whine. Here they play over the game\'s own, a whine rising with the car\'s speed and gear, a second layer louder the faster it goes, a pause at each upshift and a whine of its own in reverse, as loud as the game\'s Master and Engine Volume make them. In split screen and co-op each player\'s car has its own. The sounds download once it is on.',
-    online: 'you', sizeMB: 0.5, files: ['runtime/whine.c', 'runtime/whine.h', 'tools/whinepack.py', 'licenses/UG2WhineGen.txt'],
-  },
-
-  // ---- Seen by others
-  {
     id: 'extra-options', name: 'Extra Options', mod: 'NFSU2 Extra Options', authors: [{ name: 'ExOpts Team' }],
     links: { page: 'https://nfsmods.xyz/mod/290', source: 'https://github.com/ExOptsTeam/NFSU2ExOpts' },
-    kind: 'shared', uses: 'findings', licence: 'GPL-3.0', control: { always: true },
+    kind: 'extras', uses: 'findings', licence: 'GPL-3.0', control: { always: true },
     line: N('Drift camera, high beam, EU cars and more.'),
     details: 'Five of the mod\'s parts, written anew from what it found out about the game. All five are always on, and the rest of the game stays as in the original.',
     parts: [
@@ -230,49 +279,6 @@ export const MODS: readonly Mod[] = [
     ],
     online: 'seen', files: ['runtime/cameras.c', 'runtime/lightkey.c', 'runtime/regional.c', 'runtime/vinylcat.c', 'runtime/quickrace.c'],
   },
-  {
-    id: 'stance', name: 'Stance', mod: 'Stance Mod', authors: [{ name: 'Archie (AR4I)' }],
-    links: { page: 'https://nfsmods.xyz/mod/1687', source: 'https://github.com/ArchieGoldmill/NFSU2_StanceMod' },
-    kind: 'shared', uses: 'findings', control: { setting: 'stance' },
-    line: N('Camber, offset and tire width for each car.'),
-    details: 'Each car\'s camber front and rear, how far its wheels stand out and how wide its tires are; only the look changes, the car drives as in the original game. To use it: turn it on, go to the garage\'s Body Shop and pick Stance (after Rims), choose a slider with up and down, move it with left and right, and Back keeps it for that car. In free roam other players see your car\'s stance, unless they set Mods on other cars to Original. Your saves still work in the original game: the stance is kept beside the profile, and stays there while this is off.',
-    online: 'seen', files: ['runtime/stance.c', 'runtime/stance.h'],
-  },
-  {
-    id: 'crash-damage', name: 'Crash Damage', mod: 'Crashing Foreign Cars', authors: [{ name: 'Chrystian Farias (FRS Mods)' }],
-    links: { page: 'https://streetsmodz.com.br/mods/underground-2/crashing-foreign-cars' },
-    kind: 'shared', uses: 'code', ownPort: true, control: { setting: 'crash_damage' },
-    line: N('Dents, loose parts and scratches.'),
-    details: 'The racers\' cars, yours and the AI\'s, dent where they are hit, scratch, break their lights and lose their bumpers, mirrors, hood, trunk lid and doors, which lie on the road for a while. Only what is seen: the car drives as in the original game. In free roam, other players who have it on see your car\'s damage; with it off you see every car undamaged. The game\'s own repair, at a race\'s start or in the garage, takes it away.',
-    online: 'seen', sizeMB: 1, files: ['runtime/damage.c', 'runtime/damagecore.cpp', 'runtime/damage/Dent.h',
-      'runtime/damage/Tessellate.h', 'runtime/damage_none.c', 'tools/damagepack.py', 'tools/damage/scratches.tpk'],
-  },
-  // The rims are out for now (with settings.ts's mod_rims and others_mod_parts, settings-ui.ts's rows and
-  // runtime/modpacks.c's shop switch); back with their makers' names and link:
-  // {
-  //   id: 'mod-rims', name: 'Blitz Rims', authors: [],
-  //   links: {},
-  //   kind: 'shared', uses: 'data', control: { setting: 'mod_rims' },
-  //   line: N('New rim brands in the rim shop.'),
-  //   details: 'Blitz, a brand of 24 rims, in the rim shop. Everyone\'s game has them, so a friend\'s car with them looks the same with this off. Off, the shop offers only the game\'s own brands; rims already on your car stay. Your saves still work in the original game: there the car has a similar rim of the game\'s in the same size.',
-  //   online: 'seen', sizeMB: 1, files: ['runtime/modpacks.c', 'tools/modpacks.py'],
-  // },
-
-  // ---- Map
-  {
-    id: 'open-tunnel', name: 'Open Construction Tunnel', authors: [{ name: 'roman01la' }], links: {},
-    kind: 'map', uses: 'data', control: { setting: 'open_tunnel' },
-    line: N('Drive through the Construction Tunnel in free roam.'),
-    details: 'The tunnel the game keeps closed for construction is open, to drive through in your career\'s free roam. Only your own city changes: friends you meet in free roam should turn it on too, or you drive where their city has a wall. It needs this server to have its pack.',
-    online: 'mine', sizeMB: 2, files: ['runtime/fileio.c'],
-  },
-  {
-    id: 'open-parking-lots', name: 'Open Parking Lots', authors: [{ name: 'nfsu2.xyz' }], links: {},
-    kind: 'map', uses: 'data', control: { setting: 'car_parks' },
-    line: N('Drive into the airport\'s parking garage and more parking lots in the city.'),
-    details: 'The airport\'s parking garage and more of the city\'s parking lots are open to drive into in your career\'s free roam. Only your own city changes: friends you meet in free roam should turn it on too, or you drive where their city has a wall. It needs this server to have its pack.',
-    online: 'mine', sizeMB: 11, files: ['runtime/fileio.c'],
-  },
 
   // ---- Game rules
   {
@@ -283,6 +289,13 @@ export const MODS: readonly Mod[] = [
     online: 'career', files: ['runtime/hiddenraces.c'],
   },
   {
+    id: 'rubberbanding', name: 'Rubberbanding', authors: [{ name: '007hacky007', url: 'https://github.com/007hacky007' }], links: {},
+    kind: 'rules', uses: 'original', control: { setting: 'catchup', values: ['noboost', 'off'] }, off: false,
+    line: N('Career rivals that wait and catch up.'),
+    details: 'In a career race the game slows the opponents ahead of you and gives the ones behind more power and grip. Original, the default, keeps that; No boost keeps the waiting, but one behind never beats its own pace; Off drops both, as Quick Race with Catch Up off. Only in your own career races: never in Quick Race, LAN or online races.',
+    online: 'career', files: ['runtime/catchup.c'],
+  },
+  {
     id: 'visual-rep', name: 'Visual Reputation Remover', authors: [{ name: 'thelink2012', url: 'https://github.com/thelink2012' }],
     links: { page: 'https://nfsmods.xyz/mod/2773', source: 'https://github.com/thelink2012/novisualrep' },
     kind: 'rules', uses: 'findings', licence: 'MIT', control: { setting: 'visual_rep_remover' },
@@ -290,12 +303,31 @@ export const MODS: readonly Mod[] = [
     details: 'In the original game a stage\'s DVD cover shoots come only once your car\'s parts rate enough stars, and pay more for more stars. On, the rating is the stage\'s: 0, 1, 3, 5.5 and 8 stars in stages 0 to 4, 10 from stage 5, so the stage\'s cover shoots come and pay by it. The shops show no Visual Rating box.',
     online: 'career', files: ['runtime/visualrep.c', 'licenses/novisualrep.txt'],
   },
+
+  // ---- Sound
   {
-    id: 'rubberbanding', name: 'Rubberbanding', authors: [{ name: '007hacky007', url: 'https://github.com/007hacky007' }], links: {},
-    kind: 'rules', uses: 'original', control: { setting: 'catchup', values: ['noboost', 'off'] }, off: false,
-    line: N('Career rivals that wait and catch up.'),
-    details: 'In a career race the game slows the opponents ahead of you and gives the ones behind more power and grip. Original, the default, keeps that; No boost keeps the waiting, but one behind never beats its own pace; Off drops both, as Quick Race with Catch Up off. Only in your own career races: never in Quick Race, LAN or online races.',
-    online: 'career', files: ['runtime/catchup.c'],
+    id: 'gearbox-whine', name: 'Transmission Whine', mod: 'Underground 2 Transmission Whine',
+    authors: [{ name: 'ropi', url: 'https://github.com/ropi336' }],
+    links: { page: 'https://nfsmods.xyz/mod/5927', source: 'https://github.com/ropi336/UG2WhineGen' },
+    kind: 'sound', uses: 'code', licence: 'No Rights Reserved', control: { setting: 'gearbox_whine' },
+    line: N('NFS Carbon\'s gearbox whine on your car.'),
+    details: 'The mod\'s sounds are NFS Carbon\'s: the BMW M3 GTR\'s gearbox whine. Here they play over the game\'s own, a whine rising with the car\'s speed and gear, a second layer louder the faster it goes, a pause at each upshift and a whine of its own in reverse, as loud as the game\'s Master and Engine Volume make them. In split screen and co-op each player\'s car has its own. The sounds download once it is on.',
+    online: 'you', sizeMB: 0.5, files: ['runtime/whine.c', 'runtime/whine.h', 'tools/whinepack.py', 'licenses/UG2WhineGen.txt'],
+  },
+  {
+    id: 'songs', name: 'Uncensored & Restored Soundtrack', authors: [{ name: 'xGMVx' }], links: { page: 'https://nfsmods.xyz/mod/3649' },
+    kind: 'sound', uses: 'data', control: { setting: 'songs', values: ['uncensored'] },
+    line: N('The EA Trax songs unedited.'),
+    details: 'Every EA Trax song in its full, unedited version, some from their newer remastered releases, made with BadHairDay\'s NFS U2 Music Importer. Uncensored, the default, plays them; Original plays the versions the game shipped with.',
+    online: 'you', files: ['tools/musicpack.py', 'web/src/host/io-worker.ts'],
+  },
+  {
+    id: 'high-fps-audio', name: 'High FPS Audio Fix', mod: 'NFSU2 High FPS Audio Fix', authors: [{ name: 'dstudnicki' }],
+    links: { source: 'https://github.com/dstudnicki/NFSU2HighFPSAudioFix' },
+    kind: 'sound', uses: 'findings', control: { always: true },
+    line: N('Engine sounds right above 60 fps.'),
+    details: 'The game updates its sounds at most every 15 ms, and then by one frame\'s time only: above 60 fps the engine\'s pitch and the gear shifts ran slow, at 120 fps at half speed. Here an update also gets the time of the frames it skipped. At 60 fps and below nothing changes.',
+    online: 'you', files: ['runtime/framerate.c'],
   },
 ];
 

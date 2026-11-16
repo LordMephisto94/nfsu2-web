@@ -220,16 +220,16 @@ static void open_pack(const char *env){
     if (!v || !*v || !strcasecmp(v, "original")) return;
     open_named(env, v, 1);
 }
-/* The HD textures (roads_and_shadows = roads-and-shadows, the Mods tab's HD): underground2.net's, in four packs by
- * what they redraw: the roads and pavements (roads), the city's buildings, signs, trees and neon (city), the cars'
- * neon (cars) and the skies (skies), each where the game folder has it; a folder with none of them but the one pack
- * of roads and car shadows (roads-and-shadows) has that.  The setting's value keeps its name: players' settings.ini
- * keep their choice. */
+/* The sharper textures (sharper_textures = on, NFSU2_SHARPER_TEXTURES; or its older roads_and_shadows =
+ * roads-and-shadows): the game's own textures at a higher resolution, in four packs by what they redraw: the roads
+ * and pavements (roads), the city's buildings, signs, trees and neon (city), the cars' neon (cars) and the skies
+ * (skies), each where the game folder has it; a folder with none of them but the one older pack of roads and car
+ * shadows (roads-and-shadows) has that. */
 static const char *const HD_PACKS[] = { "roads", "city", "cars", "skies" };
 static void open_hd(void){
-    const char *v = getenv("NFSU2_ROADS_AND_SHADOWS");
-    if (!v || !*v || !strcasecmp(v, "original")) return;
-    if (strcasecmp(v, "roads-and-shadows")){ open_named("NFSU2_ROADS_AND_SHADOWS", v, 1); return; }
+    const char *v = getenv("NFSU2_ROADS_AND_SHADOWS"), *s = getenv("NFSU2_SHARPER_TEXTURES");
+    int on = (s && *s && *s != '0') || (v && !strcasecmp(v, "roads-and-shadows"));
+    if (!on) return;
     int n = 0;
     for (unsigned i = 0; i < sizeof HD_PACKS / sizeof *HD_PACKS; i++) n += open_named("NFSU2_ROADS_AND_SHADOWS", HD_PACKS[i], 0);
     if (!n) open_named("NFSU2_ROADS_AND_SHADOWS", "roads-and-shadows", 1);

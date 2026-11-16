@@ -181,6 +181,9 @@ export const KEYS: readonly KeyDef[] = [
   // map turns on only that one (uiPack: no pack of the menus' and HUD's).  Not in bundle.m's table: the Mac's packs
   // are "textures"
   { key: 'ui_textures', env: 'NFSU2_UI_TEXTURES', kind: 'enum', vals: 'original|map|uhud', scope: 'web', device: true },
+  // the sharper textures' packs (runtime/web/texrep_web.c open_hd); roads_and_shadows = roads-and-shadows, its older
+  // key, still turns them on (no row: a settings.ini line of its own)
+  { key: 'sharper_textures', env: 'NFSU2_SHARPER_TEXTURES', kind: 'bool', scope: 'web' },
   { key: 'roads_and_shadows', env: 'NFSU2_ROADS_AND_SHADOWS', kind: 'enum', vals: 'original|roads-and-shadows', scope: 'web', device: true },
   // the city's region A with community mods' add-ons, from their packs in MODPACKS (runtime/fileio.c city_resolve)
   { key: 'open_tunnel', env: 'NFSU2_OPEN_TUNNEL', kind: 'bool', scope: 'web' },
@@ -518,10 +521,10 @@ export const TEMPLATE = `# NFSU2 settings, read at every launch.
 # phones' GPUs decode the larger textures into four times the memory;
 # NFSU2_MAP_TEXTURES = original keeps the game's maps).  [NFSU2_UI_TEXTURES]
 #ui_textures = original
-# HD textures from underground2.net: the roads, the city's buildings, signs
-# and neon, the cars' neon and the skies, sharp at high resolutions; where
-# this server has their packs.  [NFSU2_ROADS_AND_SHADOWS]
-#roads_and_shadows = original
+# The game's own textures, sharper: the roads, the city's buildings, signs
+# and neon, the cars' neon and the skies, where this server has their packs
+# (on on computers, off on phones).  [NFSU2_SHARPER_TEXTURES]
+#sharper_textures = on
 # Community mods' add-ons to the city, where this server has their packs
 # (MODPACKS): the tunnel the game keeps closed for construction open, and
 # the car parks drivable.  Players who meet in free roam should pick the

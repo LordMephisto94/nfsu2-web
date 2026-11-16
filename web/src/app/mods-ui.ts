@@ -97,21 +97,37 @@ function section(id: string, title: string, rows: HTMLElement[]): HTMLElement {
   return box;
 }
 
-/** a section's first row, a setting of no mod's: how other players' cars show the mods' looks (settings-ui.ts) */
-const LEAD: Partial<Record<string, string>> = { shared: 'others_mod_parts' };
+/** a section's last row, a setting of no mod's: how other players' cars show the mods' looks (settings-ui.ts) */
+const TRAIL: Partial<Record<string, string>> = { car: 'others_mod_parts' };
+/** the folded sections open (kept while the tab is drawn again): Always on, Our changes */
+const opened = new Set<string>();
+/** Always on's order (upstream's: what a player meets first); a mod without a setting not named here goes after */
+const ALWAYS = ['splitscreen', 'extra-options', 'widescreen', 'high-fps-audio'];
+/** a folded section: its summary, then its rows */
+function folded(id: string, title: string, rows: HTMLElement[]): HTMLElement {
+  const d = document.createElement('details'); d.className = `more mods-${id}`; d.open = opened.has(id);
+  d.ontoggle = () => { if (d.open) opened.add(id); else opened.delete(id); };
+  const s = document.createElement('summary'); s.textContent = title;
+  d.append(s, ...rows);
+  return d;
+}
 
 /**
- * The tab's sections, in KINDS' order (a section without entries is left out), a row per mod, then our changes, a row
- * per group.  settingRow(key): the settings panel's row for that setting (its name with the (i): modName).
+ * The tab: top (the presets), its sections in KINDS' order (a section without a mod with a setting is left out), a
+ * row per mod with a setting; then Always on, folded, the mods without one (each where it is set: its popup); then
+ * our changes, a row per group.  settingRow(key): the settings panel's row for that setting (its name with the (i):
+ * modName).
  */
-export function modSections(settingRow: (key: string) => HTMLElement): HTMLElement[] {
+export function modSections(settingRow: (key: string) => HTMLElement, top: HTMLElement[] = []): HTMLElement[] {
   const mods = KINDS.flatMap(k => {
-    const ms = MODS.filter(m => m.kind === k.kind && !m.row);
-    const lead = LEAD[k.kind] ? [settingRow(LEAD[k.kind]!)] : [];
-    return ms.length ? [section(k.kind, k.title, [...lead, ...ms.map(m => 'setting' in m.control ? settingRow(m.control.setting) : modRow(m))])] : [];
+    const ms = MODS.filter(m => m.kind === k.kind && !m.row && 'setting' in m.control);
+    const trail = TRAIL[k.kind] ? [settingRow(TRAIL[k.kind]!)] : [];
+    return ms.length ? [section(k.kind, k.title, [...ms.map(m => settingRow((m.control as { setting: string }).setting)), ...trail])] : [];
   });
-  return [...mods, section('ours', OURS.title, ADDED.map(g =>
-    plainRow(g.id, t(g.title), t(LABELS.ours, { name: t(g.title) }), groupHelp(g.items))))];
+  const at = (m: Mod) => { const i = ALWAYS.indexOf(m.id); return i < 0 ? ALWAYS.length : i; };
+  const always = MODS.filter(m => !m.row && !('setting' in m.control)).sort((a, b) => at(a) - at(b)).map(modRow);
+  const ours = ADDED.map(g => plainRow(g.id, t(g.title), t(LABELS.ours, { name: t(g.title) }), groupHelp(g.items)));
+  return [...top, ...mods, folded('always', t(LABELS.always), always), folded('ours', t(OURS.title), ours)];
 }
 
 /** a row with no control: its name with its (i) (named about), and its help line */
