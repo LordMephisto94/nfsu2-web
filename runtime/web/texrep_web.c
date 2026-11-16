@@ -61,7 +61,7 @@ typedef struct { uint32_t off, size; } Base;
 _Static_assert(sizeof(Base) == 8, "TEXPACKS base");
 
 /* the packs picked, each a TEXPACKS/<name>.pak; their entries are merged into one table, sorted by key */
-#define MAXPACKS 3
+#define MAXPACKS 8
 typedef struct { char name[32]; FILE *fp; char *names; uint32_t names_at, names_len, version; } Pack;
 static Pack g_packs[MAXPACKS]; static unsigned g_npacks;
 static int g_init, g_on, g_shown = 1, g_log;
@@ -158,26 +158,25 @@ static void read_tracks(const char *name){
     fclose(f);
     fprintf(stderr, "[texrep] %s: %u changes to the Tracks table\n", path, g_nedits - n0);
 }
-/* TEXPACKS/<pack>.pak for the setting env: its value names the pack, "original" (or unset) is none */
-static void open_pack(const char *env){
-    const char *v = getenv(env);
-    if (!v || !*v || !strcasecmp(v, "original") || g_npacks == MAXPACKS) return;
+/* TEXPACKS/<v>.pak (said: whether a missing one is a line in the log); 1 if it opened */
+static int open_named(const char *env, const char *v, int said){
+    if (g_npacks == MAXPACKS) return 0;
     Pack *p = &g_packs[g_npacks];
     size_t k = 0;
     for (; v[k] && k + 1 < sizeof p->name; k++){
         char c = (char)tolower((unsigned char)v[k]);
-        if (!isalnum((unsigned char)c) && c != '_' && c != '-'){ fprintf(stderr, "[texrep] %s \"%s\": not a pack name\n", env, v); return; }
+        if (!isalnum((unsigned char)c) && c != '_' && c != '-'){ fprintf(stderr, "[texrep] %s \"%s\": not a pack name\n", env, v); return 0; }
         p->name[k] = c;
     }
     p->name[k] = 0;
     char win[64], path[1024]; uint32_t hd[4];
     snprintf(win, sizeof win, "TEXPACKS\\%s.pak", p->name);
     if (!fileio_resolve_game(win, path, sizeof path) || !(p->fp = fopen(path, "rb"))){
-        fprintf(stderr, "[texrep] %s: the game folder has no TEXPACKS/%s.pak: the game's own textures\n", p->name, p->name);
-        return;
+        if (said) fprintf(stderr, "[texrep] %s: the game folder has no TEXPACKS/%s.pak: the game's own textures\n", p->name, p->name);
+        return 0;
     }
     if (fread(hd, sizeof hd, 1, p->fp) != 1 || memcmp(hd, "NTXP", 4) || (hd[1] != 1 && hd[1] != 2) || !hd[2] || hd[2] > 65536u){
-        fprintf(stderr, "[texrep] %s: not a texture pack this runtime reads\n", path); fclose(p->fp); p->fp = 0; return;
+        fprintf(stderr, "[texrep] %s: not a texture pack this runtime reads\n", path); fclose(p->fp); p->fp = 0; return 0;
     }
     unsigned n = hd[2];
     p->version = hd[1];
@@ -189,7 +188,7 @@ static void open_pack(const char *env){
     if (base) g_base = base;
     if (!ent || !src || !base || fread(g_ent + g_n, sizeof *g_ent, n, p->fp) != n ||
         (p->version == 2 && fread(g_base + g_n, sizeof *g_base, n, p->fp) != n)){
-        fprintf(stderr, "[texrep] %s: unreadable\n", path); fclose(p->fp); p->fp = 0; return;
+        fprintf(stderr, "[texrep] %s: unreadable\n", path); fclose(p->fp); p->fp = 0; return 0;
     }
     if (p->version == 1) memset(g_base + g_n, 0, n * sizeof *g_base);
     memset(g_src + g_n, (int)g_npacks, n);
@@ -213,13 +212,34 @@ static void open_pack(const char *env){
     snprintf(g_pack + strlen(g_pack), sizeof g_pack - strlen(g_pack), "%s%s", g_npacks ? "+" : "", p->name);
     g_npacks++;
     read_tracks(p->name);
+    return 1;
+}
+/* TEXPACKS/<pack>.pak for the setting env: its value names the pack, "original" (or unset) is none */
+static void open_pack(const char *env){
+    const char *v = getenv(env);
+    if (!v || !*v || !strcasecmp(v, "original")) return;
+    open_named(env, v, 1);
+}
+/* The HD textures (roads_and_shadows = roads-and-shadows, the Mods tab's HD): underground2.net's, in four packs by
+ * what they redraw: the roads and pavements (roads), the city's buildings, signs, trees and neon (city), the cars'
+ * neon (cars) and the skies (skies), each where the game folder has it; a folder with none of them but the one pack
+ * of roads and car shadows (roads-and-shadows) has that.  The setting's value keeps its name: players' settings.ini
+ * keep their choice. */
+static const char *const HD_PACKS[] = { "roads", "city", "cars", "skies" };
+static void open_hd(void){
+    const char *v = getenv("NFSU2_ROADS_AND_SHADOWS");
+    if (!v || !*v || !strcasecmp(v, "original")) return;
+    if (strcasecmp(v, "roads-and-shadows")){ open_named("NFSU2_ROADS_AND_SHADOWS", v, 1); return; }
+    int n = 0;
+    for (unsigned i = 0; i < sizeof HD_PACKS / sizeof *HD_PACKS; i++) n += open_named("NFSU2_ROADS_AND_SHADOWS", HD_PACKS[i], 0);
+    if (!n) open_named("NFSU2_ROADS_AND_SHADOWS", "roads-and-shadows", 1);
 }
 static void init(void){
     g_init = 1;
     g_log = getenv("NFSU2_TEXLOG") && *getenv("NFSU2_TEXLOG") == '1';
     open_pack("NFSU2_UI_TEXTURES");
     open_pack("NFSU2_MAP_TEXTURES");
-    open_pack("NFSU2_ROADS_AND_SHADOWS");
+    open_hd();
     if (!g_n) return;
     /* one table: sorted by key, with each entry's pack beside it */
     struct { Ent e; Base b; uint8_t src; } *both = malloc(g_n * sizeof *both);

@@ -518,6 +518,9 @@ export const TEMPLATE = `# NFSU2 settings, read at every launch.
 # phones' GPUs decode the larger textures into four times the memory;
 # NFSU2_MAP_TEXTURES = original keeps the game's maps).  [NFSU2_UI_TEXTURES]
 #ui_textures = original
+# HD textures from underground2.net: the roads, the city's buildings, signs
+# and neon, the cars' neon and the skies, sharp at high resolutions; where
+# this server has their packs.  [NFSU2_ROADS_AND_SHADOWS]
 #roads_and_shadows = original
 # Community mods' add-ons to the city, where this server has their packs
 # (MODPACKS): the tunnel the game keeps closed for construction open, and

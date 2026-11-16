@@ -330,9 +330,13 @@ function resolved(host: Record<string, string> = {}): Resolved { return resolveE
 /** the game's language (runtime/language.c): which language pack the page fetches ahead and counts */
 const language = (r: Resolved = resolved()) => (r.env.NFSU2_LANGUAGE ?? 'english').toLowerCase();
 /** the texture packs picked (runtime/web/texrep_web.c), comma-separated, '' for none: the ones the page fetches ahead
- *  and counts.  Each setting's value names its pack (ui_textures = map: none of the menus' and HUD's, uiPack) */
+ *  and counts.  Each setting's value names its pack (ui_textures = map: none of the menus' and HUD's, uiPack), but the
+ *  HD textures' (roads_and_shadows = roads-and-shadows: texrep_web.c open_hd), four packs, or the one older pack where
+ *  a server has only that (a pack the server has not is never asked for: datacache.ts) */
+const HD_PACKS = ['roads', 'city', 'cars', 'skies', 'roads-and-shadows'];
 const texpack = (r: Resolved = resolved()) => [uiPack(r.env.NFSU2_UI_TEXTURES), r.env.NFSU2_MAP_TEXTURES, r.env.NFSU2_ROADS_AND_SHADOWS]
-  .map(v => (v ?? '').toLowerCase()).filter(v => v && v !== 'original').join(',');
+  .map(v => (v ?? '').toLowerCase()).filter(v => v && v !== 'original')
+  .flatMap(v => v === 'roads-and-shadows' ? HD_PACKS : [v]).join(',');
 /** the data the settings pick (datacache.ts Packs): the texture pack, the songs (EA's own: io-worker.ts dataFile), the
  *  crash damage's scratches and the gearbox whine's sounds (runtime/damage.c, runtime/whine.c: each read only with its
  *  switch on) */
