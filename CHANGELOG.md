@@ -11,9 +11,10 @@ first, then under `### Fixes` what was broken and works now, which the popup kee
 insides, the forum bot, logs, tests, docs and cheat checks. A change that may or may not belong here is asked about
 before the release, not guessed.
 
-## 2026-11-17 (4d8a6a08)
+## 2026-11-17 (f9d08454)
 
 - **Achievements:** new ones for the career: Welcome to Bayview, Yo Noobie, Bring My Car Back... Now!, Career (stages complete), Outrun ace, No mercy (stage finals won on Hard), Cover star (magazine covers) and On DVD (DVD covers). A save you load gives you the ones its career has already earned.
+- **Achievements:** Riders on the Storm for finishing the career, Full clear for winning all of a stage's races (but its SUV and sponsor races), SUV king for winning all of a stage's SUV races; Cover star and On DVD now go up to all 20 magazine and 10 DVD covers.
 
 ## 2026-11-16 (4e9e0c52)
 
