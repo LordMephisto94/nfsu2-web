@@ -1723,5 +1723,17 @@
   "Make {n} DVD covers.": {
     "one": "Kom på forsiden af en dvd.",
     "other": "Kom på {n} dvd-forsider."
+  },
+  "Riders on the Storm": "Riders on the Storm",
+  "Full clear": "Rent bord",
+  "SUV king": "SUV-konge",
+  "Finish the career.": "Gennemfør karrieren.",
+  "Win every race of {n} stages from stage 2 on, but their SUV and sponsor races.": {
+    "one": "Vind hvert løb i en etape fra etape 2, undtagen SUV- og sponsorløb.",
+    "other": "Vind hvert løb i {n} etaper fra etape 2, undtagen SUV- og sponsorløb."
+  },
+  "Win every SUV race of {n} stages.": {
+    "one": "Vind hvert SUV-løb i en etape.",
+    "other": "Vind hvert SUV-løb i {n} etaper."
   }
 }

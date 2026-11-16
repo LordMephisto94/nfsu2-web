@@ -131,7 +131,10 @@ test('the career\'s state unpacks as raceresult.c packs it', () => {
   assert.equal(A.unpackCareer(0), null);
   assert.deepEqual(A.unpackCareer(career({ done: [1, 2], outruns: { 1: 4, 2: 15, 3: 1 }, finals: [1, 2], over: true, p0outruns: 2,
     mags: 3, dvds: 1, difficulty: 2 })), { stagesDone: [1, 2], finalsWon: [1, 2], outruns: 20, prologueOver: true, prologueOutruns: 2,
-    prologueRaces: false, magazines: 3, dvds: 1, difficulty: 2 });
+    prologueRaces: false, magazines: 3, dvds: 1, difficulty: 2, cleared: [], suv: [] });
+  for (const k of ['<< st;', '<< (4 + st)', '"cr_more"']) assert.ok(c.includes(k), k);
+  const m = A.unpackCareer(career({}), 1 + 2 ** 2 + 2 ** 5 + 2 ** (4 + 3));
+  assert.deepEqual([m.cleared, m.suv], [[2, 5], [3]]);
 });
 
 test('the career\'s achievements: from a save as it loads; No mercy only for a final won on Hard while seen', () => {
@@ -149,6 +152,10 @@ test('the career\'s achievements: from a save as it loads; No mercy only for a f
   assert.deepEqual(A.earnCareer(r.kept, medium, won, 4).kept.totals.hardFinals, [2]);   // won on Medium: not counted
   // another profile's smaller career takes nothing away
   assert.equal(A.earnCareer(r.kept, A.unpackCareer(career({})), null, 5).kept.totals.stagesDone, 1);
+  // a full clear, the SUV races, the career finished
+  const done = A.earnCareer(r.kept, A.unpackCareer(career({ done: [1, 2, 3, 4, 5] }), 1 + 2 ** 2 + 2 ** 6), null, 7);
+  assert.deepEqual(done.got.map(g => A.levelKey(g.a, g.level)).sort(),
+    ['career:2', 'career:3', 'career:4', 'career:5', 'full_clear:1', 'storm:1', 'suv:1']);
   // the prologue's races
   assert.equal(A.earnCareer(A.parse(null), A.unpackCareer(career({ p0races: true })), null, 6).got[0].a.id, 'bring_back');
 });

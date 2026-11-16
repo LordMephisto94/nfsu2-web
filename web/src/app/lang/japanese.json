@@ -1625,5 +1625,11 @@
   "Win {n} outruns in the career.": "キャリアでアウトランに{n}回勝つ。",
   "Win the final race of {n} stages on Hard.": "ハードで{n}ステージのファイナルレースに勝つ。",
   "Make {n} magazine covers.": "雑誌の表紙を{n}回飾る。",
-  "Make {n} DVD covers.": "DVDのジャケットを{n}回飾る。"
+  "Make {n} DVD covers.": "DVDのジャケットを{n}回飾る。",
+  "Riders on the Storm": "Riders on the Storm",
+  "Full clear": "完全制覇",
+  "SUV king": "SUVキング",
+  "Finish the career.": "キャリアをクリアする。",
+  "Win every race of {n} stages from stage 2 on, but their SUV and sponsor races.": "ステージ2以降の{n}ステージで、SUVとスポンサー以外の全レースに勝つ。",
+  "Win every SUV race of {n} stages.": "{n}ステージのSUVレースすべてに勝つ。"
 }

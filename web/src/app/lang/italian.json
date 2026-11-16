@@ -1754,5 +1754,19 @@
     "one": "Finisci sulla copertina di un DVD.",
     "many": "Finisci su {n} copertine di DVD.",
     "other": "Finisci su {n} copertine di DVD."
+  },
+  "Riders on the Storm": "Riders on the Storm",
+  "Full clear": "Fatto piazza pulita",
+  "SUV king": "Re dei SUV",
+  "Finish the career.": "Completa la carriera.",
+  "Win every race of {n} stages from stage 2 on, but their SUV and sponsor races.": {
+    "one": "Vinci tutte le gare di una fase dalla fase 2 in poi, tranne quelle SUV e degli sponsor.",
+    "many": "Vinci tutte le gare di {n} fasi dalla fase 2 in poi, tranne quelle SUV e degli sponsor.",
+    "other": "Vinci tutte le gare di {n} fasi dalla fase 2 in poi, tranne quelle SUV e degli sponsor."
+  },
+  "Win every SUV race of {n} stages.": {
+    "one": "Vinci tutte le gare SUV di una fase.",
+    "many": "Vinci tutte le gare SUV di {n} fasi.",
+    "other": "Vinci tutte le gare SUV di {n} fasi."
   }
 }

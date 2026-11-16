@@ -1645,5 +1645,17 @@
   "Make {n} DVD covers.": {
     "one": "Bir DVD'nin kapağına çık.",
     "other": "{n} DVD kapağına çık."
+  },
+  "Riders on the Storm": "Riders on the Storm",
+  "Full clear": "Tam temizlik",
+  "SUV king": "SUV kralı",
+  "Finish the career.": "Kariyeri bitir.",
+  "Win every race of {n} stages from stage 2 on, but their SUV and sponsor races.": {
+    "one": "2. aşamadan itibaren bir aşamanın SUV ve sponsor yarışları dışındaki tüm yarışlarını kazan.",
+    "other": "2. aşamadan itibaren {n} aşamanın SUV ve sponsor yarışları dışındaki tüm yarışlarını kazan."
+  },
+  "Win every SUV race of {n} stages.": {
+    "one": "Bir aşamanın tüm SUV yarışlarını kazan.",
+    "other": "{n} aşamanın tüm SUV yarışlarını kazan."
   }
 }

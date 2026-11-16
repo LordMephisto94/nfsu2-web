@@ -1663,5 +1663,17 @@
   "Make {n} DVD covers.": {
     "one": "Βγες στο εξώφυλλο ενός DVD.",
     "other": "Βγες σε {n} εξώφυλλα DVD."
+  },
+  "Riders on the Storm": "Riders on the Storm",
+  "Full clear": "Πλήρες σάρωμα",
+  "SUV king": "Βασιλιάς των SUV",
+  "Finish the career.": "Ολοκλήρωσε την καριέρα.",
+  "Win every race of {n} stages from stage 2 on, but their SUV and sponsor races.": {
+    "one": "Κέρδισε κάθε αγώνα ενός σταδίου από το στάδιο 2 και μετά, εκτός από τους αγώνες SUV και χορηγών.",
+    "other": "Κέρδισε κάθε αγώνα {n} σταδίων από το στάδιο 2 και μετά, εκτός από τους αγώνες SUV και χορηγών."
+  },
+  "Win every SUV race of {n} stages.": {
+    "one": "Κέρδισε κάθε αγώνα SUV ενός σταδίου.",
+    "other": "Κέρδισε κάθε αγώνα SUV {n} σταδίων."
   }
 }

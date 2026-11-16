@@ -1758,5 +1758,19 @@
     "one": "Fais la couverture d'un DVD.",
     "many": "Fais {n} couvertures de DVD.",
     "other": "Fais {n} couvertures de DVD."
+  },
+  "Riders on the Storm": "Riders on the Storm",
+  "Full clear": "Tout raflé",
+  "SUV king": "Roi du SUV",
+  "Finish the career.": "Termine la carrière.",
+  "Win every race of {n} stages from stage 2 on, but their SUV and sponsor races.": {
+    "one": "Gagne toutes les courses d'une étape à partir de l'étape 2, sauf les courses SUV et de sponsor.",
+    "many": "Gagne toutes les courses de {n} étapes à partir de l'étape 2, sauf les courses SUV et de sponsor.",
+    "other": "Gagne toutes les courses de {n} étapes à partir de l'étape 2, sauf les courses SUV et de sponsor."
+  },
+  "Win every SUV race of {n} stages.": {
+    "one": "Gagne toutes les courses SUV d'une étape.",
+    "many": "Gagne toutes les courses SUV de {n} étapes.",
+    "other": "Gagne toutes les courses SUV de {n} étapes."
   }
 }

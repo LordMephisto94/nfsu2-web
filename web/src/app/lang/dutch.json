@@ -1723,5 +1723,17 @@
   "Make {n} DVD covers.": {
     "one": "Kom op de cover van een dvd.",
     "other": "Kom op {n} dvd-covers."
+  },
+  "Riders on the Storm": "Riders on the Storm",
+  "Full clear": "Alles gewonnen",
+  "SUV king": "SUV-koning",
+  "Finish the career.": "Voltooi je carrière.",
+  "Win every race of {n} stages from stage 2 on, but their SUV and sponsor races.": {
+    "one": "Win vanaf etappe 2 elke race van een etappe, behalve de SUV- en sponsorraces.",
+    "other": "Win vanaf etappe 2 elke race van {n} etappes, behalve de SUV- en sponsorraces."
+  },
+  "Win every SUV race of {n} stages.": {
+    "one": "Win elke SUV-race van een etappe.",
+    "other": "Win elke SUV-race van {n} etappes."
   }
 }

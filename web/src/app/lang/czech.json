@@ -1793,5 +1793,21 @@
     "few": "Dostaň se na {n} obaly DVD.",
     "many": "Dostaň se na {n} obalu DVD.",
     "other": "Dostaň se na {n} obalů DVD."
+  },
+  "Riders on the Storm": "Riders on the Storm",
+  "Full clear": "Čistý stůl",
+  "SUV king": "Král SUV",
+  "Finish the career.": "Dokonči kariéru.",
+  "Win every race of {n} stages from stage 2 on, but their SUV and sponsor races.": {
+    "one": "Vyhraj všechny závody etapy od etapy 2, kromě závodů SUV a sponzorů.",
+    "few": "Vyhraj všechny závody {n} etap od etapy 2, kromě závodů SUV a sponzorů.",
+    "many": "Vyhraj všechny závody {n} etapy od etapy 2, kromě závodů SUV a sponzorů.",
+    "other": "Vyhraj všechny závody {n} etap od etapy 2, kromě závodů SUV a sponzorů."
+  },
+  "Win every SUV race of {n} stages.": {
+    "one": "Vyhraj všechny závody SUV etapy.",
+    "few": "Vyhraj všechny závody SUV {n} etap.",
+    "many": "Vyhraj všechny závody SUV {n} etapy.",
+    "other": "Vyhraj všechny závody SUV {n} etap."
   }
 }

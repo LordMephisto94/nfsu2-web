@@ -30,6 +30,10 @@
  *             the prologue's three races won (STAGE_0_CIRCUIT_0, _1, STAGE_0_SPRINT_0), only while in it, << 37 |
  *             magazine covers done << 38 (6 bits) | DVD covers done << 44 (6) | the difficulty << 50 (2: 0 Easy ..)
  *
+ *   cr_more   0 outside the career, else: 1 | stage s (2 .. 5) fully cleared << s (every one of its races won but its
+ *             SUV races (S<s>_SUV_k), its sponsors' (S<s>_SPON_*: only the signed sponsor's can be raced) and its hidden
+ *             ones (S<s>_H_*: only the Show hidden races mod opens them)) | every SUV race of stage s won << (4 + s)
+ *
  * From the career's own records (game.h: the stages' records, the events' states, the race table, the cover shoots
  * and the difficulty), so a save gives what it has done as it loads.  A cover shoot is done when its event is won;
  * its kind says magazine or DVD.  The game marks the prologue's own events won without a race (career.c), so its
@@ -194,6 +198,32 @@ static int race_won_named(const char *name){
     }
     return 0;
 }
+/* cr_more: the stages' races by their names (S<s>_...), won or not */
+static double career_more(char *why, size_t n){
+    why[0] = 0;
+    if (rd(G_GAMEMODE) != 1u) return 0;
+    uint32_t t = rd(G_RACES), cnt = rd(G_NRACES), pool = rd(G_STRPOOL);
+    if (!t || !pool || cnt > 512u || !committed(t, cnt * 0x88u)) return 0;
+    unsigned all[6] = {0}, won[6] = {0}, suv[6] = {0}, suvwon[6] = {0};
+    for (uint32_t i = 0; i < cnt; i++){
+        uint32_t r = t + i * 0x88u, nm = pool + MR16(r);
+        if (!committed(nm, 32)) continue;
+        const char *x = (const char *)g_mem + nm;
+        if (x[0] != 'S' || x[1] < '2' || x[1] > '5' || x[2] != '_') continue;
+        int st = x[1] - '0', w = ev_won(MR32(r + 8u));
+        if (!strncmp(x + 3, "SUV_", 4)){ suv[st]++; suvwon[st] += w; continue; }
+        if (!strncmp(x + 3, "SPON_", 5) || !strncmp(x + 3, "H_", 2)) continue;
+        all[st]++; won[st] += w;
+    }
+    uint64_t v = 1; int k = 0;
+    for (int st = 2; st <= 5; st++){
+        if (all[st] && won[st] == all[st]) v |= 1ull << st;
+        if (suv[st] && suvwon[st] == suv[st]) v |= 1ull << (4 + st);
+        k += snprintf(why + k, n - (size_t)k, "%sstage %d %u of %u, SUV %u of %u", st > 2 ? "; " : "", st, won[st], all[st], suvwon[st], suv[st]);
+        if (k >= (int)n) break;
+    }
+    return (double)v;
+}
 static double career_state(int *mags, int *dvds){
     *mags = *dvds = 0;
     if (rd(G_GAMEMODE) != 1u) return 0;
@@ -224,16 +254,21 @@ static double career_state(int *mags, int *dvds){
     return (double)v;
 }
 static void career_frame(void){
-    static int slot = -2; static double was = -1; static long next;
+    static int slot[2] = { -2, -2 }; static double was = -1, was_more = -1; static long next;
     long f = autotest_frame();
     if (f < next) return;
     next = f + 30;
-    int mags, dvds;
-    double v = career_state(&mags, &dvds);
+    int mags, dvds; char why[256];
+    double v = career_state(&mags, &dvds), more = career_more(why, sizeof why);
+    if (more != was_more){
+        was_more = more;
+        if (more) fprintf(stderr, "[career] f=%ld races won: %s\n", f, why);
+    }
+    if (slot[0] == -2){ slot[0] = host_status_slot("cr_state"); slot[1] = host_status_slot("cr_more"); }
+    double vals[2] = { v, more };
+    if (slot[0] >= 0 && slot[1] >= 0) host_status_set_n(slot, vals, 2);
     if (v == was) return;
     was = v;
-    if (slot == -2) slot = host_status_slot("cr_state");
-    if (slot >= 0) host_status_set_n(&slot, &v, 1);
     if (!v){ fprintf(stderr, "[career] f=%ld state: not in the career\n", f); return; }
     uint64_t b = (uint64_t)v;
     fprintf(stderr, "[career] f=%ld state: stage %u, stages complete %02x, finals won %02x, outrun wins %u %u %u %u %u %u, "

@@ -1793,5 +1793,21 @@
     "few": "Traf na {n} okładki DVD.",
     "many": "Traf na {n} okładek DVD.",
     "other": "Traf na {n} okładki DVD."
+  },
+  "Riders on the Storm": "Riders on the Storm",
+  "Full clear": "Czysto",
+  "SUV king": "Król SUV-ów",
+  "Finish the career.": "Ukończ karierę.",
+  "Win every race of {n} stages from stage 2 on, but their SUV and sponsor races.": {
+    "one": "Wygraj każdy wyścig etapu od etapu 2, poza wyścigami SUV i sponsorów.",
+    "few": "Wygraj każdy wyścig {n} etapów od etapu 2, poza wyścigami SUV i sponsorów.",
+    "many": "Wygraj każdy wyścig {n} etapów od etapu 2, poza wyścigami SUV i sponsorów.",
+    "other": "Wygraj każdy wyścig {n} etapu od etapu 2, poza wyścigami SUV i sponsorów."
+  },
+  "Win every SUV race of {n} stages.": {
+    "one": "Wygraj każdy wyścig SUV etapu.",
+    "few": "Wygraj każdy wyścig SUV {n} etapów.",
+    "many": "Wygraj każdy wyścig SUV {n} etapów.",
+    "other": "Wygraj każdy wyścig SUV {n} etapu."
   }
 }

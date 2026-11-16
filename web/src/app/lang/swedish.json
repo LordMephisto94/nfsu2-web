@@ -1723,5 +1723,17 @@
   "Make {n} DVD covers.": {
     "one": "Hamna på ett dvd-omslag.",
     "other": "Hamna på {n} dvd-omslag."
+  },
+  "Riders on the Storm": "Riders on the Storm",
+  "Full clear": "Rent hus",
+  "SUV king": "SUV-kung",
+  "Finish the career.": "Klara karriären.",
+  "Win every race of {n} stages from stage 2 on, but their SUV and sponsor races.": {
+    "one": "Vinn varje lopp i en etapp från etapp 2, utom SUV- och sponsorlopp.",
+    "other": "Vinn varje lopp i {n} etapper från etapp 2, utom SUV- och sponsorlopp."
+  },
+  "Win every SUV race of {n} stages.": {
+    "one": "Vinn varje SUV-lopp i en etapp.",
+    "other": "Vinn varje SUV-lopp i {n} etapper."
   }
 }

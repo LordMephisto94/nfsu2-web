@@ -1723,5 +1723,17 @@
   "Make {n} DVD covers.": {
     "one": "Komm auf ein DVD-Cover.",
     "other": "Komm auf {n} DVD-Cover."
+  },
+  "Riders on the Storm": "Riders on the Storm",
+  "Full clear": "Alles abgeräumt",
+  "SUV king": "SUV-König",
+  "Finish the career.": "Beende die Karriere.",
+  "Win every race of {n} stages from stage 2 on, but their SUV and sponsor races.": {
+    "one": "Gewinne ab Etappe 2 jedes Rennen einer Etappe, außer SUV- und Sponsorrennen.",
+    "other": "Gewinne ab Etappe 2 jedes Rennen von {n} Etappen, außer SUV- und Sponsorrennen."
+  },
+  "Win every SUV race of {n} stages.": {
+    "one": "Gewinne jedes SUV-Rennen einer Etappe.",
+    "other": "Gewinne jedes SUV-Rennen von {n} Etappen."
   }
 }

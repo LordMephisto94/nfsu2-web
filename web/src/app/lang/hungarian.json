@@ -1639,5 +1639,17 @@
   "Make {n} DVD covers.": {
     "one": "Kerülj egy DVD borítójára.",
     "other": "Kerülj {n} DVD borítójára."
+  },
+  "Riders on the Storm": "Riders on the Storm",
+  "Full clear": "Tiszta lap",
+  "SUV king": "SUV-király",
+  "Finish the career.": "Fejezd be a karriert.",
+  "Win every race of {n} stages from stage 2 on, but their SUV and sponsor races.": {
+    "one": "Nyerd meg egy szakasz minden versenyét a 2. szakasztól, a SUV- és szponzorversenyek kivételével.",
+    "other": "Nyerd meg {n} szakasz minden versenyét a 2. szakasztól, a SUV- és szponzorversenyek kivételével."
+  },
+  "Win every SUV race of {n} stages.": {
+    "one": "Nyerd meg egy szakasz minden SUV-versenyét.",
+    "other": "Nyerd meg {n} szakasz minden SUV-versenyét."
   }
 }
