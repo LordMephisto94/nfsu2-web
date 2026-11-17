@@ -11,10 +11,18 @@ first, then under `### Fixes` what was broken and works now, which the popup kee
 insides, the forum bot, logs, tests, docs and cheat checks. A change that may or may not belong here is asked about
 before the release, not guessed.
 
-## 2026-11-17 (f9d08454)
+## 2026-11-17 (f3407949)
 
 - **Achievements:** new ones for the career: Welcome to Bayview, Yo Noobie, Bring My Car Back... Now!, Career (stages complete), Outrun ace, No mercy (stage finals won on Hard), Cover star (magazine covers) and On DVD (DVD covers). A save you load gives you the ones its career has already earned.
 - **Achievements:** Riders on the Storm for finishing the career, Full clear for winning all of a stage's races (but its SUV and sponsor races), SUV king for winning all of a stage's SUV races; Cover star and On DVD now go up to all 20 magazine and 10 DVD covers.
+- **Race again:** races of the stages you finished come back on the map, 6 at a time, and winning one pays its prize again (Game tab → More game settings, off by default).
+- **Career:** after Caleb, every 3 outrun wins give the car you're driving one more unique performance part, with the usual message and a drive to the shop, until it has three. Pick any of the 9, then switch cars and do it again.
+
+### Fixes
+
+- **Races:** holding the throttle through a race's intro and countdown now drives at the start, without pressing it again.
+- **Race lobbies:** a lobby win of Caleb's race counts in your career only once it's open on your map.
+- **Tracks:** the World Map (M) opens on the tracks of F9 → Tracks, the Underground 1 maps too.
 
 ## 2026-11-16 (4e9e0c52)
 
