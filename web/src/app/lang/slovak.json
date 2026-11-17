@@ -1809,5 +1809,7 @@
     "few": "Vyhraj všetky preteky SUV {n} etáp.",
     "many": "Vyhraj všetky preteky SUV {n} etapy.",
     "other": "Vyhraj všetky preteky SUV {n} etáp."
-  }
+  },
+  "Race again": "Pretekať znova",
+  "Races of the stages you finished are back on the map, a few at a time. Winning one pays its prize again.": "Preteky z dokončených etáp sa vracajú na mapu, vždy po niekoľko. Výhra v jednom znova vyplatí jeho odmenu."
 }

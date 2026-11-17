@@ -5657,6 +5657,13 @@ static int race_open(uint32_t r){
     for (uint32_t i = 0; i < 64; i++) if (rd32(G_CAREER + C_OPENRACES + 4u * i) == r) return 1;
     return 0;
 }
+/* r is the final of the stage (its stage record +0x100 the stage info, +0x28 the final event's hash; stage 5's is
+ * Caleb's race): a normal race the career opens only after the stage's story asks for it, so it counts only open */
+static int race_final(uint32_t r, uint32_t stage){
+    if (stage >= 8u) return 0;
+    uint32_t si = rd32(G_CAREER + C_STAGEREC + stage * 0x104u + 0x100u);
+    return ok(si, 0x2c) && MR32(si + 0x28u) && MR32(si + 0x28u) == MR32(r + 8u);
+}
 /* a race a LAN race can be: not a story race (type 3), its first heat's track a network one */
 static int race_lan(uint32_t r){ return MR8(r + 0xfu) != 3u && MR8(r + 0xfu) <= 5u && MR16(r + 0x18u) != 4000u && MR8(r + 0x7eu) >= 1u; }
 static int car_suv(void){
@@ -5705,7 +5712,7 @@ static int mp_counts(uint32_t r){
     }
     if (MR8(r + 0xdu) && !car_suv()) return 0;
     if (race_open(r)) return 1;
-    return MR8(r + 0x37u) == stage && MR8(r + 0x34u) == 3u;
+    return MR8(r + 0x37u) == stage && MR8(r + 0x34u) == 3u && !race_final(r, stage);
 }
 /* the spot of trigger e (a type-13 trigger), or MPS_NONE */
 static void spot_of(CPU *c, uint32_t e, uint32_t stage, MpSpot *sp){

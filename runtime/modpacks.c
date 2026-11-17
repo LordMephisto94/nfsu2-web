@@ -5,7 +5,7 @@
  * only decides whether the shops offer its parts.  Parts already on a car
  * stay, with the switch off too: a save never loses them.  Without
  * MODPACKS/PARTS.BIN nothing changes.  Today the packs hold new rim brands
- * (Blitz), mod_rims = on (NFSU2_MOD_RIMS=1), off by default; for now the
+ * (Blitz), ug2net_parts = on (NFSU2_UG2NET_PARTS=1), off by default; for now the
  * page has no row for it (web/src/app/settings.ts).
  *
  * The parts: GLOBALB's car part database (chunk 0x80034602, its loader

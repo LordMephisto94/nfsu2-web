@@ -168,12 +168,12 @@ export const MODS: readonly Mod[] = [
     details: 'Each car\'s camber front and rear, how far its wheels stand out and how wide its tires are; only the look changes, the car drives as in the original game. To use it: turn it on, go to the garage\'s Body Shop and pick Stance (after Rims), choose a slider with up and down, move it with left and right, and Back keeps it for that car. In free roam other players see your car\'s stance, unless they set Mods on other cars to Original. Your saves still work in the original game: the stance is kept beside the profile, and stays there while this is off.',
     online: 'seen', files: ['runtime/stance.c', 'runtime/stance.h'],
   },
-  // The rims are out for now (with settings.ts's mod_rims and others_mod_parts, settings-ui.ts's rows and
+  // The rims are out for now (with settings.ts's ug2net_parts and others_mod_parts, settings-ui.ts's rows and
   // runtime/modpacks.c's shop switch); back with their makers' names and link:
   // {
   //   id: 'mod-rims', name: 'Blitz Rims', authors: [],
   //   links: {},
-  //   kind: 'shared', uses: 'data', control: { setting: 'mod_rims' },
+  //   kind: 'shared', uses: 'data', control: { setting: 'ug2net_parts' },
   //   line: N('New rim brands in the rim shop.'),
   //   details: 'Blitz, a brand of 24 rims, in the rim shop. Everyone\'s game has them, so a friend\'s car with them looks the same with this off. Off, the shop offers only the game\'s own brands; rims already on your car stay. Your saves still work in the original game: there the car has a similar rim of the game\'s in the same size.',
   //   online: 'seen', sizeMB: 1, files: ['runtime/modpacks.c', 'tools/modpacks.py'],

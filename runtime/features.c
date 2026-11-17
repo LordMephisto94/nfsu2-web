@@ -64,7 +64,6 @@ static const struct { const char *name; int (*hook)(CPU *c, uint32_t ip); } k_ho
     { "drift",       drift_hook },         /* drift mode's and race_music's music */
     { "quickrace",   quickrace_hook },     /* Quick Race's laps and opponents */
     { "trafficcars", trafficcars_hook },   /* a traffic vehicle as the player's car */
-    { "travel",      travel_hook },        /* the World Map shut on a race track's map */
     { "damage",      damage_hook },        /* crash damage on the cars' meshes */
     { "lobbyai",     lobbyai_hook },       /* a lobby race's AI racers' names on the results */
 };

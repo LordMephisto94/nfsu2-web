@@ -1631,5 +1631,7 @@
   "SUV king": "SUV 之王",
   "Finish the career.": "完成生涯。",
   "Win every race of {n} stages from stage 2 on, but their SUV and sponsor races.": "从第 2 阶段起，赢得 {n} 个阶段中除 SUV 和赞助商比赛外的所有比赛。",
-  "Win every SUV race of {n} stages.": "赢得 {n} 个阶段的所有 SUV 比赛。"
+  "Win every SUV race of {n} stages.": "赢得 {n} 个阶段的所有 SUV 比赛。",
+  "Race again": "再次比赛",
+  "Races of the stages you finished are back on the map, a few at a time. Winning one pays its prize again.": "已完成阶段的比赛会重新出现在地图上，每次几场。再次获胜可再次获得奖金。"
 }

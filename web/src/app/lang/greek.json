@@ -1675,5 +1675,7 @@
   "Win every SUV race of {n} stages.": {
     "one": "Κέρδισε κάθε αγώνα SUV ενός σταδίου.",
     "other": "Κέρδισε κάθε αγώνα SUV {n} σταδίων."
-  }
+  },
+  "Race again": "Αγώνας ξανά",
+  "Races of the stages you finished are back on the map, a few at a time. Winning one pays its prize again.": "Οι αγώνες των σταδίων που ολοκλήρωσες επιστρέφουν στον χάρτη, λίγοι κάθε φορά. Μια νίκη πληρώνει ξανά το έπαθλό του."
 }

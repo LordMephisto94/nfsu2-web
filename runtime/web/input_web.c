@@ -491,13 +491,35 @@ void roam_plat_name_piece(int off, int total, const char *b, int n);    /* roam_
 void roam_plat_name2_piece(int off, int total, const char *b, int n);   /* ...player 2's (co-op) */
 void roam_plat_lobby_input(int act, uint32_t host, uint32_t lobby, uint32_t race);   /* roam_web.c */
 static int g_muted;
-static void handle(const InEv *e){
+/* keys pressed while muted and not let go since: pressed for the game when the input comes back, so that a throttle
+ * held through the race's loading and countdown drives at the start (a browser's autorepeat of a key whose press was
+ * dropped is no press: key_down drops it) */
+static InEv g_held_muted[256];
+/* the mute's start and end: at an event, and from the input thread's loop (which wakes every 100 ms with no event:
+ * a key only held sends nothing more, so the end must not wait for one) */
+static int mute_check(void){
     int mute = mprace_owns_input();
     if (mute != g_muted){
         g_muted = mute;
-        if (mute) release_all("a multiplayer race's trip drives the game", 1, IREASON_NONE);
+        if (mute){ release_all("a multiplayer race's trip drives the game", 1, IREASON_NONE); memset(g_held_muted, 0, sizeof g_held_muted); }
         fprintf(stderr, "[key] the player's input %s\n", mute ? "muted: the game drives itself to the multiplayer race" : "back");
+        if (!mute){
+            int n = 0;
+            for (int k = 1; k < 256; k++){
+                if (g_held_muted[k].type != IEV_KEY_DOWN) continue;
+                InEv d = g_held_muted[k]; d.flags &= (uint8_t)~IKF_REPEAT; d.nch = 0;
+                g_held_muted[k].type = 0;
+                key_down(&d); n++;
+            }
+            if (n) fprintf(stderr, "[key] %d key(s) held through the mute pressed for the game\n", n);
+        }
     }
+    return mute;
+}
+static void handle(const InEv *e){
+    int mute = mute_check();
+    if (mute && e->type == IEV_KEY_DOWN && e->dik) g_held_muted[e->dik] = *e;
+    if (mute && e->type == IEV_KEY_UP && e->dik) g_held_muted[e->dik].type = 0;
     if (mute && (e->type == IEV_KEY_DOWN || e->type == IEV_KEY_TAP || e->type == IEV_TEXT || e->type == IEV_MOUSE_MOVE || e->type == IEV_MOUSE_DOWN || e->type == IEV_WHEEL)) return;
     switch (e->type){
     case IEV_KEY_DOWN: key_down(e); break;
@@ -563,6 +585,7 @@ static void *input_main(void *unused){
             handle(&e);
             atomic_fetch_add(&MH(IM_EVENTS), 1u);
         }
+        mute_check();
         atomic_store(&MH(IM_KEYS_HELD), (uint32_t)g_nheld);
         atomic_store(&MH(IM_GAME_INACTIVE), (uint32_t)lifecycle_game_parked());
         lifecycle_poll();

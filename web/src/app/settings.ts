@@ -204,6 +204,8 @@ export const KEYS: readonly KeyDef[] = [
   // the career's hidden races on the map like the others (runtime/hiddenraces.c).  Not in bundle.m's table: there a
   // lower-case key, so it reaches the runtime as NFSU2_SHOW_HIDDEN_RACES all the same
   { key: 'show_hidden_races', env: 'NFSU2_SHOW_HIDDEN_RACES', kind: 'bool', scope: 'web' },
+  // races of the stages finished back on the map, a few at a time (runtime/raceagain.c)
+  { key: 'race_again', env: 'NFSU2_RACE_AGAIN', kind: 'bool', scope: 'web' },
   // the career's visual rating set by the stage, not by the car's parts (runtime/visualrep.c).  Not in bundle.m's
   // table: there a lower-case key, so it reaches the runtime as NFSU2_VISUAL_REP_REMOVER all the same
   { key: 'visual_rep_remover', env: 'NFSU2_VISUAL_REP_REMOVER', kind: 'bool', scope: 'web' },
@@ -215,11 +217,11 @@ export const KEYS: readonly KeyDef[] = [
   //   # New rim brands in the rim shop: Blitz.  Everyone's game has their rims,
   //   # so a friend's car with them looks the same either way, and rims already
   //   # on your car stay.  off = the shops offer only the original game's.
-  //   # [NFSU2_MOD_RIMS]
-  //   #mod_rims = off
+  //   # [NFSU2_UG2NET_PARTS]
+  //   #ug2net_parts = off
   // the new rim brands in the rim shop (runtime/modpacks.c; everyone's game has them, so a friend's car shows them either
-  // way).  Not in bundle.m's table: there a lower-case key, so it reaches the runtime as NFSU2_MOD_RIMS all the same
-  // { key: 'mod_rims', env: 'NFSU2_MOD_RIMS', kind: 'bool', scope: 'web' },
+  // way).  Not in bundle.m's table: there a lower-case key, so it reaches the runtime as NFSU2_UG2NET_PARTS all the same
+  // { key: 'ug2net_parts', env: 'NFSU2_UG2NET_PARTS', kind: 'bool', scope: 'web' },
   // each car's stance, set in the garage's Body Shop (runtime/stance.c: the Stance entry, the car drawn with it, sent to
   // friends in free roam; kept in MODPARTS.DAT by runtime/modpacks.c).  Not in bundle.m's table: there a lower-case key,
   // so it reaches the runtime as NFSU2_STANCE all the same
@@ -378,6 +380,12 @@ export const TEMPLATE = `# NFSU2 settings, read at every launch.
 # original game: a hidden race shows only when you drive near it.
 # [NFSU2_SHOW_HIDDEN_RACES]
 #show_hidden_races = off
+
+# Race again: races of the stages you finished come back on the map, up to
+# 6 at a time and a new few after each win, and winning one pays its prize
+# again.  Normal races only (no finals, sponsor, URL or SUV races).  off =
+# the original game: a race won once never comes back.  [NFSU2_RACE_AGAIN]
+#race_again = off
 
 # The distance to the GPS destination under its arrow, in metres or feet as
 # Speedometer Units has it (Mods: GPS Distance).

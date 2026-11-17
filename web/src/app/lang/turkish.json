@@ -1657,5 +1657,7 @@
   "Win every SUV race of {n} stages.": {
     "one": "Bir aşamanın tüm SUV yarışlarını kazan.",
     "other": "{n} aşamanın tüm SUV yarışlarını kazan."
-  }
+  },
+  "Race again": "Yeniden yarış",
+  "Races of the stages you finished are back on the map, a few at a time. Winning one pays its prize again.": "Bitirdiğin aşamaların yarışları birkaç tane olmak üzere haritaya geri döner. Birini kazanmak ödülünü yeniden öder."
 }

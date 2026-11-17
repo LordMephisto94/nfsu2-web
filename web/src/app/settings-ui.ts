@@ -93,7 +93,7 @@ export const MOD_CONTROLS: Record<string, Control> = {
   hq_vinyls: { t: 'switch' },
   open_tunnel: { t: 'switch' },
   car_parks: { t: 'switch' },
-  // mod_rims: { t: 'switch' },   (the rims: out for now, mods.ts)
+  // ug2net_parts: { t: 'switch' },   (the rims: out for now, mods.ts)
 };
 /** the Mods tab's one row that is no mod's: how other players' cars show the mods' looks (mods-ui.ts: first in "Seen by
  *  others") */
@@ -133,6 +133,7 @@ const GROUPS: Group[] = [
     { key: 'language', label: N('Language'), help: N('Menus, subtitles, dubbed voices and this page.'), c: { t: 'select', opts: LANGUAGE_OPTS } },
     { key: 'movies', label: N('Movies'), help: N('Intro and story movies.'), c: { t: 'switch' } },
     { key: 'race_music', label: N('Music in drag and drift races'), help: N('The songs play there too, as in the other races. Off: none there, as in the original, so you hear the engine.'), c: { t: 'switch' } },
+    { key: 'race_again', label: N('Race again'), help: N('Races of the stages you finished are back on the map, a few at a time. Winning one pays its prize again.'), c: { t: 'switch' }, more: true },
     { key: 'autosave', label: N('Autosave'), help: N('Sets each profile\'s Save option to Autosave once. A later change in the game\'s Options stays.'), c: { t: 'switch' } },
     { key: 'intro', label: N('Startup movies'), help: N('Logos, PSA and intro. Skippable: Enter, Esc, Space, a click, A, B or Start skips each. Original: only the intro can be skipped.'), c: { t: 'seg', opts: [['skippable', N('Skippable')], ['original', N('Original')], ['off', N('Off')]] }, more: true },
     { key: 'sound', label: N('Sound'), help: N('All sound output.'), c: { t: 'switch' }, more: true },

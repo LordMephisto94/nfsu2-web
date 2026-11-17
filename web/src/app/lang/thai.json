@@ -1631,5 +1631,7 @@
   "SUV king": "ราชา SUV",
   "Finish the career.": "จบโหมดอาชีพ",
   "Win every race of {n} stages from stage 2 on, but their SUV and sponsor races.": "ตั้งแต่ด่าน 2 ชนะทุกการแข่งของ {n} ด่าน ยกเว้นการแข่ง SUV และสปอนเซอร์",
-  "Win every SUV race of {n} stages.": "ชนะการแข่ง SUV ทุกรายการของ {n} ด่าน"
+  "Win every SUV race of {n} stages.": "ชนะการแข่ง SUV ทุกรายการของ {n} ด่าน",
+  "Race again": "แข่งอีกครั้ง",
+  "Races of the stages you finished are back on the map, a few at a time. Winning one pays its prize again.": "การแข่งขันของด่านที่จบแล้วกลับมาบนแผนที่ทีละไม่กี่รายการ ชนะอีกครั้งได้รับเงินรางวัลอีกครั้ง"
 }

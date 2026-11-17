@@ -27,7 +27,7 @@
  *    for the pause menu's Save (savegame.c asks travel_city), and before free roam's setup when the game itself loads
  *    it again (travel_presetup).  A save made on a track's map loads in the city, in the stock game too.  Once the
  *    front end is up (the pause menu's Quit) the career is left so: another profile may load next;
- *  - the World Map (M) stays shut: it is the city's (HOOK_SITE 0x602EEF: no map, as in Quick Race's Free Run);
+ *  - the World Map (M) opens as in the city: it draws the loaded map's own picture (as the minimap does), with its roads;
  *  - free-roam multiplayer meets the players at the same spot only (roam_game.c room_at: the room's hash with the
  *    spot's key mixed in), whose count the page's Tracks asks the server for; outruns between them go as in the city
  *    (tests/scripts/travel_outrun_a.txt);
@@ -47,7 +47,6 @@
 #include "game.h"
 #include "featurelist.h"
 #include "splitscreen_mem.h"
-#include "widescreen.h"           /* HOOK_SITE */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -405,19 +404,6 @@ void travel_frame(CPU *c){
         if (why && why != WHY_COOP){ said(SAID_NOT_NOW, why, f); F.name = 0; }
     } else if (k) go(c, k - 1, f);
     publish(career && (flow == 6u || T.going) ? why_not(1) : -1);
-}
-
-/* The World Map's key (Player's input 0x602BD0, its event 0xC0) asks the career whether there is a map (0x500B60: none
- * in Quick Race's Free Run, where M does nothing) before it stops the world for the map's screen (race status event
- * 0x12, then 0x606730 shows it, and its close starts the world again); on a track's map the answer is none.  (Later
- * than that, the world stays stopped: the screen that would start it again never comes) */
-int travel_hook(CPU *c, uint32_t ip){
-    switch (ip){
-    case HOOK_SITE(0x00602eef):
-        if (on_track()) c->eax &= ~0xffu;
-        return 1;
-    }
-    return 0;
 }
 
 /* The outrun challengers' manager (race coordinator +0xC40, Update 0x42EDF0; roam_game.c em_update) asks at its state 1

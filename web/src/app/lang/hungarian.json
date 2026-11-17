@@ -1651,5 +1651,7 @@
   "Win every SUV race of {n} stages.": {
     "one": "Nyerd meg egy szakasz minden SUV-versenyét.",
     "other": "Nyerd meg {n} szakasz minden SUV-versenyét."
-  }
+  },
+  "Race again": "Újra verseny",
+  "Races of the stages you finished are back on the map, a few at a time. Winning one pays its prize again.": "A befejezett szakaszok versenyei visszakerülnek a térképre, egyszerre néhány. Egy győzelem újra kifizeti a díjat."
 }
