@@ -54,7 +54,6 @@ int sndlead_hook(CPU *c, uint32_t ip);
 int drift_hook(CPU *c, uint32_t ip);
 int quickrace_hook(CPU *c, uint32_t ip);
 int trafficcars_hook(CPU *c, uint32_t ip);
-int travel_hook(CPU *c, uint32_t ip);
 int damage_hook(CPU *c, uint32_t ip);
 
 /* ---- every frame --------------------------------------------------------- */
