@@ -19,7 +19,9 @@
  * pays whenever a race is being run, won or not before), the margin into that
  * stage's record; the stage is complete already (0x532C60 does nothing). The
  * list is made again at once, so the race leaves the map with the others.
- * Off again, the next list is the game's own: a profile keeps nothing else. */
+ * Off again, the next list is the game's own: a profile keeps nothing else.
+ * The override also keeps uniques.c's unique performance part open after Caleb
+ * (one override per function: this file owns 0x527D30). */
 #include "cpu.h"
 #include "guest.h"
 #include "game.h"
@@ -73,10 +75,12 @@ static uint32_t rnd(uint32_t n){
 }
 
 void sub_00527d30_orig(CPU *c);
+void uniques_perf_open(CPU *c);   /* uniques.c: after Caleb, the unique performance part waiting for the car */
 void sub_00527d30(CPU *c){
     uint32_t self = c->ecx;
     sub_00527d30_orig(c);
     if (self != G_CAREER) return;
+    uniques_perf_open(c);
     if (g_on < 0) g_on = setting_bool("NFSU2_RACE_AGAIN", 0);
     if (!g_on) return;
     uint32_t stage = MR32(G_CAREER + C_STAGE), tab = MR32(G_RACES), nr = MR32(G_NRACES);
