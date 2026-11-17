@@ -1631,5 +1631,7 @@
   "SUV king": "SUV 킹",
   "Finish the career.": "커리어를 끝내세요.",
   "Win every race of {n} stages from stage 2 on, but their SUV and sponsor races.": "스테이지 2부터 스테이지 {n}개에서 SUV와 스폰서 레이스를 뺀 모든 레이스를 이기세요.",
-  "Win every SUV race of {n} stages.": "스테이지 {n}개의 SUV 레이스를 모두 이기세요."
+  "Win every SUV race of {n} stages.": "스테이지 {n}개의 SUV 레이스를 모두 이기세요.",
+  "Race again": "다시 레이스",
+  "Races of the stages you finished are back on the map, a few at a time. Winning one pays its prize again.": "완료한 스테이지의 레이스가 몇 개씩 지도에 다시 나타납니다. 이기면 상금을 다시 받습니다."
 }

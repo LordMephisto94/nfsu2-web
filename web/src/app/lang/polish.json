@@ -1809,5 +1809,7 @@
     "few": "Wygraj każdy wyścig SUV {n} etapów.",
     "many": "Wygraj każdy wyścig SUV {n} etapów.",
     "other": "Wygraj każdy wyścig SUV {n} etapu."
-  }
+  },
+  "Race again": "Ścigaj się ponownie",
+  "Races of the stages you finished are back on the map, a few at a time. Winning one pays its prize again.": "Wyścigi z ukończonych etapów wracają na mapę, po kilka naraz. Wygrana w jednym ponownie wypłaca nagrodę."
 }

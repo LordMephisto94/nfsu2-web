@@ -204,6 +204,8 @@ export const KEYS: readonly KeyDef[] = [
   // the career's hidden races on the map like the others (runtime/hiddenraces.c).  Not in bundle.m's table: there a
   // lower-case key, so it reaches the runtime as NFSU2_SHOW_HIDDEN_RACES all the same
   { key: 'show_hidden_races', env: 'NFSU2_SHOW_HIDDEN_RACES', kind: 'bool', scope: 'web' },
+  // races of the stages finished back on the map, a few at a time (runtime/raceagain.c)
+  { key: 'race_again', env: 'NFSU2_RACE_AGAIN', kind: 'bool', scope: 'web' },
   // the career's visual rating set by the stage, not by the car's parts (runtime/visualrep.c).  Not in bundle.m's
   // table: there a lower-case key, so it reaches the runtime as NFSU2_VISUAL_REP_REMOVER all the same
   { key: 'visual_rep_remover', env: 'NFSU2_VISUAL_REP_REMOVER', kind: 'bool', scope: 'web' },
@@ -378,6 +380,12 @@ export const TEMPLATE = `# NFSU2 settings, read at every launch.
 # original game: a hidden race shows only when you drive near it.
 # [NFSU2_SHOW_HIDDEN_RACES]
 #show_hidden_races = off
+
+# Race again: races of the stages you finished come back on the map, up to
+# 6 at a time and a new few after each win, and winning one pays its prize
+# again.  Normal races only (no finals, sponsor, URL or SUV races).  off =
+# the original game: a race won once never comes back.  [NFSU2_RACE_AGAIN]
+#race_again = off
 
 # The distance to the GPS destination under its arrow, in metres or feet as
 # Speedometer Units has it (Mods: GPS Distance).

@@ -1772,5 +1772,7 @@
     "one": "Gana todas las carreras SUV de una etapa.",
     "many": "Gana todas las carreras SUV de {n} etapas.",
     "other": "Gana todas las carreras SUV de {n} etapas."
-  }
+  },
+  "Race again": "Correr de nuevo",
+  "Races of the stages you finished are back on the map, a few at a time. Winning one pays its prize again.": "Las carreras de las etapas que terminaste vuelven al mapa, unas pocas a la vez. Ganar una paga su premio otra vez."
 }

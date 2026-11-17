@@ -1809,5 +1809,7 @@
     "few": "Выиграй все гонки SUV {n} этапов.",
     "many": "Выиграй все гонки SUV {n} этапов.",
     "other": "Выиграй все гонки SUV {n} этапа."
-  }
+  },
+  "Race again": "Повторные гонки",
+  "Races of the stages you finished are back on the map, a few at a time. Winning one pays its prize again.": "Гонки пройденных этапов снова на карте, по несколько за раз. Победа в гонке снова приносит её приз."
 }

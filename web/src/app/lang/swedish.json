@@ -1735,5 +1735,7 @@
   "Win every SUV race of {n} stages.": {
     "one": "Vinn varje SUV-lopp i en etapp.",
     "other": "Vinn varje SUV-lopp i {n} etapper."
-  }
+  },
+  "Race again": "Kör igen",
+  "Races of the stages you finished are back on the map, a few at a time. Winning one pays its prize again.": "Lopp från etapper du har klarat är tillbaka på kartan, några i taget. Att vinna ett betalar ut priset igen."
 }

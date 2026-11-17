@@ -1631,5 +1631,7 @@
   "SUV king": "SUVキング",
   "Finish the career.": "キャリアをクリアする。",
   "Win every race of {n} stages from stage 2 on, but their SUV and sponsor races.": "ステージ2以降の{n}ステージで、SUVとスポンサー以外の全レースに勝つ。",
-  "Win every SUV race of {n} stages.": "{n}ステージのSUVレースすべてに勝つ。"
+  "Win every SUV race of {n} stages.": "{n}ステージのSUVレースすべてに勝つ。",
+  "Race again": "再レース",
+  "Races of the stages you finished are back on the map, a few at a time. Winning one pays its prize again.": "クリアしたステージのレースが、数件ずつマップに戻ります。勝つと賞金がもう一度もらえます。"
 }

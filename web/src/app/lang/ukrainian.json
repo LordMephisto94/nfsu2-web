@@ -1809,5 +1809,7 @@
     "few": "Виграй усі гонки SUV {n} етапів.",
     "many": "Виграй усі гонки SUV {n} етапів.",
     "other": "Виграй усі гонки SUV {n} етапу."
-  }
+  },
+  "Race again": "Повторні перегони",
+  "Races of the stages you finished are back on the map, a few at a time. Winning one pays its prize again.": "Перегони пройдених етапів знову на мапі, по кілька за раз. Перемога знову приносить її приз."
 }
