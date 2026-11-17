@@ -108,8 +108,11 @@ typedef struct {
     int      acquired;
     uint32_t cursor;             /* next key event (kbd_ev_*) to report */
     uint64_t events;
+    uint8_t  pend[256];          /* keys held when the race's map came in: reported as pressed first (held_in) */
+    int      npend;
 } KDev;
 static KDev g_kd[8];
+static void held_in(KDev *d, const char *why);   /* (below, by the methods) */
 static int  g_nkd;
 static uint64_t g_maps_saved, g_maps_loaded;
 
@@ -429,6 +432,7 @@ static uint32_t set_map(KDev *d, uint32_t af, uint32_t flags){
     d->datasize = MR32(af + 8) ? MR32(af + 8) : 4u * f.nact;
     if (MR32(af + 40)) d->bufsize = MR32(af + 40);
     d->cursor = kbd_ev_head();
+    held_in(d, "SetActionMap");
     page_keys(d);
     if (flags & DIDSAM_FORCESAVE) save_user_map(&f);
     if (lg()) fprintf(stderr, "[dikbd] SetActionMap %s: %u actions, %d keys mapped%s\n",
@@ -466,6 +470,21 @@ int split_kb_hidden(unsigned dik);
 static int split_kb_hidden(unsigned dik){ (void)dik; return 0; }
 #endif
 
+/* The game swaps its action maps between the front end, a race's intro and the race (0x5CF320: Unacquire,
+ * SetActionMap, then Acquire at its next read), and its buffered reads start at the swap: a key held from before
+ * (a throttle held through the intro and the countdown) never comes as a press, and the car stays put until it is
+ * pressed again.  So when the race's map (the DIACTIONFORMAT 0x86F348, made from the race table 0x7FCAC0 by
+ * 0x5B9280) comes in, the keys held then that it maps are reported as pressed, before the events that follow.
+ * The front end's maps get nothing of the kind: a held Enter must not choose twice. */
+#define AF_RACE 0x0086f348u
+static void held_in(KDev *d, const char *why){
+    d->npend = 0;
+    if (d->fmt != FMT_ACTIONS || d->af != AF_RACE) return;
+    for (int k = 1; k < 256 && d->npend < 256; k++)
+        if (d->act_of[k] >= 0 && kbd_key_down((unsigned)k) && !split_kb_hidden((unsigned)k)) d->pend[d->npend++] = (uint8_t)k;
+    if (d->npend) fprintf(stderr, "[dikbd] the race's keys: %d held at %s, reported as pressed\n", d->npend, why);
+}
+
 /* ---- methods ------------------------------------------------------------------- */
 uint32_t dikbd_call(CPU *c, uint32_t self, const char *nm, int nargs, const uint32_t *a){
     KDev *d = kdev(self);
@@ -477,6 +496,22 @@ uint32_t dikbd_call(CPU *c, uint32_t self, const char *nm, int nargs, const uint
         if (!pn || !mem_is_committed(pn + 3) || (rg && (cb < 16u || cb > 64u))) return DIERR_INVALIDPARAM;
         if (d->fmt == FMT_NONE){ MR32(pn) = 0; return DIERR_INVALIDPARAM; }
         uint32_t want = MR32(pn), n = 0, s = d->cursor, head = kbd_ev_head(), r = DI_OK;
+        int used = 0;
+        while (d->fmt == FMT_ACTIONS && used < d->npend && n < want){
+            unsigned k = d->pend[used++];
+            if (d->act_of[k] < 0 || !kbd_key_down(k)) continue;           /* (let go since: its up is in the ring) */
+            if (rg){
+                uint32_t p = rg + n * cb;
+                mem_commit(p, cb); memset(g_mem + p, 0, cb);
+                MR32(p) = 4u * (uint32_t)d->act_of[k]; MR32(p + 4) = 0x80u;
+                MR32(p + 8) = 0; MR32(p + 12) = 0;
+                if (cb >= 20u) MR32(p + 16) = d->app_of[k];
+            }
+            n++;
+        }
+        if (!(fl & DIGDD_PEEK) && used){
+            memmove(d->pend, d->pend + used, (size_t)(d->npend - used)); d->npend -= used;
+        }
         while (s != head && n < want){
             KbdEv e; int g = kbd_ev_get(s, &e);
             if (g < 0){ r = DI_BUFFEROVERFLOW; s++; continue; }
@@ -527,6 +562,7 @@ uint32_t dikbd_call(CPU *c, uint32_t self, const char *nm, int nargs, const uint
     if (!strcmp(nm, "Acquire")){
         if (d->acquired) return DI_NOEFFECT;
         d->acquired = 1; d->cursor = kbd_ev_head();      /* nothing is buffered while unacquired */
+        held_in(d, "Acquire");
         return DI_OK;
     }
     if (!strcmp(nm, "Unacquire")){
