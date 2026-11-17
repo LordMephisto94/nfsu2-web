@@ -59,7 +59,7 @@ KIND_RIM, KIND_BRAND = 28, 67
 A_TEXTURE, A_OUTER, A_INNER, A_BRAND = (bstring_hash(n) for n in ('TEXTURE_NAME', 'OUTER_RADIUS', 'INNER_RADIUS', 'BRAND_NAME'))
 RIM_ATTRS = {A_TEXTURE, A_OUTER, A_INNER, A_BRAND}     # a rim's attributes: all plain values (no string indices)
 OWNER_WHEELS = bstring_hash('WHEELS')
-RIMS_SWITCH = ('NFSU2_MOD_RIMS',)                      # the rims' switch (web/src/app/settings.ts)
+RIMS_SWITCH = ('NFSU2_UG2NET_PARTS',)                  # the rims' switch (web/src/app/settings.ts)
 # A mod rim's look-alike among the game's (picked from the rim shop's renders): its stand-in, in the same size, where
 # the game shows no mod parts (a profile, so the original game and pages of before; the Original view of other
 # players' cars; a game without MODPACKS).  A mod part without one stands in with the slot's stock part.
